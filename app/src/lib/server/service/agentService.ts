@@ -7,7 +7,7 @@ interface DeployAgentParams {
 	instructions: string;
 	apiKey: string;
 	apiUrl: string;
-	// mcpServers: string[];
+	mcpServers: string[];
 }
 
 class AgentService {
@@ -85,6 +85,7 @@ class AgentService {
 
 	async deployAgent(params: DeployAgentParams) {
 		const docker = this.getDockerClient();
+		const mcpServersValue = params.mcpServers.join(',');
 
 		await this.runAndRetryWithFreePort(async () => {
 			const listenPort = await this.getFreePort();
@@ -98,8 +99,8 @@ class AgentService {
 					`AGENT_DESCRIPTION=${params.description}`,
 					`API_KEY=${params.apiKey}`,
 					`API_URI=${params.apiUrl}`,
-					`LISTEN_PORT=${listenPort}`
-					// `MCP_SERVERS=${JSON.stringify(params.mcpServers)}`
+					`LISTEN_PORT=${listenPort}`,
+					`MCP_SERVERS=${mcpServersValue}`
 				],
 				OpenStdin: true,
 				Tty: true,

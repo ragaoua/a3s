@@ -2,6 +2,7 @@ import traceback
 from typing import Any
 from uuid import uuid4
 import json
+import os
 
 from a2a.client import A2ACardResolver, A2AClient
 from a2a.types import (
@@ -17,7 +18,7 @@ from a2a.types import (
 )
 import httpx
 
-AGENT_URL = "http://localhost:8001"
+AGENT_URL = f"http://localhost:{os.getenv('PORT', '8000')}"
 
 
 def create_send_message_payload(
@@ -57,7 +58,7 @@ async def run_single_turn_test(client: A2AClient) -> None:
     """Runs a single-turn non-streaming test."""
 
     send_message_payload = create_send_message_payload(
-        text="how much is 100 USD in CAD?"
+        text="Write a simple python cli to compute a 2-operator math operation"
     )
     request = SendMessageRequest(
         id=str(uuid4()), params=MessageSendParams(**send_message_payload)

@@ -5,6 +5,16 @@ from google.adk.agents import LlmAgent
 
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
+
+
+def _load_mcp_servers() -> list[str]:
+    raw = os.getenv("MCP_SERVERS", "").strip()
+    if raw:
+        return [item.strip() for item in raw.split(",") if item.strip()]
+
+    return []
+
 
 for var in [
     "API_URI",
@@ -18,6 +28,8 @@ for var in [
         print(f"Variable {var} not found")
         sys.exit(1)
 
+mcp_servers = _load_mcp_servers()
+
 root_agent = LlmAgent(
     model=LiteLlm(
         model="openai/C2-Cloud-Gemini-2.5-Flash",
@@ -27,13 +39,10 @@ root_agent = LlmAgent(
     name=os.environ["AGENT_NAME"],
     description=os.environ["AGENT_DESCRIPTION"],
     instruction=os.environ["AGENT_INSTRUCTIONS"],
-    # tools=[
-    #     MCPToolset(
-    #         connection_params=StreamableHTTPConnectionParams(
-    #             url=os.getenv("MCP_SERVER_URL", "http://localhost:8080/mcp")
-    #         )
-    #     )
-    # ],
+    tools=[
+        MCPToolset(connection_params=StreamableHTTPConnectionParams(url=url))
+        for url in mcp_servers
+    ],
 )
 
 # TODO: check that LISTEN_PORT is a valid integer

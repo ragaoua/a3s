@@ -10,10 +10,10 @@ export const actions: Actions = {
 		const instructions = String(formData.get('instructions') ?? '').trim();
 		const apiKey = String(formData.get('apiKey') ?? '').trim();
 		const apiUrl = String(formData.get('apiUrl') ?? '').trim();
-		// const mcpServers = formData
-		// 	.getAll('mcpServers')
-		// 	.map((value) => String(value).trim())
-		// 	.filter((value) => value.length > 0);
+		const mcpServers = formData
+			.getAll('mcpServers')
+			.map((value) => String(value).trim())
+			.filter((value) => value.length > 0);
 
 		if (!name || !description || !instructions || !apiKey || !apiUrl) {
 			return fail(400, {
@@ -26,8 +26,8 @@ export const actions: Actions = {
 			description,
 			instructions,
 			apiKey,
-			apiUrl
-			// mcpServers
+			apiUrl,
+			mcpServers
 		});
 
 		return {
