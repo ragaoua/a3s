@@ -15,9 +15,7 @@ class AgentService {
 
 	private getDockerClient(): Docker {
 		if (!this._docker) {
-			this._docker = new Docker({
-				socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock'
-			});
+			this._docker = new Docker();
 		}
 
 		return this._docker;
