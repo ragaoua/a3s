@@ -33,7 +33,7 @@ uv run uvicorn agent:a2a_app --host localhost --port "$LISTEN_PORT"
 Test the A2A agent:
 
 ```bash
-PORT="$LISTEN_PORT" uv run agent/test_a2a.py # PORT=8000 is the default
+PORT="$LISTEN_PORT" uv run test_a2a.py # PORT=8000 is the default
 ```
 
 Build and run the image:
