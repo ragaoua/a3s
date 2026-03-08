@@ -1,0 +1,26 @@
+x-ollama-model: &ollama-model "qwen3:4b"
+
+services:
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ./ollama_data:/root/.ollama
+    healthcheck:
+      # The ollama image doesn't include curl, wget nor nc, so we'll use perl
+      test: ["CMD-SHELL", "perl -e 'use IO::Socket::INET; IO::Socket::INET->new(\"localhost:11434\") or exit 1;'"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    ports:
+      - 11434:11434
+  ollama-init:
+    image: ollama/ollama
+    container_name: mcpg_ollama-init
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    depends_on:
+      ollama:
+        condition: service_healthy
+        restart: true
+    command: ["pull", *ollama-model]
+
