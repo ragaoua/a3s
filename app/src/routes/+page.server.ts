@@ -5,6 +5,7 @@ import { containersService } from '$lib/server/service/agentService';
 export const actions: Actions = {
 	default: async ({ request }) => {
 		const formData = await request.formData();
+		const model = String(formData.get('model') ?? '').trim();
 		const name = String(formData.get('name') ?? '').trim();
 		const description = String(formData.get('description') ?? '').trim();
 		const instructions = String(formData.get('instructions') ?? '').trim();
@@ -22,6 +23,7 @@ export const actions: Actions = {
 		}
 
 		await containersService.deployAgent({
+			model,
 			name,
 			description,
 			instructions,

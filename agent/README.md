@@ -9,6 +9,7 @@ Run the adk web console for testing:
 ```bash
 export API_URI=
 export API_KEY=
+export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
 export AGENT_INSTRUCTIONS=
@@ -22,6 +23,7 @@ Expose the a2a agent:
 ```bash
 export API_URI=
 export API_KEY=
+export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
 export AGENT_INSTRUCTIONS=
@@ -45,6 +47,7 @@ podman run \
     --tty \
     --rm \
     --name aaas \
+    -e MODEL= \
     -e AGENT_INSTRUCTIONS= \
     -e AGENT_DESCRIPTION= \
     -e AGENT_NAME= \

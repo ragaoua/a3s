@@ -2,6 +2,7 @@ import Docker from 'dockerode';
 import net from 'node:net';
 
 interface DeployAgentParams {
+	model: string;
 	name: string;
 	description: string;
 	instructions: string;
@@ -92,6 +93,7 @@ class AgentService {
 			const container = await docker.createContainer({
 				Image: 'agent',
 				Env: [
+					`MODEL=${params.model}`,
 					`AGENT_NAME=${params.name}`,
 					`AGENT_INSTRUCTIONS=${params.instructions}`,
 					`AGENT_DESCRIPTION=${params.description}`,

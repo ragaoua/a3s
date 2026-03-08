@@ -1,4 +1,5 @@
 <script lang="ts">
+  let model = '';
 	let agentName = '';
 	let description = '';
 	let instructions = '';
@@ -27,6 +28,19 @@
 		<p class="mt-2 text-sm text-slate-600">Define your agent and the MCP servers it can reach.</p>
 
 		<form method="POST" class="mt-8 space-y-6">
+			<div class="space-y-2">
+				<label for="model" class="text-sm font-medium">Model</label>
+				<input
+					id="model"
+					name="model"
+					type="text"
+					bind:value={model}
+					placeholder="e.g. Support Assistant"
+					required
+					class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
+				/>
+			</div>
+
 			<div class="space-y-2">
 				<label for="agent-name" class="text-sm font-medium">Agent name</label>
 				<input
@@ -93,7 +107,7 @@
 
 			<fieldset class="space-y-3">
 				<legend class="text-sm font-medium">MCP servers</legend>
-				{#each mcpServers as server, index (index)}
+        {#each { length: mcpServers.length }, index}
 					<div class="flex items-center gap-2">
 						<input
 							type="url"
