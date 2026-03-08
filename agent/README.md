@@ -7,8 +7,8 @@ uv sync
 Run the adk web console for testing:
 
 ```bash
-export API_URI=
-export API_KEY=
+export LLM_API_URI=
+export LLM_API_KEY=
 export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
@@ -21,8 +21,8 @@ uv run adk web
 Expose the a2a agent:
 
 ```bash
-export API_URI=
-export API_KEY=
+export LLM_API_URI=
+export LLM_API_KEY=
 export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
@@ -51,8 +51,8 @@ podman run \
     -e AGENT_INSTRUCTIONS= \
     -e AGENT_DESCRIPTION= \
     -e AGENT_NAME= \
-    -e API_URI= \
-    -e API_KEY= \
+    -e LLM_API_URI= \
+    -e LLM_API_KEY= \
     -e MCP_SERVERS= \
     -e LISTEN_PORT="8001" \
     --publish 8001:8001 \

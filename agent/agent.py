@@ -17,8 +17,8 @@ def _load_mcp_servers() -> list[str]:
 
 
 for var in [
-    "API_URI",
-    "API_KEY",
+    "LLM_API_URI",
+    "LLM_API_KEY",
     "MODEL",
     "AGENT_NAME",
     "AGENT_DESCRIPTION",
@@ -35,8 +35,8 @@ model = os.environ["MODEL"]
 root_agent = LlmAgent(
     model=LiteLlm(
         model=f"openai/{model}",
-        api_base=os.environ["API_URI"],
-        api_key=os.environ["API_KEY"],
+        api_base=os.environ["LLM_API_URI"],
+        api_key=os.environ["LLM_API_KEY"],
     ),
     name=os.environ["AGENT_NAME"],
     description=os.environ["AGENT_DESCRIPTION"],

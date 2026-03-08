@@ -97,8 +97,8 @@ class AgentService {
 					`AGENT_NAME=${params.name}`,
 					`AGENT_INSTRUCTIONS=${params.instructions}`,
 					`AGENT_DESCRIPTION=${params.description}`,
-					`API_KEY=${params.apiKey}`,
-					`API_URI=${params.apiUrl}`,
+					`LLM_API_KEY=${params.apiKey}`,
+					`LLM_API_URI=${params.apiUrl}`,
 					`LISTEN_PORT=${listenPort}`,
 					`MCP_SERVERS=${mcpServersValue}`
 				],
