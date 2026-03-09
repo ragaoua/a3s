@@ -1,6 +1,11 @@
 import os
 import sys
+from hmac import compare_digest
+
 from google.adk.agents import LlmAgent
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
@@ -19,6 +24,7 @@ def _load_mcp_servers() -> list[str]:
 for var in [
     "LLM_API_URI",
     "LLM_API_KEY",
+    "AGENT_API_KEY",
     "MODEL",
     "AGENT_NAME",
     "AGENT_DESCRIPTION",
@@ -47,8 +53,27 @@ root_agent = LlmAgent(
     ],
 )
 
+
+class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, api_key: str):
+        super().__init__(app)
+        self.api_key = api_key
+
+    async def dispatch(self, request: Request, call_next):
+        received_key = request.headers.get("API-Key", "")
+        if not compare_digest(received_key, self.api_key):
+            return JSONResponse(
+                status_code=401,
+                content={"detail": "Unauthorized"},
+                headers={"WWW-Authenticate": "API-Key"},
+            )
+
+        return await call_next(request)
+
+
 # TODO: check that LISTEN_PORT is a valid integer
 a2a_app = to_a2a(root_agent, port=int(os.environ["LISTEN_PORT"]))
+a2a_app.add_middleware(ApiKeyAuthMiddleware, api_key=os.environ["AGENT_API_KEY"])
 
 # NOTE: LISTEN_PORT is necessary here because that's the value that will be
 # used for the url for the agent's card. Since this is intended to be run

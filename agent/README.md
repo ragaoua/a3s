@@ -9,6 +9,7 @@ Run the adk web console for testing:
 ```bash
 export LLM_API_URI=
 export LLM_API_KEY=
+export AGENT_API_KEY=
 export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
@@ -23,6 +24,7 @@ Expose the a2a agent:
 ```bash
 export LLM_API_URI=
 export LLM_API_KEY=
+export AGENT_API_KEY=
 export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
@@ -53,6 +55,7 @@ podman run \
     -e AGENT_NAME= \
     -e LLM_API_URI= \
     -e LLM_API_KEY= \
+    -e AGENT_API_KEY= \
     -e MCP_SERVERS= \
     -e LISTEN_PORT="8001" \
     --publish 8001:8001 \

@@ -18,6 +18,11 @@ from a2a.types import (
 )
 import httpx
 
+AGENT_API_KEY = os.getenv("AGENT_API_KEY")
+if not AGENT_API_KEY:
+    raise RuntimeError("AGENT_API_KEY must be set")
+AGENT_API_KEY_HEADER = {"API-Key": AGENT_API_KEY}
+
 AGENT_URL = f"http://localhost:{os.getenv('PORT', '8000')}"
 
 
@@ -130,7 +135,9 @@ async def main() -> None:
     """Main function to run the tests."""
     print(f"--- 🔄 Connecting to agent at {AGENT_URL}... ---")
     try:
-        async with httpx.AsyncClient() as httpx_client:
+        async with httpx.AsyncClient(
+            headers=AGENT_API_KEY_HEADER,
+        ) as httpx_client:
             # Create a resolver to fetch the agent card
             resolver = A2ACardResolver(
                 httpx_client=httpx_client,

@@ -1,4 +1,5 @@
 import Docker from 'dockerode';
+import { randomBytes } from 'node:crypto';
 import net from 'node:net';
 
 interface DeployAgentParams {
@@ -82,6 +83,10 @@ class AgentService {
 		throw new Error('Failed to deploy agent after exhausting retry attempts');
 	}
 
+	private generateAgentApiKey(): string {
+		return randomBytes(32).toString('hex');
+	}
+
 	async deployAgent(params: DeployAgentParams) {
 		const docker = this.getDockerClient();
 		const mcpServersValue = params.mcpServers.join(',');
@@ -89,6 +94,7 @@ class AgentService {
 		await this.runAndRetryWithFreePort(async () => {
 			const listenPort = await this.getFreePort();
 			const portKey = `${listenPort}/tcp`;
+			const agentApiKey = this.generateAgentApiKey();
 
 			const container = await docker.createContainer({
 				Image: 'agent',
@@ -99,6 +105,7 @@ class AgentService {
 					`AGENT_DESCRIPTION=${params.description}`,
 					`LLM_API_KEY=${params.apiKey}`,
 					`LLM_API_URI=${params.apiUrl}`,
+					`AGENT_API_KEY=${agentApiKey}`,
 					`LISTEN_PORT=${listenPort}`,
 					`MCP_SERVERS=${mcpServersValue}`
 				],
@@ -117,7 +124,9 @@ class AgentService {
 
 			await container.start();
 
-			console.log(`Started local agent container ${container.id} on localhost:${listenPort}`);
+			console.log(
+				`Started local agent container ${container.id} on localhost:${listenPort}.\nUse Api key ${agentApiKey}`
+			);
 			return container;
 		});
 	}
