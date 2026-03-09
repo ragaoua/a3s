@@ -1,4 +1,4 @@
-x-ollama-model: &ollama-model "qwen3:4b"
+x-ollama-model: &ollama-model "qwen2.5:7b"
 
 services:
   ollama:
@@ -15,7 +15,6 @@ services:
       - 11434:11434
   ollama-init:
     image: ollama/ollama
-    container_name: mcpg_ollama-init
     environment:
       OLLAMA_HOST: "http://ollama:11434"
     depends_on:
