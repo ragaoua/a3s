@@ -10,6 +10,8 @@ interface DeployAgentParams {
 	apiKey: string;
 	apiUrl: string;
 	mcpServers: string[];
+	oauth2IssuerUrl?: string;
+	oauth2JwksUrl?: string;
 }
 
 class AgentService {
@@ -94,7 +96,21 @@ class AgentService {
 		await this.runAndRetryWithFreePort(async () => {
 			const listenPort = await this.getFreePort();
 			const portKey = `${listenPort}/tcp`;
-			const agentApiKey = this.generateAgentApiKey();
+
+			const authVars = [];
+			if (params.oauth2IssuerUrl) {
+				authVars.push(`OAUTH2_ISSUER_URL=${params.oauth2IssuerUrl}`);
+				if (params.oauth2JwksUrl) {
+					authVars.push(`OAUTH2_JWKS_URL=${params.oauth2JwksUrl}`);
+				}
+				console.log('Agent will be configured with OAuth2 Authorization.');
+			} else {
+				const agentApiKey = this.generateAgentApiKey();
+				authVars.push(`AGENT_API_KEY=${agentApiKey}`);
+				console.log(
+					`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
+				);
+			}
 
 			const container = await docker.createContainer({
 				Image: 'agent',
@@ -105,9 +121,9 @@ class AgentService {
 					`AGENT_DESCRIPTION=${params.description}`,
 					`LLM_API_KEY=${params.apiKey}`,
 					`LLM_API_URI=${params.apiUrl}`,
-					`AGENT_API_KEY=${agentApiKey}`,
 					`LISTEN_PORT=${listenPort}`,
-					`MCP_SERVERS=${mcpServersValue}`
+					`MCP_SERVERS=${mcpServersValue}`,
+					...authVars
 				],
 				OpenStdin: true,
 				Tty: true,
@@ -124,9 +140,7 @@ class AgentService {
 
 			await container.start();
 
-			console.log(
-				`Started local agent container ${container.id} on localhost:${listenPort}.\nUse Api key ${agentApiKey}`
-			);
+			console.log(`Started local agent container ${container.id} on localhost:${listenPort}.`);
 			return container;
 		});
 	}

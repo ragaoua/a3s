@@ -18,10 +18,14 @@ from a2a.types import (
 )
 import httpx
 
-AGENT_API_KEY = os.getenv("AGENT_API_KEY")
-if not AGENT_API_KEY:
-    raise RuntimeError("AGENT_API_KEY must be set")
-AGENT_API_KEY_HEADER = {"API-Key": AGENT_API_KEY}
+auth_header = {}
+agent_api_key = os.getenv("AGENT_API_KEY")
+if agent_api_key:
+    auth_header = {"API-Key": agent_api_key}
+else:
+    agent_access_token = os.getenv("AGENT_ACCESS_TOKEN")
+    if agent_access_token:
+        auth_header = {"Authorization": f"Bearer {agent_access_token}"}
 
 AGENT_URL = f"http://localhost:{os.getenv('PORT', '8000')}"
 
@@ -136,7 +140,8 @@ async def main() -> None:
     print(f"--- 🔄 Connecting to agent at {AGENT_URL}... ---")
     try:
         async with httpx.AsyncClient(
-            headers=AGENT_API_KEY_HEADER,
+            headers=auth_header,
+            timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
             # Create a resolver to fetch the agent card
             resolver = A2ACardResolver(

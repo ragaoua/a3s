@@ -10,6 +10,8 @@ Run the adk web console for testing:
 export LLM_API_URI=
 export LLM_API_KEY=
 export AGENT_API_KEY=
+export OAUTH2_ISSUER_URL= # e.g. https://keycloak.example.com/realms/my-realm
+export OAUTH2_JWKS_URL= # optional override, otherwise discovered from <issuer>/.well-known/oauth-authorization-server
 export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
@@ -25,6 +27,8 @@ Expose the a2a agent:
 export LLM_API_URI=
 export LLM_API_KEY=
 export AGENT_API_KEY=
+export OAUTH2_ISSUER_URL= # e.g. https://keycloak.example.com/realms/my-realm
+export OAUTH2_JWKS_URL= # optional override, otherwise discovered from <issuer>/.well-known/oauth-authorization-server
 export MODEL=
 export AGENT_NAME=
 export AGENT_DESCRIPTION=
@@ -37,7 +41,9 @@ uv run uvicorn agent:a2a_app --host localhost --port "$LISTEN_PORT"
 Test the A2A agent:
 
 ```bash
-PORT="$LISTEN_PORT" uv run test_a2a.py # PORT=8000 is the default
+export PORT="$LISTEN_PORT"
+export AGENT_ACCESS_TOKEN=
+uv run test_a2a.py # PORT=8000 is the default
 ```
 
 Build and run the image:
@@ -56,6 +62,8 @@ podman run \
     -e LLM_API_URI= \
     -e LLM_API_KEY= \
     -e AGENT_API_KEY= \
+    -e OAUTH2_ISSUER_URL= \
+    -e OAUTH2_JWKS_URL= \
     -e MCP_SERVERS= \
     -e LISTEN_PORT="8001" \
     --publish 8001:8001 \
