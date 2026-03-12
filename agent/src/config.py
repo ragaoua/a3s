@@ -1,9 +1,10 @@
 import os
 import sys
 from functools import lru_cache
+from typing import Self
 
 from attr import dataclass
-from pydantic import Field
+from pydantic import Field, PrivateAttr, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.loggingManager import LoggingManager
@@ -22,19 +23,23 @@ class OAuth2Auth:
     oauth2_jwks_url: str | None
 
 
-def _compute_auth() -> APIKeyAuth | OAuth2Auth:
-    agent_api_key = os.getenv("AGENT_API_KEY")
-    oauth2_issuer_url = os.getenv("OAUTH2_ISSUER_URL")
+def _validate_auth_config(
+    agent_api_key: str | None,
+    oauth2_issuer_url: str | None,
+    oauth2_jwks_url: str | None,
+) -> APIKeyAuth | OAuth2Auth:
     if (agent_api_key is None) == (oauth2_issuer_url is None):
         raise ValueError(
-            "Exactly one auth mode must be configured: set either AGENT_API_KEY to enable API Key auth, or OAUTH2_ISSUER_URL to enabled OAuth2 (but not both)"
+            "Exactly one auth mode must be configured: "
+            + "set either AGENT_API_KEY to enable API Key auth, "
+            + "or OAUTH2_ISSUER_URL to enabled OAuth2 (but not both)"
         )
 
     if agent_api_key is not None:
         return APIKeyAuth(agent_api_key)
 
     assert oauth2_issuer_url is not None
-    return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url=os.getenv("OAUTH2_JWKS_URL"))
+    return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url)
 
 
 def _compute_mcp_servers() -> list[str]:
@@ -52,16 +57,73 @@ class _Config(BaseSettings):
     agent_description: str = Field(validation_alias="AGENT_DESCRIPTION", init=False)
     agent_instructions: str = Field(validation_alias="AGENT_INSTRUCTIONS", init=False)
     listen_port: int = Field(validation_alias="LISTEN_PORT", init=False)
-    auth: APIKeyAuth | OAuth2Auth = Field(
-        default_factory=_compute_auth,
-        exclude=True,
-        init=False,
+
+    agent_api_key: str | None = Field(
+        default=None, validation_alias="AGENT_API_KEY", exclude=True
     )
-    mcp_servers: list[str] = Field(
-        default_factory=_compute_mcp_servers,
-        exclude=True,
-        init=False,
+    oauth2_issuer_url: str | None = Field(
+        default=None, validation_alias="OAUTH2_ISSUER_URL", exclude=True
     )
+    oauth2_jwks_url: str | None = Field(
+        default=None, validation_alias="OAUTH2_JWKS_URL", exclude=True
+    )
+
+    _auth: APIKeyAuth | OAuth2Auth = PrivateAttr()
+    _mcp_servers: list[str] = PrivateAttr(default_factory=_compute_mcp_servers)
+
+    @property
+    def auth(self):
+        return self._auth
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def validate_auth(cls, data, handler):
+        errors = []
+        model: Self | None = None
+        try:
+            model = handler(data)
+        except ValidationError as e:
+            errors.extend(e.errors(include_url=False))
+
+        agent_api_key = model.agent_api_key if model else os.getenv("AGENT_API_KEY")
+        oauth2_issuer_url = (
+            model.oauth2_issuer_url if model else os.getenv("OAUTH2_ISSUER_URL")
+        )
+        oauth2_jwks_url = (
+            model.oauth2_jwks_url if model else os.getenv("OAUTH2_JWKS_URL")
+        )
+        try:
+            auth = _validate_auth_config(
+                agent_api_key, oauth2_issuer_url, oauth2_jwks_url
+            )
+            if model is not None:
+                model._auth = auth
+        except ValueError:
+            errors.append(
+                {
+                    "type": "value_error",
+                    "loc": ("auth",),
+                    "input": {
+                        "AGENT_API_KEY": agent_api_key,
+                        "OAUTH2_ISSUER_URL": oauth2_issuer_url,
+                    },
+                    "ctx": {
+                        "error": ValueError(
+                            "Exactly one auth mode must be configured: set either AGENT_API_KEY "
+                            + "or OAUTH2_ISSUER_URL (but not both)"
+                        )
+                    },
+                }
+            )
+        if errors:
+            raise ValidationError.from_exception_data(cls.__name__, errors)
+
+        assert model is not None
+        return model
+
+    @property
+    def mcp_servers(self):
+        return self._mcp_servers
 
 
 @lru_cache(maxsize=1)

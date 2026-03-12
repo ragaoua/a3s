@@ -14,6 +14,10 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 from typing_extensions import override
 
+from src.loggingManager import LoggingManager
+
+logger = LoggingManager().get_logger(__name__)
+
 
 @final
 class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
