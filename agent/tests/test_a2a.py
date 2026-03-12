@@ -98,7 +98,9 @@ async def run_multi_turn_test(client: A2AClient) -> None:
     print("--- 📝 Multi-Turn Request ---")
     # --- First Turn ---
 
-    first_turn_payload = create_send_message_payload(text="how much is 100 USD in CAD?")
+    first_turn_payload = create_send_message_payload(
+        text="Write a python script that computes a 2-operator operation?"
+    )
     request1 = SendMessageRequest(
         id=str(uuid4()), params=MessageSendParams(**first_turn_payload)
     )

@@ -2,7 +2,7 @@ import os
 from functools import lru_cache
 
 from attr import dataclass
-from pydantic import Field, ValidationError
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

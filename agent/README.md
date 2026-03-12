@@ -35,7 +35,7 @@ export AGENT_DESCRIPTION=
 export AGENT_INSTRUCTIONS=
 export LISTEN_PORT=
 export MCP_SERVERS= # comma separated list of mcp endpoints (/!\ prefixed with "https://"), can be empty
-uv run uvicorn agent:a2a_app --host localhost --port "$LISTEN_PORT"
+uv run uvicorn src.agent:a2a_app --host localhost --port "$LISTEN_PORT"
 ```
 
 Test the A2A agent:
@@ -43,7 +43,7 @@ Test the A2A agent:
 ```bash
 export PORT="$LISTEN_PORT"
 export AGENT_ACCESS_TOKEN=
-uv run test_a2a.py # PORT=8000 is the default
+uv run tests/test_a2a.py # PORT=8000 is the default
 ```
 
 Build and run the image:

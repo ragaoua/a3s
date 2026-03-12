@@ -1,5 +1,4 @@
 import logging
-import sys
 import json
 from json import JSONDecodeError
 from hmac import compare_digest
@@ -21,7 +20,7 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
 from starlette.types import ASGIApp
 
-from config import APIKeyAuth, get_config
+from .config import APIKeyAuth, get_config
 
 logging.basicConfig(
     level="INFO",
