@@ -1,10 +1,10 @@
 import logging
-import os
 import sys
 import json
 from json import JSONDecodeError
 from hmac import compare_digest
-from typing import Any, final, override
+from typing import Any, final
+from typing_extensions import override
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -21,67 +21,27 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
 from starlette.types import ASGIApp
 
+from config import APIKeyAuth, get_config
+
 logging.basicConfig(
     level="INFO",
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-
-def _load_mcp_servers() -> list[str]:
-    raw = os.getenv("MCP_SERVERS", "").strip()
-    if raw:
-        return [item.strip() for item in raw.split(",") if item.strip()]
-
-    return []
-
-
-def _check_env():
-    requiredVars = {
-        "LLM_API_URI",
-        "LLM_API_KEY",
-        "MODEL",
-        "AGENT_NAME",
-        "AGENT_DESCRIPTION",
-        "AGENT_INSTRUCTIONS",
-        "LISTEN_PORT",
-    }
-
-    missing = [k for k in requiredVars if not os.getenv(k)]
-    if missing:
-        logger.error("Missing required environment variables: %s", ", ".join(missing))
-        sys.exit(1)
-
-    try:
-        _ = int(os.environ["LISTEN_PORT"])
-    except ValueError:
-        logger.error("LISTEN_PORT must be a valid integer")
-        sys.exit(1)
-
-    if not (("AGENT_API_KEY" in os.environ) ^ ("OAUTH2_ISSUER_URL" in os.environ)):
-        logger.error(
-            "Exactly one auth mode must be configured: set either AGENT_API_KEY or OAUTH2_ISSUER_URL (but not both)"
-        )
-        sys.exit(1)
-
-
-_check_env()
-
-mcp_servers = _load_mcp_servers()
-
-model = os.environ["MODEL"]
+config = get_config()
 root_agent = LlmAgent(
     model=LiteLlm(
-        model=f"openai/{model}",
-        api_base=os.environ["LLM_API_URI"],
-        api_key=os.environ["LLM_API_KEY"],
+        model=f"openai/{config.model}",
+        api_base=config.llm_api_uri,
+        api_key=config.llm_api_key,
     ),
-    name=os.environ["AGENT_NAME"],
-    description=os.environ["AGENT_DESCRIPTION"],
-    instruction=os.environ["AGENT_INSTRUCTIONS"],
+    name=config.agent_name,
+    description=config.agent_description,
+    instruction=config.agent_instructions,
     tools=[
         MCPToolset(connection_params=StreamableHTTPConnectionParams(url=url))
-        for url in mcp_servers
+        for url in config.mcp_servers
     ],
 )
 
@@ -227,15 +187,15 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 # inside a container, and the port will be published, this a2a agent needs
 # to know on which port it will be exposed. We should probably do the same
 # for the host, but we're only working with localhost for now.
-a2a_app = to_a2a(root_agent, port=int(os.environ["LISTEN_PORT"]))
-if os.getenv("AGENT_API_KEY"):
+a2a_app = to_a2a(root_agent, port=config.listen_port)
+if isinstance(config.auth, APIKeyAuth):
     logger.info("Auth mode: API Key")
-    a2a_app.add_middleware(ApiKeyAuthMiddleware, api_key=os.environ["AGENT_API_KEY"])
+    a2a_app.add_middleware(ApiKeyAuthMiddleware, api_key=config.auth.api_key)
 else:
     logger.info("Auth mode: OAuth2")
     a2a_app.add_middleware(
         OAuth2BearerAuthMiddleware,
-        issuer_url=os.environ["OAUTH2_ISSUER_URL"],
-        jwks_url=os.getenv("OAUTH2_JWKS_URL"),
+        issuer_url=config.auth.oauth2_issuer_url,
+        jwks_url=config.auth.oauth2_jwks_url,
         realm=root_agent.name,
     )
