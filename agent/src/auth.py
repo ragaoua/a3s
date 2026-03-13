@@ -141,6 +141,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         try:
             token_payload = self._decode_access_token(token)
             request.state.token_claims = dict(token_payload)
+            request.state.authorization_header = f"Bearer {token}"
         except Exception as err:
             logger.error("Token validation failed: %s", err)
             if isinstance(err, JoseError) and err.error == "expired_token":

@@ -8,8 +8,7 @@ from a2a.server.tasks import (
     InMemoryPushNotificationConfigStore,
     InMemoryTaskStore,
 )
-from a2a.types import AgentCard
-from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.a2a.converters.request_converter import (
@@ -18,7 +17,6 @@ from google.adk.a2a.converters.request_converter import (
 )
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.executor.config import A2aAgentExecutorConfig
-from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.auth.credential_service.in_memory_credential_service import (
     InMemoryCredentialService,
@@ -39,9 +37,9 @@ logger = LoggingManager().get_logger(__name__)
 
 
 def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
-    api_key = ctx.state.get("api_key")
-    if isinstance(api_key, str) and api_key:
-        return {"X-Api-Key": api_key}
+    authorization_header = ctx.state.get("authorization_header")
+    if isinstance(authorization_header, str) and authorization_header:
+        return {"Authorization": authorization_header}
     return {}
 
 
@@ -49,9 +47,9 @@ class MiddlewareCallContextBuilder(DefaultCallContextBuilder):
     def build(self, request: Request):
         context = super().build(request)
 
-        api_key = getattr(request.state, "api_key", None)
-        if isinstance(api_key, str) and api_key:
-            context.state["api_key"] = api_key
+        authorization_header = getattr(request.state, "authorization_header", None)
+        if isinstance(authorization_header, str) and authorization_header:
+            context.state["authorization_header"] = authorization_header
 
         return context
 
@@ -66,11 +64,14 @@ def request_converter(
     )
 
     call_context = request.call_context
-    api_key = call_context.state.get("api_key") if call_context else None
-    if isinstance(api_key, str) and api_key:
+    authorization_header = (
+        call_context.state.get("authorization_header") if call_context else None
+    )
+
+    if isinstance(authorization_header, str) and authorization_header:
         run_request.state_delta = {
             **(run_request.state_delta or {}),
-            "api_key": api_key,
+            "authorization_header": authorization_header,
         }
 
     return run_request
@@ -110,15 +111,36 @@ def create_a2a_app(
         push_config_store=push_config_store,
     )
 
-    card_builder = AgentCardBuilder(
-        agent=agent,
-        rpc_url=f"{protocol}://{host}:{port}/",
-    )
+    rpc_url = f"{protocol}://{host}:{port}"
+
+    def create_static_agent_card() -> AgentCard:
+        return AgentCard(
+            name=agent.name,
+            description=agent.description,
+            url=rpc_url,
+            version="0.0.1",
+            capabilities=AgentCapabilities(),
+            skills=[
+                AgentSkill(
+                    id=agent.name,
+                    name="model" if isinstance(agent, LlmAgent) else "agent",
+                    description=agent.description,
+                    tags=["llm"] if isinstance(agent, LlmAgent) else ["custom_agent"],
+                )
+            ],
+            default_input_modes=["text/plain"],
+            default_output_modes=["text/plain"],
+            # TODO: maybe this is interesting.
+            # We would provide an extended agent card to authorized users
+            # to, for instance, be able to see what MCP tools the agent has
+            # access to
+            supports_authenticated_extended_card=False,
+        )
 
     app = Starlette()
 
     async def setup_a2a():
-        final_agent_card: AgentCard = await card_builder.build()
+        final_agent_card: AgentCard = create_static_agent_card()
         a2a_server = A2AStarletteApplication(
             agent_card=final_agent_card,
             http_handler=request_handler,
