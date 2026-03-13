@@ -1,5 +1,3 @@
-import logging
-
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
@@ -7,12 +5,9 @@ from google.adk.tools.mcp_tool import MCPToolset, StreamableHTTPConnectionParams
 
 from .auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
 from .config import APIKeyAuth, get_config
+from .loggingManager import LoggingManager
 
-logging.basicConfig(
-    level="INFO",
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-)
-logger = logging.getLogger(__name__)
+logger = LoggingManager().get_logger(__name__)
 
 config = get_config()
 root_agent = LlmAgent(

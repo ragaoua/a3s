@@ -1,9 +1,14 @@
 import os
+import sys
 from functools import lru_cache
 
 from attr import dataclass
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from src.loggingManager import LoggingManager
+
+logger = LoggingManager().get_logger(__name__)
 
 
 @dataclass
@@ -61,4 +66,9 @@ class _Config(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_config() -> _Config:
-    return _Config()
+    try:
+        return _Config()
+    except Exception as e:
+        logger.debug("Failed to load config", exc_info=True)
+        logger.error(e)
+        sys.exit(1)
