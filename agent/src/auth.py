@@ -35,6 +35,7 @@ class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
                 headers={"WWW-Authenticate": "API-Key"},
             )
 
+        request.state.api_key = received_key
         return await call_next(request)
 
 
