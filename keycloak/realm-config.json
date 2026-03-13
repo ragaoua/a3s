@@ -1,0 +1,81 @@
+{
+  "realm": "myrealm",
+  "enabled": true,
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "chatbot-app": ["read:acronym"]
+      }
+    },
+    {
+      "username": "adminuser",
+      "enabled": true,
+      "email": "adminuser@example.com",
+      "firstName": "Admin",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "chatbot-app": ["read:acronym", "admin:tools"]
+      }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "chatbot-app",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": ["http://localhost:5173/*", "http://127.0.0.1:19876/mcp/oauth/callback"],
+      "webOrigins": ["http://localhost:5173"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "defaultClientScopes": ["profile", "email"],
+      "protocolMappers": [
+        {
+          "name": "client-roles-to-scope",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "claim.name": "scope",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "usermodel.clientRoleMapping.clientId": "chatbot-app"
+          }
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "client": {
+      "chatbot-app": [
+        {
+          "name": "read:acronym",
+          "description": "Permission to read acronym definitions"
+        },
+        {
+          "name": "admin:tools",
+          "description": "Permission to access admin-only tools"
+        }
+      ]
+    }
+  }
+}
