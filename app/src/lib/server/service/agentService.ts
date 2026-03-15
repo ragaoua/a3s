@@ -1,6 +1,6 @@
-import Docker from 'dockerode';
+import { CoreV1Api, KubeConfig, type V1EnvVar } from '@kubernetes/client-node';
+import { env } from '$env/dynamic/private';
 import { randomBytes } from 'node:crypto';
-import net from 'node:net';
 
 interface DeployAgentParams {
 	model: string;
@@ -15,134 +15,111 @@ interface DeployAgentParams {
 }
 
 class AgentService {
-	private _docker: Docker | undefined;
+	private getRequiredEnv(name: string): string {
+		const value = env[name];
 
-	private getDockerClient(): Docker {
-		if (!this._docker) {
-			this._docker = new Docker();
+		if (!value) {
+			throw new Error(`Missing required environment variable: ${name}`);
 		}
 
-		return this._docker;
-	}
-
-	private async getFreePort(): Promise<number> {
-		return await new Promise((resolve, reject) => {
-			const server = net.createServer();
-			server.unref();
-			server.on('error', reject);
-
-			server.listen(0, '127.0.0.1', () => {
-				const address = server.address();
-
-				if (!address || typeof address === 'string') {
-					server.close(() => reject(new Error('Failed to resolve free port')));
-					return;
-				}
-
-				const port = address.port;
-				server.close((err) => (err ? reject(err) : resolve(port)));
-			});
-		});
-	}
-
-	private isPortAllocatedError(error: unknown): boolean {
-		if (!(error instanceof Error)) {
-			return false;
-		}
-
-		const message = error.message.toLowerCase();
-		return (
-			message.includes('port is already allocated') || message.includes('address already in use')
-		);
-	}
-
-	private async runAndRetryWithFreePort(run: () => Promise<Docker.Container>) {
-		const MAX_DEPLOY_RETRIES = 5;
-
-		for (let attempt = 1; attempt <= MAX_DEPLOY_RETRIES; attempt += 1) {
-			let container: Docker.Container | undefined;
-
-			try {
-				container = await run();
-				return container;
-			} catch (error) {
-				if (container) {
-					try {
-						await container.remove({ force: true });
-					} catch {
-						// Best effort cleanup for a partially created container.
-					}
-				}
-
-				if (this.isPortAllocatedError(error) && attempt < MAX_DEPLOY_RETRIES) {
-					continue;
-				}
-
-				throw error;
-			}
-		}
-
-		throw new Error('Failed to deploy agent after exhausting retry attempts');
+		return value;
 	}
 
 	private generateAgentApiKey(): string {
 		return randomBytes(32).toString('hex');
 	}
 
-	async deployAgent(params: DeployAgentParams) {
-		const docker = this.getDockerClient();
-		const mcpServersValue = params.mcpServers.join(',');
+	async deployToKubernetes(params: DeployAgentParams) {
+		const clusterName = this.getRequiredEnv('K8S_CLUSTER_NAME');
+		const server = this.getRequiredEnv('K8S_SERVER_URL');
+		const serviceAccount = this.getRequiredEnv('K8S_SERVICE_ACCOUNT');
+		const serviceAccountToken = this.getRequiredEnv('K8S_SERVICE_ACCOUNT_TOKEN');
+		const namespace = this.getRequiredEnv('K8S_NAMESPACE');
+		const caData = this.getRequiredEnv('K8S_CA_DATA');
 
-		await this.runAndRetryWithFreePort(async () => {
-			const listenPort = await this.getFreePort();
-			const portKey = `${listenPort}/tcp`;
+		const kc = new KubeConfig();
 
-			const authVars = [];
-			if (params.oauth2IssuerUrl) {
-				authVars.push(`OAUTH2_ISSUER_URL=${params.oauth2IssuerUrl}`);
-				if (params.oauth2JwksUrl) {
-					authVars.push(`OAUTH2_JWKS_URL=${params.oauth2JwksUrl}`);
+		kc.loadFromOptions({
+			clusters: [
+				{
+					name: clusterName,
+					server,
+					caData
 				}
-				console.log('Agent will be configured with OAuth2 Authorization.');
-			} else {
-				const agentApiKey = this.generateAgentApiKey();
-				authVars.push(`AGENT_API_KEY=${agentApiKey}`);
-				console.log(
-					`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
-				);
-			}
-
-			const container = await docker.createContainer({
-				Image: 'agent',
-				Env: [
-					`MODEL=${params.model}`,
-					`AGENT_NAME=${params.name}`,
-					`AGENT_INSTRUCTIONS=${params.instructions}`,
-					`AGENT_DESCRIPTION=${params.description}`,
-					`LLM_API_KEY=${params.apiKey}`,
-					`LLM_API_URI=${params.apiUrl}`,
-					`LISTEN_PORT=${listenPort}`,
-					`MCP_SERVERS=${mcpServersValue}`,
-					...authVars
-				],
-				OpenStdin: true,
-				Tty: true,
-				ExposedPorts: {
-					[portKey]: {}
-				},
-				HostConfig: {
-					AutoRemove: true,
-					PortBindings: {
-						[portKey]: [{ HostPort: String(listenPort) }]
-					}
+			],
+			users: [
+				{
+					name: serviceAccount,
+					token: serviceAccountToken
 				}
-			});
-
-			await container.start();
-
-			console.log(`Started local agent container ${container.id} on localhost:${listenPort}.`);
-			return container;
+			],
+			contexts: [
+				{
+					cluster: clusterName,
+					user: serviceAccount,
+					namespace
+				}
+			]
 		});
+
+		const mcpServersValue = params.mcpServers.join(',');
+		const listenPort = 10000;
+
+		const authVars: V1EnvVar[] = [];
+		if (params.oauth2IssuerUrl) {
+			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: params.oauth2IssuerUrl });
+			if (params.oauth2JwksUrl) {
+				authVars.push({ name: 'OAUTH2_JWKS_URL', value: params.oauth2JwksUrl });
+			}
+			console.log('Agent will be configured with OAuth2 Authorization.');
+		} else {
+			const agentApiKey = this.generateAgentApiKey();
+			authVars.push({ name: 'AGENT_API_KEY', value: agentApiKey });
+			console.log(
+				`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
+			);
+		}
+
+		const core = kc.makeApiClient(CoreV1Api);
+
+		const pod = await core.createNamespacedPod({
+			namespace,
+			body: {
+				apiVersion: 'v1',
+				kind: 'Pod',
+				metadata: {
+					generateName: params.name.toLowerCase()
+				},
+				spec: {
+					restartPolicy: 'Never',
+					containers: [
+						{
+							name: params.name.toLowerCase(),
+							image: 'localhost/agent',
+							imagePullPolicy: 'Never',
+							env: [
+								{ name: 'MODEL', value: params.model },
+								{ name: 'AGENT_NAME', value: params.name },
+								{ name: 'AGENT_INSTRUCTIONS', value: params.instructions },
+								{ name: 'AGENT_DESCRIPTION', value: params.description },
+								{ name: 'LLM_API_KEY', value: params.apiKey },
+								{ name: 'LLM_API_URI', value: params.apiUrl },
+								{ name: 'LISTEN_PORT', value: String(listenPort) },
+								{ name: 'MCP_SERVERS', value: mcpServersValue },
+								...authVars
+							],
+							stdin: true,
+							tty: true,
+							ports: [{ containerPort: listenPort }]
+						}
+					]
+				}
+			}
+		});
+
+		console.log(
+			`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
+		);
 	}
 }
 
