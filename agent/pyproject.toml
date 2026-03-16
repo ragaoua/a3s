@@ -10,3 +10,8 @@ dependencies = [
     "google-adk==1.27.0",
     "litellm"
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

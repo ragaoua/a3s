@@ -1,13 +1,21 @@
 import os
 import sys
 from functools import lru_cache
-from typing import Self
+from typing import Annotated, Self
 
 from attr import dataclass
-from pydantic import Field, PrivateAttr, ValidationError, model_validator
+from pydantic import (
+    Field,
+    PrivateAttr,
+    StringConstraints,
+    ValidationError,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.loggingManager import LoggingManager
+
+NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 logger = LoggingManager().get_logger(__name__)
 
@@ -23,13 +31,18 @@ class OAuth2Auth:
     oauth2_jwks_url: str | None
 
 
-def _validate_auth_config(
+def validate_auth_config(
+    *,
     agent_api_key: str | None,
     oauth2_issuer_url: str | None,
     oauth2_jwks_url: str | None,
     no_auth: bool,
 ) -> APIKeyAuth | OAuth2Auth | None:
-    if (agent_api_key, oauth2_issuer_url, no_auth).count(True) != 1:
+    has_api_key = bool(agent_api_key)
+    has_oauth2 = bool(oauth2_issuer_url)
+    auth_modes_configured = sum((has_api_key, has_oauth2, no_auth))
+
+    if auth_modes_configured != 1:
         raise ValueError(
             "Exactly one auth mode must be configured:\n"
             + "set either AGENT_API_KEY to enable API Key auth, "
@@ -37,42 +50,48 @@ def _validate_auth_config(
             + "Set NO_AUTH to 1 or true to disable auth altogether."
         )
 
-    if oauth2_issuer_url is not None:
+    if has_oauth2:
+        assert oauth2_issuer_url is not None
         return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url)
-    if agent_api_key is not None:
+    if has_api_key:
+        assert agent_api_key is not None
         return APIKeyAuth(agent_api_key)
     return None
 
 
-def _compute_mcp_servers() -> list[str]:
+def compute_mcp_servers() -> list[str]:
     mcp_servers_raw = os.getenv("MCP_SERVERS") or ""
     return [item.strip() for item in mcp_servers_raw.split(",") if item.strip()]
 
 
-class _Config(BaseSettings):
+class Config(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=True)
 
-    llm_api_uri: str = Field(validation_alias="LLM_API_URI", init=False)
-    llm_api_key: str = Field(validation_alias="LLM_API_KEY", init=False)
-    model: str = Field(validation_alias="MODEL", init=False)
-    agent_name: str = Field(validation_alias="AGENT_NAME", init=False)
-    agent_description: str = Field(validation_alias="AGENT_DESCRIPTION", init=False)
-    agent_instructions: str = Field(validation_alias="AGENT_INSTRUCTIONS", init=False)
+    llm_api_uri: NonEmptyStr = Field(validation_alias="LLM_API_URI", init=False)
+    llm_api_key: NonEmptyStr = Field(validation_alias="LLM_API_KEY", init=False)
+    model: NonEmptyStr = Field(validation_alias="MODEL", init=False)
+    agent_name: NonEmptyStr = Field(validation_alias="AGENT_NAME", init=False)
+    agent_description: NonEmptyStr = Field(
+        validation_alias="AGENT_DESCRIPTION", init=False
+    )
+    agent_instructions: NonEmptyStr = Field(
+        validation_alias="AGENT_INSTRUCTIONS", init=False
+    )
     listen_port: int = Field(validation_alias="LISTEN_PORT", init=False)
 
-    agent_api_key: str | None = Field(
+    agent_api_key: NonEmptyStr | None = Field(
         default=None, validation_alias="AGENT_API_KEY", exclude=True
     )
-    oauth2_issuer_url: str | None = Field(
+    oauth2_issuer_url: NonEmptyStr | None = Field(
         default=None, validation_alias="OAUTH2_ISSUER_URL", exclude=True
     )
-    oauth2_jwks_url: str | None = Field(
+    oauth2_jwks_url: NonEmptyStr | None = Field(
         default=None, validation_alias="OAUTH2_JWKS_URL", exclude=True
     )
     no_auth: bool = Field(default=False, validation_alias="NO_AUTH", exclude=True)
 
     _auth: APIKeyAuth | OAuth2Auth | None = PrivateAttr()
-    _mcp_servers: list[str] = PrivateAttr(default_factory=_compute_mcp_servers)
+    _mcp_servers: list[str] = PrivateAttr(default_factory=compute_mcp_servers)
 
     @property
     def auth(self):
@@ -100,8 +119,11 @@ class _Config(BaseSettings):
             no_auth = os.getenv("NO_AUTH", "").lower() in ["1", "true"]
 
         try:
-            auth = _validate_auth_config(
-                agent_api_key, oauth2_issuer_url, oauth2_jwks_url, no_auth
+            auth = validate_auth_config(
+                agent_api_key=agent_api_key,
+                oauth2_issuer_url=oauth2_issuer_url,
+                oauth2_jwks_url=oauth2_jwks_url,
+                no_auth=no_auth,
             )
             if model is not None:
                 model._auth = auth
@@ -130,9 +152,9 @@ class _Config(BaseSettings):
 
 
 @lru_cache(maxsize=1)
-def get_config() -> _Config:
+def get_config() -> Config:
     try:
-        return _Config()
+        return Config()
     except Exception as e:
         logger.debug("Failed to load config", exc_info=True)
         if isinstance(e, ValidationError):
