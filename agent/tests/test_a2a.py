@@ -93,50 +93,6 @@ async def run_single_turn_test(client: A2AClient) -> None:
     print_json_response(get_response, "📥 Query Task Response")
 
 
-async def run_multi_turn_test(client: A2AClient) -> None:
-    """Runs a multi-turn non-streaming test."""
-    print("--- 📝 Multi-Turn Request ---")
-    # --- First Turn ---
-
-    first_turn_payload = create_send_message_payload(
-        text="Write a python script that computes a 2-operator operation?"
-    )
-    request1 = SendMessageRequest(
-        id=str(uuid4()), params=MessageSendParams(**first_turn_payload)
-    )
-    first_turn_response: SendMessageResponse = await client.send_message(request1)
-    print_json_response(first_turn_response, "📥 Multi-Turn: First Turn Response")
-
-    context_id: str | None = None
-    if isinstance(first_turn_response.root, SendMessageSuccessResponse) and isinstance(
-        first_turn_response.root.result, Task
-    ):
-        task: Task = first_turn_response.root.result
-        context_id = task.context_id  # Capture context ID
-
-        # --- Second Turn (if input required) ---
-        if task.status.state == TaskState.input_required and context_id:
-            print("--- 📝 Multi-Turn: Second Turn (Input Required) ---")
-            second_turn_payload = create_send_message_payload(
-                "in GBP", task.id, context_id
-            )
-            request2 = SendMessageRequest(
-                id=str(uuid4()), params=MessageSendParams(**second_turn_payload)
-            )
-            second_turn_response = await client.send_message(request2)
-            print_json_response(
-                second_turn_response, "Multi-Turn: Second Turn Response"
-            )
-        elif not context_id:
-            print(
-                "--- ⚠️ Warning: Could not get context ID from first turn response. ---"
-            )
-        else:
-            print(
-                "--- 🚀 First turn completed, no further input required for this test case. ---"
-            )
-
-
 async def main() -> None:
     """Main function to run the tests."""
     print(f"--- 🔄 Connecting to agent at {AGENT_URL}... ---")
