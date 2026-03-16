@@ -30,7 +30,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 
 from .auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
-from .config import APIKeyAuth, get_config
+from .config import APIKeyAuth, OAuth2Auth, get_config
 from .loggingManager import LoggingManager
 
 logger = LoggingManager().get_logger(__name__)
@@ -181,7 +181,7 @@ a2a_app = create_a2a_app(root_agent, port=config.listen_port)
 if isinstance(config.auth, APIKeyAuth):
     logger.info("Auth mode: API Key")
     a2a_app.add_middleware(ApiKeyAuthMiddleware, api_key=config.auth.api_key)
-else:
+elif isinstance(config.auth, OAuth2Auth):
     logger.info("Auth mode: OAuth2")
     a2a_app.add_middleware(
         OAuth2BearerAuthMiddleware,
@@ -189,3 +189,5 @@ else:
         jwks_url=config.auth.oauth2_jwks_url,
         realm=root_agent.name,
     )
+else:
+    logger.info("Auth disabled.")

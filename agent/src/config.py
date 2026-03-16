@@ -27,19 +27,21 @@ def _validate_auth_config(
     agent_api_key: str | None,
     oauth2_issuer_url: str | None,
     oauth2_jwks_url: str | None,
-) -> APIKeyAuth | OAuth2Auth:
-    if (agent_api_key is None) == (oauth2_issuer_url is None):
+    no_auth: bool,
+) -> APIKeyAuth | OAuth2Auth | None:
+    if (agent_api_key, oauth2_issuer_url, no_auth).count(True) != 1:
         raise ValueError(
-            "Exactly one auth mode must be configured: "
+            "Exactly one auth mode must be configured:\n"
             + "set either AGENT_API_KEY to enable API Key auth, "
-            + "or OAUTH2_ISSUER_URL to enabled OAuth2 (but not both)"
+            + "or OAUTH2_ISSUER_URL to enable OAuth2 (but not both).\n"
+            + "Set NO_AUTH to 1 or true to disable auth altogether."
         )
 
+    if oauth2_issuer_url is not None:
+        return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url)
     if agent_api_key is not None:
         return APIKeyAuth(agent_api_key)
-
-    assert oauth2_issuer_url is not None
-    return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url)
+    return None
 
 
 def _compute_mcp_servers() -> list[str]:
@@ -67,8 +69,9 @@ class _Config(BaseSettings):
     oauth2_jwks_url: str | None = Field(
         default=None, validation_alias="OAUTH2_JWKS_URL", exclude=True
     )
+    no_auth: bool = Field(default=False, validation_alias="NO_AUTH", exclude=True)
 
-    _auth: APIKeyAuth | OAuth2Auth = PrivateAttr()
+    _auth: APIKeyAuth | OAuth2Auth | None = PrivateAttr()
     _mcp_servers: list[str] = PrivateAttr(default_factory=_compute_mcp_servers)
 
     @property
@@ -85,16 +88,20 @@ class _Config(BaseSettings):
         except ValidationError as e:
             errors.extend(e.errors())
 
-        agent_api_key = model.agent_api_key if model else os.getenv("AGENT_API_KEY")
-        oauth2_issuer_url = (
-            model.oauth2_issuer_url if model else os.getenv("OAUTH2_ISSUER_URL")
-        )
-        oauth2_jwks_url = (
-            model.oauth2_jwks_url if model else os.getenv("OAUTH2_JWKS_URL")
-        )
+        if model:
+            agent_api_key = model.agent_api_key
+            oauth2_issuer_url = model.oauth2_issuer_url
+            oauth2_jwks_url = model.oauth2_jwks_url
+            no_auth = model.no_auth
+        else:
+            agent_api_key = os.getenv("AGENT_API_KEY")
+            oauth2_issuer_url = os.getenv("OAUTH2_ISSUER_URL")
+            oauth2_jwks_url = os.getenv("OAUTH2_JWKS_URL")
+            no_auth = os.getenv("NO_AUTH", "").lower() in ["1", "true"]
+
         try:
             auth = _validate_auth_config(
-                agent_api_key, oauth2_issuer_url, oauth2_jwks_url
+                agent_api_key, oauth2_issuer_url, oauth2_jwks_url, no_auth
             )
             if model is not None:
                 model._auth = auth
@@ -106,6 +113,7 @@ class _Config(BaseSettings):
                     "input": {
                         "AGENT_API_KEY": agent_api_key,
                         "OAUTH2_ISSUER_URL": oauth2_issuer_url,
+                        "NO_AUTH": no_auth,
                     },
                     "ctx": {"error": e},
                 }
