@@ -83,7 +83,7 @@ class _Config(BaseSettings):
         try:
             model = handler(data)
         except ValidationError as e:
-            errors.extend(e.errors(include_url=False))
+            errors.extend(e.errors())
 
         agent_api_key = model.agent_api_key if model else os.getenv("AGENT_API_KEY")
         oauth2_issuer_url = (
@@ -98,21 +98,16 @@ class _Config(BaseSettings):
             )
             if model is not None:
                 model._auth = auth
-        except ValueError:
+        except ValueError as e:
             errors.append(
                 {
                     "type": "value_error",
-                    "loc": ("auth",),
+                    "loc": ("Auth",),
                     "input": {
                         "AGENT_API_KEY": agent_api_key,
                         "OAUTH2_ISSUER_URL": oauth2_issuer_url,
                     },
-                    "ctx": {
-                        "error": ValueError(
-                            "Exactly one auth mode must be configured: set either AGENT_API_KEY "
-                            + "or OAUTH2_ISSUER_URL (but not both)"
-                        )
-                    },
+                    "ctx": {"error": e},
                 }
             )
         if errors:
@@ -132,5 +127,11 @@ def get_config() -> _Config:
         return _Config()
     except Exception as e:
         logger.debug("Failed to load config", exc_info=True)
-        logger.error(e)
+        if isinstance(e, ValidationError):
+            for error in e.errors(include_url=False):
+                loc = error["loc"]
+                msg = error["msg"]
+                logger.error(f"{loc}: {msg}")
+        else:
+            logger.error(e)
         sys.exit(1)
