@@ -1,14 +1,11 @@
-from pathlib import Path
-
-from a2a.types import APIKeySecurityScheme, In, OAuth2SecurityScheme, SecurityScheme
+from a2a.types import APIKeySecurityScheme, In, OAuth2SecurityScheme
 import httpx
 import pytest
-from a2a.client import A2AClient
 
 from src.auth import ApiKeyAuthMiddleware
-from src.config import APIKeyAuth, Config, OAuth2Auth
+from src.config import APIKeyAuth, OAuth2Auth
 from tests.integration.utils import (
-    run_single_turn_test,
+    get_base_test_config_with,
     start_agent_server,
     wait_for_agent_card,
 )
@@ -27,17 +24,7 @@ async def test_agent_card_contains_proper_security_scheme(
     AGENT_API_KEY: str | None,
     OAUTH2_ISSUER_URL: str | None,
 ) -> None:
-    config = Config(
-        LLM_API_URI="endpoint",
-        LLM_API_KEY="fakekey",
-        MODEL="model",
-        AGENT_NAME="Cody",
-        AGENT_DESCRIPTION="A helpful coding assistant",
-        AGENT_INSTRUCTIONS="""
-You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks.
-DO NOT PRINT OUT CODE TO THE USER unless explicitely prompted. ALWAYS WRITE CODE TO FILES.
-Take initiatives regarding file names, architecture etc.""",
-        LISTEN_PORT=10000,
+    config = get_base_test_config_with(
         NO_AUTH=AGENT_API_KEY is None and OAUTH2_ISSUER_URL is None,
         AGENT_API_KEY=AGENT_API_KEY,
         OAUTH2_ISSUER_URL=OAUTH2_ISSUER_URL,

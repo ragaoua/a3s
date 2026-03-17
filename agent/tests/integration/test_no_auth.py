@@ -2,8 +2,8 @@ import httpx
 import pytest
 from a2a.client import A2AClient
 
-from src.config import Config
 from tests.integration.utils import (
+    get_base_test_config_with,
     run_single_turn_test,
     start_agent_server,
     wait_for_agent_card,
@@ -12,19 +12,7 @@ from tests.integration.utils import (
 
 @pytest.mark.asyncio
 async def test_agent_is_reachable_in_no_auth_mode() -> None:
-    config = Config(
-        LLM_API_URI="endpoint",
-        LLM_API_KEY="fakekey",
-        MODEL="model",
-        AGENT_NAME="Cody",
-        AGENT_DESCRIPTION="A helpful coding assistant",
-        AGENT_INSTRUCTIONS="""
-You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks.
-DO NOT PRINT OUT CODE TO THE USER unless explicitely prompted. ALWAYS WRITE CODE TO FILES.
-Take initiatives regarding file names, architecture etc.""",
-        LISTEN_PORT=10000,
-        NO_AUTH=True,
-    )
+    config = get_base_test_config_with(NO_AUTH=True)
 
     server, server_thread = start_agent_server(config)
 

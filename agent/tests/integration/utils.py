@@ -22,6 +22,27 @@ from a2a.types import (
 from src.config import Config
 
 
+def get_base_test_config_with(
+    AGENT_API_KEY: str | None = None,
+    OAUTH2_ISSUER_URL: str | None = None,
+    OAUTH2_JWKS_URL: str | None = None,
+    NO_AUTH: bool = False,
+) -> Config:
+    return Config(
+        LLM_API_URI="endpoint",
+        LLM_API_KEY="fakekey",
+        MODEL="mymodel",
+        AGENT_NAME="Cody",
+        AGENT_DESCRIPTION="A helpful coding assistant",
+        AGENT_INSTRUCTIONS="You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks",
+        LISTEN_PORT=12345,
+        AGENT_API_KEY=AGENT_API_KEY,
+        OAUTH2_ISSUER_URL=OAUTH2_ISSUER_URL,
+        OAUTH2_JWKS_URL=OAUTH2_JWKS_URL,
+        NO_AUTH=NO_AUTH,
+    )
+
+
 async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
     STARTUP_TIMEOUT_SECONDS = 10
     RETRY_DELAY_SECONDS = 1
