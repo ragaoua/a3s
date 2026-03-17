@@ -9,8 +9,6 @@ from tests.integration.utils import (
     wait_for_agent_card,
 )
 
-pytest_plugins = ("pytest_asyncio",)
-
 
 @pytest.mark.asyncio
 async def test_agent_is_reachable_in_no_auth_mode() -> None:

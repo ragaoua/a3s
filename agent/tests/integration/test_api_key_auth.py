@@ -10,8 +10,6 @@ from tests.integration.utils import (
     wait_for_agent_card,
 )
 
-pytest_plugins = ("pytest_asyncio",)
-
 
 @pytest.mark.asyncio
 async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:

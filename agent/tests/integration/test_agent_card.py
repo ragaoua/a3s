@@ -13,8 +13,6 @@ from tests.integration.utils import (
     wait_for_agent_card,
 )
 
-pytest_plugins = ("pytest_asyncio",)
-
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
