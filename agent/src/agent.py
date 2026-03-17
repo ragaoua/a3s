@@ -169,9 +169,9 @@ def create_a2a_app(
             skills=[
                 AgentSkill(
                     id=agent.name,
-                    name="model" if isinstance(agent, LlmAgent) else "agent",
+                    name="model",
                     description=agent_description,
-                    tags=["llm"] if isinstance(agent, LlmAgent) else ["custom_agent"],
+                    tags=["llm"],
                 )
             ],
             security_schemes=security_schemes,
