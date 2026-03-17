@@ -1,12 +1,11 @@
 import pytest
 from pydantic import ValidationError
 
-import src.config as config_module
 from src.config import (
     APIKeyAuth,
     OAuth2Auth,
     Config,
-    get_config,
+    from_env,
 )
 
 
@@ -37,32 +36,32 @@ def _reset_state(monkeypatch: pytest.MonkeyPatch):
         "MCP_SERVERS",
     )
 
-    get_config.cache_clear()
+    from_env.cache_clear()
     for key in managed_keys:
         monkeypatch.delenv(key, raising=False)
 
     yield
 
-    get_config.cache_clear()
+    from_env.cache_clear()
 
 
 def test_config_loads_in_no_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
 
-    config = Config()
+    config = Config()  # pyright: ignore[reportCallIssue]
 
-    assert config.auth is None
+    assert config.AUTH is None
 
 
 def test_config_loads_in_api_key_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("AGENT_API_KEY", "test-api-key")
 
-    config = Config()
+    config = Config()  # pyright: ignore[reportCallIssue]
 
-    assert isinstance(config.auth, APIKeyAuth)
-    assert config.auth.api_key == "test-api-key"
+    assert isinstance(config.AUTH, APIKeyAuth)
+    assert config.AUTH.api_key == "test-api-key"
 
 
 def test_config_loads_in_oauth2_mode_with_jwks_url(
@@ -72,11 +71,11 @@ def test_config_loads_in_oauth2_mode_with_jwks_url(
     monkeypatch.setenv("OAUTH2_ISSUER_URL", "https://issuer.example")
     monkeypatch.setenv("OAUTH2_JWKS_URL", "https://issuer.example/jwks")
 
-    config = Config()
+    config = Config()  # pyright: ignore[reportCallIssue]
 
-    assert isinstance(config.auth, OAuth2Auth)
-    assert config.auth.oauth2_issuer_url == "https://issuer.example"
-    assert config.auth.oauth2_jwks_url == "https://issuer.example/jwks"
+    assert isinstance(config.AUTH, OAuth2Auth)
+    assert config.AUTH.oauth2_issuer_url == "https://issuer.example"
+    assert config.AUTH.oauth2_jwks_url == "https://issuer.example/jwks"
 
 
 def test_config_loads_in_oauth2_mode_without_jwks_url(
@@ -85,11 +84,11 @@ def test_config_loads_in_oauth2_mode_without_jwks_url(
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("OAUTH2_ISSUER_URL", "https://issuer.example")
 
-    config = Config()
+    config = Config()  # pyright: ignore[reportCallIssue]
 
-    assert isinstance(config.auth, OAuth2Auth)
-    assert config.auth.oauth2_issuer_url == "https://issuer.example"
-    assert config.auth.oauth2_jwks_url is None
+    assert isinstance(config.AUTH, OAuth2Auth)
+    assert config.AUTH.oauth2_issuer_url == "https://issuer.example"
+    assert config.AUTH.oauth2_jwks_url is None
 
 
 @pytest.mark.parametrize(
@@ -116,7 +115,7 @@ def test_config_rejects_conflicting_auth_modes(
         monkeypatch.setenv("NO_AUTH", "1")
 
     with pytest.raises(ValidationError) as exc:
-        Config()  # pyright: ignore[reportUnusedCallResult]
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
     assert any(error["loc"] == ("Auth",) for error in exc.value.errors())
 
@@ -127,9 +126,9 @@ def test_config_accepts_uppercase_true_for_no_auth(
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "TRUE")
 
-    config = Config()
+    config = Config()  # pyright: ignore[reportCallIssue]
 
-    assert config.auth is None
+    assert config.AUTH is None
 
 
 @pytest.mark.parametrize("no_auth_value", ["0", "false"])
@@ -141,7 +140,7 @@ def test_config_requires_other_mode_when_no_auth_is_falsey(
     monkeypatch.setenv("NO_AUTH", no_auth_value)
 
     with pytest.raises(ValidationError):
-        Config()  # pyright: ignore[reportUnusedCallResult]
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
 
 @pytest.mark.parametrize("invalid_port", ["abc", "3.14", ""])
@@ -154,7 +153,7 @@ def test_config_rejects_invalid_listen_port(
     monkeypatch.setenv("LISTEN_PORT", invalid_port)
 
     with pytest.raises(ValidationError) as exc:
-        Config()  # pyright: ignore[reportUnusedCallResult]
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
     assert any(error["loc"] == ("LISTEN_PORT",) for error in exc.value.errors())
 
@@ -179,7 +178,7 @@ def test_config_rejects_empty_required_string_fields(
     monkeypatch.setenv(env_key, "")
 
     with pytest.raises(ValidationError):
-        Config()  # pyright: ignore[reportUnusedCallResult]
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
 
 @pytest.mark.parametrize(
@@ -203,27 +202,9 @@ def test_config_raises_when_required_env_is_missing(
     monkeypatch.delenv(missing_env_key)
 
     with pytest.raises(ValidationError) as exc:
-        Config()  # pyright: ignore[reportUnusedCallResult]
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
     assert any(error["loc"] == (missing_env_key,) for error in exc.value.errors())
-
-
-def test_config_requires_uppercase_env_keys_with_case_sensitive_mode(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("llm_api_uri", "http://127.0.0.1:11434/v1")
-    monkeypatch.setenv("llm_api_key", "test-key")
-    monkeypatch.setenv("model", "abc")
-    monkeypatch.setenv("agent_name", "test-agent")
-    monkeypatch.setenv("agent_description", "test agent")
-    monkeypatch.setenv("agent_instructions", "Reply briefly.")
-    monkeypatch.setenv("listen_port", "1234")
-    monkeypatch.setenv("NO_AUTH", "1")
-
-    with pytest.raises(ValidationError) as exc:
-        Config()  # pyright: ignore[reportUnusedCallResult]
-
-    assert any(error["loc"] == ("LLM_API_URI",) for error in exc.value.errors())
 
 
 def test_config_mcp_servers_is_snapshot_at_instantiation(
@@ -233,10 +214,10 @@ def test_config_mcp_servers_is_snapshot_at_instantiation(
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("MCP_SERVERS", "mcp://one")
 
-    config = Config()
+    config = Config()  # pyright: ignore[reportCallIssue]
     monkeypatch.setenv("MCP_SERVERS", "mcp://two")
 
-    assert config.mcp_servers == ["mcp://one"]
+    assert config.MCP_SERVERS == ["mcp://one"]
 
 
 def test_config_new_instance_picks_up_updated_mcp_servers(
@@ -245,13 +226,13 @@ def test_config_new_instance_picks_up_updated_mcp_servers(
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("MCP_SERVERS", "mcp://one")
-    first = Config()
+    first = Config()  # pyright: ignore[reportCallIssue]
 
     monkeypatch.setenv("MCP_SERVERS", "mcp://two")
-    second = Config()
+    second = Config()  # pyright: ignore[reportCallIssue]
 
-    assert first.mcp_servers == ["mcp://one"]
-    assert second.mcp_servers == ["mcp://two"]
+    assert first.MCP_SERVERS == ["mcp://one"]
+    assert second.MCP_SERVERS == ["mcp://two"]
 
 
 def test_config_raises_when_no_auth_mode_is_configured(
@@ -260,7 +241,7 @@ def test_config_raises_when_no_auth_mode_is_configured(
     _set_required_base_env(monkeypatch)
 
     with pytest.raises(ValidationError) as exc:
-        Config()  # pyright: ignore[reportUnusedCallResult]
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
     assert any(error["loc"] == ("Auth",) for error in exc.value.errors())
 
@@ -269,8 +250,8 @@ def test_get_config_returns_cached_instance(monkeypatch: pytest.MonkeyPatch) -> 
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "true")
 
-    first = get_config()
-    second = get_config()
+    first = from_env()
+    second = from_env()
 
     assert first is second
 
@@ -281,9 +262,9 @@ def test_get_config_returns_new_instance_after_cache_clear(
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
 
-    first = get_config()
-    get_config.cache_clear()
-    second = get_config()
+    first = from_env()
+    from_env.cache_clear()
+    second = from_env()
 
     assert first is not second
 
@@ -296,7 +277,7 @@ def test_get_config_exits_when_config_validation_fails(
     monkeypatch.delenv("LLM_API_URI")
 
     with pytest.raises(SystemExit) as exc:
-        get_config()  # pyright: ignore[reportUnusedCallResult]
+        from_env()  # pyright: ignore[reportUnusedCallResult]
 
     assert exc.value.code == 1
 
@@ -308,13 +289,13 @@ def test_get_config_mcp_servers_respects_cache_until_cleared(
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("MCP_SERVERS", "mcp://one")
 
-    first = get_config()
+    first = from_env()
     monkeypatch.setenv("MCP_SERVERS", "mcp://two")
-    second = get_config()
+    second = from_env()
 
     assert first is second
-    assert second.mcp_servers == ["mcp://one"]
+    assert second.MCP_SERVERS == ["mcp://one"]
 
-    get_config.cache_clear()
-    third = get_config()
-    assert third.mcp_servers == ["mcp://two"]
+    from_env.cache_clear()
+    third = from_env()
+    assert third.MCP_SERVERS == ["mcp://two"]

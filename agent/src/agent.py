@@ -30,7 +30,7 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 
 from .auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
-from .config import APIKeyAuth, Config, OAuth2Auth, get_config
+from .config import APIKeyAuth, Config, OAuth2Auth, from_env
 from .loggingManager import LoggingManager
 
 logger = LoggingManager().get_logger(__name__)
@@ -155,19 +155,19 @@ def create_a2a_app(
 def create_app(config: Config) -> Starlette:
     root_agent = LlmAgent(
         model=LiteLlm(
-            model=f"openai/{config.model}",
-            api_base=config.llm_api_uri,
-            api_key=config.llm_api_key,
+            model=f"openai/{config.MODEL}",
+            api_base=config.LLM_API_URI,
+            api_key=config.LLM_API_KEY,
         ),
-        name=config.agent_name,
-        description=config.agent_description,
-        instruction=config.agent_instructions,
+        name=config.AGENT_NAME,
+        description=config.AGENT_DESCRIPTION,
+        instruction=config.AGENT_INTRUCTIONS,
         tools=[
             McpToolset(
                 connection_params=StreamableHTTPConnectionParams(url=url),
                 header_provider=header_provider,
             )
-            for url in config.mcp_servers
+            for url in config.MCP_SERVERS
         ],
     )
 
@@ -176,16 +176,16 @@ def create_app(config: Config) -> Starlette:
     # inside a container, and the port will be published, this a2a agent needs
     # to know on which port it will be exposed. We should probably do the same
     # for the host, but we're only working with localhost for now.
-    app = create_a2a_app(root_agent, port=config.listen_port)
-    if isinstance(config.auth, APIKeyAuth):
+    app = create_a2a_app(root_agent, port=config.LISTEN_PORT)
+    if isinstance(config.AUTH, APIKeyAuth):
         logger.info("Auth mode: API Key")
-        app.add_middleware(ApiKeyAuthMiddleware, api_key=config.auth.api_key)
-    elif isinstance(config.auth, OAuth2Auth):
+        app.add_middleware(ApiKeyAuthMiddleware, api_key=config.AUTH.api_key)
+    elif isinstance(config.AUTH, OAuth2Auth):
         logger.info("Auth mode: OAuth2")
         app.add_middleware(
             OAuth2BearerAuthMiddleware,
-            issuer_url=config.auth.oauth2_issuer_url,
-            jwks_url=config.auth.oauth2_jwks_url,
+            issuer_url=config.AUTH.oauth2_issuer_url,
+            jwks_url=config.AUTH.oauth2_jwks_url,
             realm=root_agent.name,
         )
     else:
@@ -195,4 +195,4 @@ def create_app(config: Config) -> Starlette:
 
 
 def create_app_from_env() -> Starlette:
-    return create_app(get_config())
+    return create_app(from_env())

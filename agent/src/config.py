@@ -65,36 +65,32 @@ def compute_mcp_servers() -> list[str]:
 
 
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=True)
+    model_config = SettingsConfigDict(case_sensitive=True, populate_by_name=True)
 
-    llm_api_uri: NonEmptyStr = Field(validation_alias="LLM_API_URI", init=False)
-    llm_api_key: NonEmptyStr = Field(validation_alias="LLM_API_KEY", init=False)
-    model: NonEmptyStr = Field(validation_alias="MODEL", init=False)
-    agent_name: NonEmptyStr = Field(validation_alias="AGENT_NAME", init=False)
-    agent_description: NonEmptyStr = Field(
-        validation_alias="AGENT_DESCRIPTION", init=False
-    )
-    agent_instructions: NonEmptyStr = Field(
-        validation_alias="AGENT_INSTRUCTIONS", init=False
-    )
-    listen_port: int = Field(validation_alias="LISTEN_PORT", init=False)
+    LLM_API_URI: NonEmptyStr = Field(validation_alias="LLM_API_URI")
+    LLM_API_KEY: NonEmptyStr = Field(validation_alias="LLM_API_KEY")
+    MODEL: NonEmptyStr = Field(validation_alias="MODEL")
+    AGENT_NAME: NonEmptyStr = Field(validation_alias="AGENT_NAME")
+    AGENT_DESCRIPTION: NonEmptyStr = Field(validation_alias="AGENT_DESCRIPTION")
+    AGENT_INTRUCTIONS: NonEmptyStr = Field(validation_alias="AGENT_INSTRUCTIONS")
+    LISTEN_PORT: int = Field(validation_alias="LISTEN_PORT")
 
-    agent_api_key: NonEmptyStr | None = Field(
+    AGENT_API_KEY: NonEmptyStr | None = Field(
         default=None, validation_alias="AGENT_API_KEY", exclude=True
     )
-    oauth2_issuer_url: NonEmptyStr | None = Field(
+    OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(
         default=None, validation_alias="OAUTH2_ISSUER_URL", exclude=True
     )
-    oauth2_jwks_url: NonEmptyStr | None = Field(
+    OAUTH2_JWKS_URL: NonEmptyStr | None = Field(
         default=None, validation_alias="OAUTH2_JWKS_URL", exclude=True
     )
-    no_auth: bool = Field(default=False, validation_alias="NO_AUTH", exclude=True)
+    NO_AUTH: bool = Field(default=False, validation_alias="NO_AUTH", exclude=True)
 
     _auth: APIKeyAuth | OAuth2Auth | None = PrivateAttr()
     _mcp_servers: list[str] = PrivateAttr(default_factory=compute_mcp_servers)
 
     @property
-    def auth(self):
+    def AUTH(self):
         return self._auth
 
     @model_validator(mode="wrap")
@@ -108,10 +104,10 @@ class Config(BaseSettings):
             errors.extend(e.errors())
 
         if model:
-            agent_api_key = model.agent_api_key
-            oauth2_issuer_url = model.oauth2_issuer_url
-            oauth2_jwks_url = model.oauth2_jwks_url
-            no_auth = model.no_auth
+            agent_api_key = model.AGENT_API_KEY
+            oauth2_issuer_url = model.OAUTH2_ISSUER_URL
+            oauth2_jwks_url = model.OAUTH2_JWKS_URL
+            no_auth = model.NO_AUTH
         else:
             agent_api_key = os.getenv("AGENT_API_KEY")
             oauth2_issuer_url = os.getenv("OAUTH2_ISSUER_URL")
@@ -147,14 +143,14 @@ class Config(BaseSettings):
         return model
 
     @property
-    def mcp_servers(self):
+    def MCP_SERVERS(self):
         return self._mcp_servers
 
 
 @lru_cache(maxsize=1)
-def get_config() -> Config:
+def from_env() -> Config:
     try:
-        return Config()
+        return Config()  # pyright: ignore[reportCallIssue]
     except Exception as e:
         logger.debug("Failed to load config", exc_info=True)
         if isinstance(e, ValidationError):

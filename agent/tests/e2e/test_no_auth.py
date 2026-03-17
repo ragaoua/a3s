@@ -1,33 +1,66 @@
-import traceback
+import asyncio
+import json
+import threading
+import time
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
-import json
-import os
 
+import httpx
+import pytest
+import uvicorn
 from a2a.client import A2ACardResolver, A2AClient
 from a2a.types import (
-    SendMessageResponse,
+    GetTaskRequest,
     GetTaskResponse,
+    MessageSendParams,
+    SendMessageRequest,
+    SendMessageResponse,
     SendMessageSuccessResponse,
     Task,
-    TaskState,
-    SendMessageRequest,
-    MessageSendParams,
-    GetTaskRequest,
     TaskQueryParams,
 )
-import httpx
 
-auth_header = {}
-agent_api_key = os.getenv("AGENT_API_KEY")
-if agent_api_key:
-    auth_header = {"API-Key": agent_api_key}
-else:
-    agent_access_token = os.getenv("AGENT_ACCESS_TOKEN")
-    if agent_access_token:
-        auth_header = {"Authorization": f"Bearer {agent_access_token}"}
+from src.config import Config
 
-AGENT_URL = f"http://localhost:{os.getenv('PORT', '8000')}"
+AGENT_DIR = Path(__file__).resolve().parents[2]
+
+pytest_plugins = ("pytest_asyncio",)
+
+
+async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
+    STARTUP_TIMEOUT_SECONDS = 10
+    RETRY_DELAY_SECONDS = 1
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+    last_error: Exception | None = None
+
+    resolver = A2ACardResolver(httpx_client, base_url)
+    while time.monotonic() < deadline:
+        try:
+            agent_card = await resolver.get_agent_card()
+            return agent_card
+        except Exception as exc:  # pragma: no cover - exercised on startup delay
+            last_error = exc
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+
+    raise TimeoutError(
+        f"Agent card not available at {base_url} after {STARTUP_TIMEOUT_SECONDS}s"
+    ) from last_error
+
+
+def start_agent_server(config: Config):
+    from src.agent import create_app
+
+    app = create_app(config)
+    server_config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=config.LISTEN_PORT,
+    )
+    server = uvicorn.Server(server_config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    return server, thread
 
 
 def create_send_message_payload(
@@ -78,12 +111,10 @@ async def run_single_turn_test(client: A2AClient) -> None:
     response: SendMessageResponse = await client.send_message(request)
     print_json_response(response, "📥 Single Turn Request Response")
     if not isinstance(response.root, SendMessageSuccessResponse):
-        print("received non-success response. Aborting get task ")
-        return
+        raise RuntimeError("received non-success response")
 
     if not isinstance(response.root.result, Task):
-        print("received non-task response. Aborting get task ")
-        return
+        raise RuntimeError("received non-task response")
 
     task_id: str = response.root.result.id
     print("--- ❔ Query Task ---")
@@ -93,20 +124,30 @@ async def run_single_turn_test(client: A2AClient) -> None:
     print_json_response(get_response, "📥 Query Task Response")
 
 
-async def main() -> None:
-    """Main function to run the tests."""
-    print(f"--- 🔄 Connecting to agent at {AGENT_URL}... ---")
+@pytest.mark.asyncio
+async def test_expose_a2a_agent_and_run_test_script() -> None:
+    config = Config(
+        LLM_API_URI="endpoint",
+        LLM_API_KEY="fakekey",
+        MODEL="model",
+        AGENT_NAME="Cody",
+        AGENT_DESCRIPTION="A helpful coding assistant",
+        AGENT_INTRUCTIONS="""
+You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks.
+DO NOT PRINT OUT CODE TO THE USER unless explicitely prompted. ALWAYS WRITE CODE TO FILES.
+Take initiatives regarding file names, architecture etc.""",
+        LISTEN_PORT=10000,
+        NO_AUTH=True,
+    )
+
+    server, server_thread = start_agent_server(config)
+
     try:
         async with httpx.AsyncClient(
-            headers=auth_header,
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            # Create a resolver to fetch the agent card
-            resolver = A2ACardResolver(
-                httpx_client=httpx_client,
-                base_url=AGENT_URL,
-            )
-            agent_card = await resolver.get_agent_card()
+            agent_url = f"http://localhost:{config.LISTEN_PORT}"
+            agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))
 
@@ -115,19 +156,10 @@ async def main() -> None:
                 httpx_client=httpx_client,
                 agent_card=agent_card,
             )
-            print("--- ✅ Connection successful. ---")
 
-            # Run the test
             await run_single_turn_test(client)
-            # await run_multi_turn_test(client)
+    finally:
+        server.should_exit = True
+        server_thread.join(timeout=5)
 
-    except Exception as e:
-        traceback.print_exc()
-        print(f"--- ❌ An error occurred: {e} ---")
-        print("Ensure the agent server is running.")
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(main())
+        assert not server_thread.is_alive(), "Agent server thread failed to stop"
