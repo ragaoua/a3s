@@ -1,5 +1,5 @@
 [project]
-name = "currency-agent"
+name = "a3s-agent"
 version = "0.1.0"
 description = "Currency conversion agent using ADK, MCP and A2A"
 readme = "README.md"
@@ -10,6 +10,16 @@ dependencies = [
     "google-adk==1.27.0",
     "litellm"
 ]
+
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+a3s-agent = "src.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
 
 [dependency-groups]
 dev = [

@@ -65,7 +65,11 @@ def compute_mcp_servers() -> list[str]:
 
 
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(case_sensitive=True, populate_by_name=True)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        populate_by_name=True,
+    )
 
     LLM_API_URI: NonEmptyStr = Field(validation_alias="LLM_API_URI")
     LLM_API_KEY: NonEmptyStr = Field(validation_alias="LLM_API_KEY")

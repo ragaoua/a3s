@@ -4,69 +4,37 @@ Install the environment:
 uv sync
 ```
 
-Run the adk web console for testing:
+Create a `.env` file (see [.env.example](.env.example)) then run the a2a agent:
 
 ```bash
-export LLM_API_URI=
-export LLM_API_KEY=
-export AGENT_API_KEY=
-export OAUTH2_ISSUER_URL= # e.g. https://keycloak.example.com/realms/my-realm
-export OAUTH2_JWKS_URL= # optional override, otherwise discovered from <issuer>/.well-known/oauth-authorization-server
-export MODEL=
-export AGENT_NAME=
-export AGENT_DESCRIPTION=
-export AGENT_INSTRUCTIONS=
-export LISTEN_PORT=
-export MCP_SERVERS= # comma separated list of mcp endpoints (/!\ prefixed with "https://"), can be empty
-uv run adk web
+uv run a3s-agent
 ```
 
-Expose the a2a agent:
+See it in action:
 
 ```bash
-export LLM_API_URI=
-export LLM_API_KEY=
-export AGENT_API_KEY=
-export OAUTH2_ISSUER_URL= # e.g. https://keycloak.example.com/realms/my-realm
-export OAUTH2_JWKS_URL= # optional override, otherwise discovered from <issuer>/.well-known/oauth-authorization-server
-export MODEL=
-export AGENT_NAME=
-export AGENT_DESCRIPTION=
-export AGENT_INSTRUCTIONS=
-export LISTEN_PORT=
-export MCP_SERVERS= # comma separated list of mcp endpoints (/!\ prefixed with "https://"), can be empty
-uv run uvicorn src.main:a2a_app --host localhost --port "$LISTEN_PORT"
+uv run pytest tests/integration/test_no_auth::test_agent_is_reachable_in_no_auth_mode
+uv run pytest tests/integration/test_api_key_auth::test_agent_is_reachable_when_api_key_auth_is_enabled
 ```
 
-Test the A2A agent:
+Run tests:
 
 ```bash
-export PORT="$LISTEN_PORT"
-export AGENT_ACCESS_TOKEN=
-uv run tests/test_a2a.py # PORT=8000 is the default
+uv run pytest -s
 ```
 
 Build and run the image:
 
 ```bash
 podman build -t agent .
+LISTEN_PORT=""
 podman run \
     --interactive \
     --tty \
     --rm \
-    --name aaas \
-    -e MODEL= \
-    -e AGENT_INSTRUCTIONS= \
-    -e AGENT_DESCRIPTION= \
-    -e AGENT_NAME= \
-    -e LLM_API_URI= \
-    -e LLM_API_KEY= \
-    -e AGENT_API_KEY= \
-    -e OAUTH2_ISSUER_URL= \
-    -e OAUTH2_JWKS_URL= \
-    -e MCP_SERVERS= \
-    -e LISTEN_PORT="8001" \
-    --publish 8001:8001 \
+    --name a3s \
+    --env-file .env \
+    --publish "$LISTEN_PORT":"$LISTEN_PORT" \
     localhost/agent
 ```
 

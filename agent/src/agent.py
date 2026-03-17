@@ -38,6 +38,7 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from starlette.applications import Starlette
 from starlette.requests import Request
+import uvicorn
 
 from .auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
 from .config import APIKeyAuth, Config, OAuth2Auth, from_env
@@ -213,11 +214,6 @@ def create_app(config: Config) -> Starlette:
         ],
     )
 
-    # NOTE: LISTEN_PORT is necessary here because that's the value that will be
-    # used for the url for the agent's card. Since this is intended to be run
-    # inside a container, and the port will be published, this a2a agent needs
-    # to know on which port it will be exposed. We should probably do the same
-    # for the host, but we're only working with localhost for now.
     app = create_a2a_app(root_agent, config=config)
 
     if isinstance(config.AUTH, APIKeyAuth):
@@ -238,7 +234,3 @@ def create_app(config: Config) -> Starlette:
         logger.info("Auth disabled.")
 
     return app
-
-
-def create_app_from_env() -> Starlette:
-    return create_app(from_env())
