@@ -71,25 +71,18 @@ class Config(BaseSettings):
         populate_by_name=True,
     )
 
-    LLM_API_URI: NonEmptyStr = Field(validation_alias="LLM_API_URI")
-    LLM_API_KEY: NonEmptyStr = Field(validation_alias="LLM_API_KEY")
-    MODEL: NonEmptyStr = Field(validation_alias="MODEL")
-    AGENT_NAME: NonEmptyStr = Field(validation_alias="AGENT_NAME")
-    AGENT_DESCRIPTION: NonEmptyStr = Field(validation_alias="AGENT_DESCRIPTION")
-    AGENT_INSTRUCTIONS: NonEmptyStr = Field(validation_alias="AGENT_INSTRUCTIONS")
-    LISTEN_PORT: int = Field(validation_alias="LISTEN_PORT")
+    LLM_API_URI: NonEmptyStr = Field()
+    LLM_API_KEY: NonEmptyStr = Field()
+    MODEL: NonEmptyStr = Field()
+    AGENT_NAME: NonEmptyStr = Field()
+    AGENT_DESCRIPTION: NonEmptyStr = Field()
+    AGENT_INSTRUCTIONS: NonEmptyStr = Field()
+    LISTEN_PORT: int = Field()
 
-    AGENT_API_KEY: NonEmptyStr | None = Field(
-        default=None, validation_alias="AGENT_API_KEY", exclude=True
-    )
-    OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(
-        default=None, validation_alias="OAUTH2_ISSUER_URL", exclude=True
-    )
-    OAUTH2_JWKS_URL: NonEmptyStr | None = Field(
-        default=None, validation_alias="OAUTH2_JWKS_URL", exclude=True
-    )
-    NO_AUTH: bool = Field(default=False, validation_alias="NO_AUTH", exclude=True)
-
+    AGENT_API_KEY: NonEmptyStr | None = Field(default=None, exclude=True)
+    OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(default=None, exclude=True)
+    OAUTH2_JWKS_URL: NonEmptyStr | None = Field(default=None, exclude=True)
+    NO_AUTH: bool = Field(default=False, exclude=True)
     _auth: APIKeyAuth | OAuth2Auth | None = PrivateAttr()
     _mcp_servers: list[str] = PrivateAttr(default_factory=compute_mcp_servers)
 
@@ -113,10 +106,17 @@ class Config(BaseSettings):
             oauth2_jwks_url = model.OAUTH2_JWKS_URL
             no_auth = model.NO_AUTH
         else:
-            agent_api_key = os.getenv("AGENT_API_KEY")
-            oauth2_issuer_url = os.getenv("OAUTH2_ISSUER_URL")
-            oauth2_jwks_url = os.getenv("OAUTH2_JWKS_URL")
-            no_auth = os.getenv("NO_AUTH", "").lower() in ["1", "true"]
+            agent_api_key = data["AGENT_API_KEY"] if "AGENT_API_KEY" in data else None
+            oauth2_issuer_url = (
+                data["OAUTH2_ISSUER_URL"] if "OAUTH2_ISSUER_URL" in data else None
+            )
+            oauth2_jwks_url = (
+                data["OAUTH2_JWKS_URL"] if "OAUTH2_JWKS_URL" in data else None
+            )
+            no_auth = (data["NO_AUTH"] if "NO_AUTH" in data else "").lower() in [
+                "1",
+                "true",
+            ]
 
         try:
             auth = validate_auth_config(
