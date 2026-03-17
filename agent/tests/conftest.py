@@ -1,8 +1,10 @@
-import sys
-from pathlib import Path
+from pydantic_settings import SettingsConfigDict
+
+import src.config as config
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+class TestConfig(config.Config):
+    model_config = SettingsConfigDict(env_file=None)
 
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+
+config.Config = TestConfig
