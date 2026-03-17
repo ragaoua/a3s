@@ -219,9 +219,13 @@ def create_app(config: Config) -> Starlette:
     # to know on which port it will be exposed. We should probably do the same
     # for the host, but we're only working with localhost for now.
     app = create_a2a_app(root_agent, config=config)
+
     if isinstance(config.AUTH, APIKeyAuth):
         logger.info("Auth mode: API Key")
-        app.add_middleware(ApiKeyAuthMiddleware, api_key=config.AUTH.api_key)
+        app.add_middleware(
+            ApiKeyAuthMiddleware,
+            api_key=config.AUTH.api_key,
+        )
     elif isinstance(config.AUTH, OAuth2Auth):
         logger.info("Auth mode: OAuth2")
         app.add_middleware(

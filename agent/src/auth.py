@@ -1,7 +1,7 @@
 import json
 from hmac import compare_digest
 from json import JSONDecodeError
-from typing import Any, final
+from typing import Any, Iterable, final
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -18,17 +18,26 @@ from src.loggingManager import LoggingManager
 
 logger = LoggingManager().get_logger(__name__)
 
+excluded_paths: Iterable[str] = ("/.well-known/agent-card.json",)
+
 
 @final
 class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
     HEADER_NAME = "API-Key"
 
-    def __init__(self, app: ASGIApp, api_key: str):
+    def __init__(
+        self,
+        app: ASGIApp,
+        api_key: str,
+    ):
         super().__init__(app)
         self.api_key = api_key
 
     @override
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        if request.url.path in excluded_paths:
+            return await call_next(request)
+
         received_key = request.headers.get("API-Key", "")
         if not compare_digest(received_key, self.api_key):
             return JSONResponse(
@@ -62,8 +71,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
     ):
         super().__init__(app)
         self.issuer_url = issuer_url.rstrip("/")
-        self.jwks_url = jwks_url or self._discover_jwks_uri()
-        self.jwk_set = self._fetch_jwk_set(self.jwks_url)
+        self.jwks_url = jwks_url
         self.realm = realm
 
     def _fetch_json(self, url: str) -> dict[str, Any]:
@@ -96,10 +104,10 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwks_raw = self._fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
 
-    def _decode_access_token(self, token: str):
+    def _decode_access_token(self, token: str, jwk_set: KeySet):
         claims = jwt.decode(
             token,
-            self.jwk_set,
+            jwk_set,
             claims_options={"iss": {"essential": True, "value": self.issuer_url}},
         )
         claims.validate()
@@ -126,6 +134,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
     @override
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        if request.url.path in excluded_paths:
+            return await call_next(request)
+
         auth_header = request.headers.get("Authorization")
 
         if not auth_header:
@@ -140,8 +151,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         token = token.strip()
 
+        jwks_url = self.jwks_url or self._discover_jwks_uri()
+        jwk_set = self._fetch_jwk_set(jwks_url)
+
         try:
-            token_payload = self._decode_access_token(token)
+            token_payload = self._decode_access_token(token, jwk_set)
             request.state.token_claims = dict(token_payload)
             request.state.authorization_header = f"Bearer {token}"
         except Exception as err:
