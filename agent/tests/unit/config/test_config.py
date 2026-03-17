@@ -19,32 +19,6 @@ def _set_required_base_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("LISTEN_PORT", "1234")
 
 
-@pytest.fixture(autouse=True)
-def _reset_state(monkeypatch: pytest.MonkeyPatch):
-    managed_keys = (
-        "LLM_API_URI",
-        "LLM_API_KEY",
-        "MODEL",
-        "AGENT_NAME",
-        "AGENT_DESCRIPTION",
-        "AGENT_INSTRUCTIONS",
-        "LISTEN_PORT",
-        "AGENT_API_KEY",
-        "OAUTH2_ISSUER_URL",
-        "OAUTH2_JWKS_URL",
-        "NO_AUTH",
-        "MCP_SERVERS",
-    )
-
-    from_env.cache_clear()
-    for key in managed_keys:
-        monkeypatch.delenv(key, raising=False)
-
-    yield
-
-    from_env.cache_clear()
-
-
 def test_config_loads_in_no_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_required_base_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
