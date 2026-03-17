@@ -24,7 +24,7 @@ async def test_expose_a2a_agent_and_run_test_script() -> None:
         MODEL="model",
         AGENT_NAME="Cody",
         AGENT_DESCRIPTION="A helpful coding assistant",
-        AGENT_INTRUCTIONS="""
+        AGENT_INSTRUCTIONS="""
 You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks.
 DO NOT PRINT OUT CODE TO THE USER unless explicitely prompted. ALWAYS WRITE CODE TO FILES.
 Take initiatives regarding file names, architecture etc.""",

@@ -72,7 +72,7 @@ class Config(BaseSettings):
     MODEL: NonEmptyStr = Field(validation_alias="MODEL")
     AGENT_NAME: NonEmptyStr = Field(validation_alias="AGENT_NAME")
     AGENT_DESCRIPTION: NonEmptyStr = Field(validation_alias="AGENT_DESCRIPTION")
-    AGENT_INTRUCTIONS: NonEmptyStr = Field(validation_alias="AGENT_INSTRUCTIONS")
+    AGENT_INSTRUCTIONS: NonEmptyStr = Field(validation_alias="AGENT_INSTRUCTIONS")
     LISTEN_PORT: int = Field(validation_alias="LISTEN_PORT")
 
     AGENT_API_KEY: NonEmptyStr | None = Field(

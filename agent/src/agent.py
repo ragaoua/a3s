@@ -203,7 +203,7 @@ def create_app(config: Config) -> Starlette:
         ),
         name=config.AGENT_NAME,
         description=config.AGENT_DESCRIPTION,
-        instruction=config.AGENT_INTRUCTIONS,
+        instruction=config.AGENT_INSTRUCTIONS,
         tools=[
             McpToolset(
                 connection_params=StreamableHTTPConnectionParams(url=url),
