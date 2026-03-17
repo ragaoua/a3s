@@ -8,8 +8,18 @@ from a2a.server.tasks import (
     InMemoryPushNotificationConfigStore,
     InMemoryTaskStore,
 )
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
-from google.adk.agents import BaseAgent, LlmAgent
+from a2a.types import (
+    APIKeySecurityScheme,
+    AgentCapabilities,
+    AgentCard,
+    AgentSkill,
+    AuthorizationCodeOAuthFlow,
+    In,
+    OAuth2SecurityScheme,
+    OAuthFlows,
+    SecurityScheme,
+)
+from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.a2a.converters.request_converter import (
     AgentRunRequest,
@@ -78,10 +88,10 @@ def request_converter(
 
 
 def create_a2a_app(
-    agent: BaseAgent,
+    agent: LlmAgent,
     *,
+    config: Config,
     host: str = "localhost",
-    port: int = 8000,
     protocol: str = "http",
 ) -> Starlette:
     adk_logger = logging.getLogger("google_adk")
@@ -111,10 +121,46 @@ def create_a2a_app(
         push_config_store=push_config_store,
     )
 
-    rpc_url = f"{protocol}://{host}:{port}"
+    rpc_url = f"{protocol}://{host}:{config.LISTEN_PORT}"
 
-    def create_static_agent_card() -> AgentCard:
-        return AgentCard(
+    app = Starlette()
+
+    async def setup_a2a():
+        if isinstance(config.AUTH, APIKeyAuth):
+            security_schemes = {
+                "APIKeySecurityScheme": SecurityScheme(
+                    APIKeySecurityScheme(
+                        in_=In.header,
+                        name=ApiKeyAuthMiddleware.HEADER_NAME,
+                    )
+                ),
+            }
+        elif isinstance(config.AUTH, OAuth2Auth):
+            security_schemes = {
+                "OAuth2SecurityScheme": SecurityScheme(
+                    OAuth2SecurityScheme(
+                        flows=OAuthFlows(
+                            authorization_code=AuthorizationCodeOAuthFlow(
+                                # TODO
+                                authorization_url="",
+                                refresh_url="",
+                                scopes={},
+                                token_url="",
+                            )
+                        ),
+                        # oauth2MetadataUrl=,
+                    )
+                ),
+            }
+        else:
+            security = None
+            security_schemes = None
+
+        agent_description = agent.description
+        if isinstance(agent.instruction, str):
+            agent_description += f"\n{agent.instruction}"
+
+        agent_card = AgentCard(
             name=agent.name,
             description=agent.description,
             url=rpc_url,
@@ -124,10 +170,11 @@ def create_a2a_app(
                 AgentSkill(
                     id=agent.name,
                     name="model" if isinstance(agent, LlmAgent) else "agent",
-                    description=agent.description,
+                    description=agent_description,
                     tags=["llm"] if isinstance(agent, LlmAgent) else ["custom_agent"],
                 )
             ],
+            security_schemes=security_schemes,
             default_input_modes=["text/plain"],
             default_output_modes=["text/plain"],
             # TODO: maybe this is interesting.
@@ -136,13 +183,8 @@ def create_a2a_app(
             # access to
             supports_authenticated_extended_card=False,
         )
-
-    app = Starlette()
-
-    async def setup_a2a():
-        final_agent_card: AgentCard = create_static_agent_card()
         a2a_server = A2AStarletteApplication(
-            agent_card=final_agent_card,
+            agent_card=agent_card,
             http_handler=request_handler,
             context_builder=MiddlewareCallContextBuilder(),
         )
@@ -176,7 +218,7 @@ def create_app(config: Config) -> Starlette:
     # inside a container, and the port will be published, this a2a agent needs
     # to know on which port it will be exposed. We should probably do the same
     # for the host, but we're only working with localhost for now.
-    app = create_a2a_app(root_agent, port=config.LISTEN_PORT)
+    app = create_a2a_app(root_agent, config=config)
     if isinstance(config.AUTH, APIKeyAuth):
         logger.info("Auth mode: API Key")
         app.add_middleware(ApiKeyAuthMiddleware, api_key=config.AUTH.api_key)

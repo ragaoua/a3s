@@ -21,6 +21,8 @@ logger = LoggingManager().get_logger(__name__)
 
 @final
 class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
+    HEADER_NAME = "API-Key"
+
     def __init__(self, app: ASGIApp, api_key: str):
         super().__init__(app)
         self.api_key = api_key
@@ -32,7 +34,7 @@ class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Unauthorized"},
-                headers={"WWW-Authenticate": "API-Key"},
+                headers={"WWW-Authenticate": self.HEADER_NAME},
             )
 
         request.state.api_key = received_key
