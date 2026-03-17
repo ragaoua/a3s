@@ -35,7 +35,7 @@ export AGENT_DESCRIPTION=
 export AGENT_INSTRUCTIONS=
 export LISTEN_PORT=
 export MCP_SERVERS= # comma separated list of mcp endpoints (/!\ prefixed with "https://"), can be empty
-uv run uvicorn src.agent:a2a_app --host localhost --port "$LISTEN_PORT"
+uv run uvicorn src.main:a2a_app --host localhost --port "$LISTEN_PORT"
 ```
 
 Test the A2A agent:
