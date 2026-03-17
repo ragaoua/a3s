@@ -7,7 +7,7 @@ from a2a.client import A2AClient
 
 from src.auth import ApiKeyAuthMiddleware
 from src.config import APIKeyAuth, Config, OAuth2Auth
-from tests.e2e.utils import (
+from tests.integration.utils import (
     run_single_turn_test,
     start_agent_server,
     wait_for_agent_card,

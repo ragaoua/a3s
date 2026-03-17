@@ -1,23 +1,19 @@
-from pathlib import Path
-
 import httpx
 import pytest
 from a2a.client import A2AClient
 
 from src.config import Config
-from tests.e2e.utils import (
+from tests.integration.utils import (
     run_single_turn_test,
     start_agent_server,
     wait_for_agent_card,
 )
 
-AGENT_DIR = Path(__file__).resolve().parents[2]
-
 pytest_plugins = ("pytest_asyncio",)
 
 
 @pytest.mark.asyncio
-async def test_expose_a2a_agent_and_run_test_script() -> None:
+async def test_agent_is_reachable_in_no_auth_mode() -> None:
     config = Config(
         LLM_API_URI="endpoint",
         LLM_API_KEY="fakekey",
