@@ -17,4 +17,4 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
 
-CMD ["sh", "-c", "/app/.venv/bin/uvicorn src.agent:a2a_app --host 0.0.0.0 --port ${LISTEN_PORT}"]
+CMD ["sh", "-c", "/app/.venv/bin/uvicorn src.main:a2a_app --host 0.0.0.0 --port ${LISTEN_PORT}"]
