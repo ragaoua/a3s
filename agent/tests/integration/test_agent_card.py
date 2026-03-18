@@ -5,10 +5,10 @@ import pytest
 from src.auth import ApiKeyAuthMiddleware
 from src.config import APIKeyAuth, OAuth2Auth
 from tests.integration.utils import (
-    get_base_test_config_with,
     start_agent_server,
     wait_for_agent_card,
 )
+from tests.utils import get_base_test_config_ignoring_env_file_with
 
 
 @pytest.mark.asyncio
@@ -24,7 +24,7 @@ async def test_agent_card_contains_proper_security_scheme(
     AGENT_API_KEY: str | None,
     OAUTH2_ISSUER_URL: str | None,
 ) -> None:
-    config = get_base_test_config_with(
+    config = get_base_test_config_ignoring_env_file_with(
         NO_AUTH=AGENT_API_KEY is None and OAUTH2_ISSUER_URL is None,
         AGENT_API_KEY=AGENT_API_KEY,
         OAUTH2_ISSUER_URL=OAUTH2_ISSUER_URL,

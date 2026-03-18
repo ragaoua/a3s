@@ -2,8 +2,9 @@ import httpx
 import pytest
 from a2a.client import A2AClient
 
+from tests.utils import get_base_test_config_ignoring_env_file_with
+
 from tests.integration.utils import (
-    get_base_test_config_with,
     run_single_turn_test,
     start_agent_server,
     wait_for_agent_card,
@@ -12,7 +13,7 @@ from tests.integration.utils import (
 
 @pytest.mark.asyncio
 async def test_agent_is_reachable_in_no_auth_mode() -> None:
-    config = get_base_test_config_with(NO_AUTH=True)
+    config = get_base_test_config_ignoring_env_file_with(NO_AUTH=True)
 
     server, server_thread = start_agent_server(config)
 

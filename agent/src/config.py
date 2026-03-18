@@ -1,4 +1,3 @@
-import os
 import sys
 from functools import lru_cache
 from typing import Annotated, Self
@@ -9,6 +8,7 @@ from pydantic import (
     PrivateAttr,
     StringConstraints,
     ValidationError,
+    field_validator,
     model_validator,
 )
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -59,9 +59,14 @@ def validate_auth_config(
     return None
 
 
-def compute_mcp_servers() -> list[str]:
-    mcp_servers_raw = os.getenv("MCP_SERVERS") or ""
-    return [item.strip() for item in mcp_servers_raw.split(",") if item.strip()]
+def normalize_mcp_servers(
+    mcp_servers: list[str] | tuple[str, ...] | str | None,
+) -> list[str]:
+    if mcp_servers is None:
+        return []
+    if isinstance(mcp_servers, str):
+        return [item.strip() for item in mcp_servers.split(",") if item.strip()]
+    return [item.strip() for item in mcp_servers if item.strip()]
 
 
 class Config(BaseSettings):
@@ -69,11 +74,13 @@ class Config(BaseSettings):
         env_file=".env",
         case_sensitive=True,
         populate_by_name=True,
+        enable_decoding=False,
     )
 
     LLM_API_URI: NonEmptyStr = Field()
     LLM_API_KEY: NonEmptyStr = Field()
     MODEL: NonEmptyStr = Field()
+
     AGENT_NAME: NonEmptyStr = Field()
     AGENT_DESCRIPTION: NonEmptyStr = Field()
     AGENT_INSTRUCTIONS: NonEmptyStr = Field()
@@ -84,7 +91,13 @@ class Config(BaseSettings):
     OAUTH2_JWKS_URL: NonEmptyStr | None = Field(default=None, exclude=True)
     NO_AUTH: bool = Field(default=False, exclude=True)
     _auth: APIKeyAuth | OAuth2Auth | None = PrivateAttr()
-    _mcp_servers: list[str] = PrivateAttr(default_factory=compute_mcp_servers)
+
+    MCP_SERVERS: list[NonEmptyStr] = Field(default_factory=list)
+
+    @field_validator("MCP_SERVERS", mode="before")
+    @classmethod
+    def parse_mcp_servers(cls, value):
+        return normalize_mcp_servers(value)
 
     @property
     def AUTH(self):
@@ -113,10 +126,17 @@ class Config(BaseSettings):
             oauth2_jwks_url = (
                 data["OAUTH2_JWKS_URL"] if "OAUTH2_JWKS_URL" in data else None
             )
-            no_auth = (data["NO_AUTH"] if "NO_AUTH" in data else "").lower() in [
-                "1",
-                "true",
-            ]
+            if "NO_AUTH" in data:
+                no_auth_raw_value = data["NO_AUTH"]
+                if isinstance(no_auth_raw_value, str):
+                    no_auth = no_auth_raw_value.lower() in [
+                        "1",
+                        "true",
+                    ]
+                else:
+                    no_auth = isinstance(no_auth_raw_value, bool) and no_auth_raw_value
+            else:
+                no_auth = False
 
         try:
             auth = validate_auth_config(
@@ -146,16 +166,21 @@ class Config(BaseSettings):
         assert model is not None
         return model
 
-    @property
-    def MCP_SERVERS(self):
-        return self._mcp_servers
-
 
 @lru_cache(maxsize=1)
 def from_env() -> Config:
     try:
-        return Config()  # pyright: ignore[reportCallIssue]
+        config = Config()  # pyright: ignore[reportCallIssue]
+        print(config)
+        return config
     except Exception as e:
+        print("===========================")
+        print("===========================")
+        print("===========================")
+        print("EXITING")
+        print("===========================")
+        print("===========================")
+        print("===========================")
         logger.debug("Failed to load config", exc_info=True)
         if isinstance(e, ValidationError):
             for error in e.errors(include_url=False):
