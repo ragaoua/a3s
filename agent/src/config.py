@@ -1,7 +1,7 @@
 from ipaddress import IPv4Address
 import sys
 from functools import lru_cache
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from attr import dataclass
 from pydantic import (
@@ -86,7 +86,9 @@ class Config(BaseSettings):
     AGENT_DESCRIPTION: NonEmptyStr = Field()
     AGENT_INSTRUCTIONS: NonEmptyStr = Field()
     LISTEN_PORT: int = Field(default=8000)
-    LISTEN_ADDRESS: IPv4Address = Field(default=IPv4Address("127.0.0.1"))
+    LISTEN_ADDRESS: IPv4Address | Literal["localhost"] = Field(
+        default=IPv4Address("127.0.0.1")
+    )
 
     AGENT_API_KEY: NonEmptyStr | None = Field(default=None, exclude=True)
     OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(default=None, exclude=True)
@@ -104,6 +106,8 @@ class Config(BaseSettings):
     @field_validator("LISTEN_ADDRESS", mode="before")
     @classmethod
     def parse_listen_address(cls, value):
+        if value == "localhost":
+            return value
         try:
             return IPv4Address(value)
         except Exception as exc:

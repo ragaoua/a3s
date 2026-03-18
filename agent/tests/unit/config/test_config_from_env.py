@@ -185,7 +185,7 @@ def test_config_rejects_invalid_listen_port(
     assert any(error["loc"] == ("LISTEN_PORT",) for error in exc.value.errors())
 
 
-@pytest.mark.parametrize("invalid_address", ["localhost", "999.0.0.1", "", "::1"])
+@pytest.mark.parametrize("invalid_address", ["999.0.0.1", "", "::1"])
 def test_config_rejects_invalid_listen_address(
     monkeypatch: pytest.MonkeyPatch,
     invalid_address: str,
@@ -384,11 +384,11 @@ def test_config_new_instance_picks_up_updated_listen_address(
 
     config = Config()  # pyright: ignore[reportCallIssue]
 
-    monkeypatch.setenv("LISTEN_ADDRESS", "127.0.0.2")
+    monkeypatch.setenv("LISTEN_ADDRESS", "localhost")
 
     config = Config()  # pyright: ignore[reportCallIssue]
 
-    assert str(config.LISTEN_ADDRESS) == "127.0.0.2"
+    assert str(config.LISTEN_ADDRESS) == "localhost"
 
 
 def test_from_env_returns_cached_instance(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -15,13 +15,18 @@ def test_config_loads_in_no_auth_mode() -> None:
     assert config.AUTH is None
 
 
-def test_config_accepts_custom_listen_address() -> None:
+@pytest.mark.parametrize("LISTEN_ADDRESS", ("0.0.0.0", "localhost", "192.168.2.1"))
+def test_config_accepts_custom_listen_address(LISTEN_ADDRESS: str) -> None:
     config = get_base_test_config_ignoring_env_file_with(
         NO_AUTH=True,
-        LISTEN_ADDRESS=IPv4Address("0.0.0.0"),
+        LISTEN_ADDRESS=(
+            LISTEN_ADDRESS
+            if LISTEN_ADDRESS == "localhost"
+            else IPv4Address(LISTEN_ADDRESS)
+        ),
     )
 
-    assert str(config.LISTEN_ADDRESS) == "0.0.0.0"
+    assert str(config.LISTEN_ADDRESS) == LISTEN_ADDRESS
 
 
 def test_config_loads_in_api_key_auth_mode() -> None:

@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic_settings import SettingsConfigDict
 from ipaddress import IPv4Address
 from src.config import Config
@@ -12,7 +13,7 @@ def get_base_test_config_ignoring_env_file_with(
     AGENT_DESCRIPTION: str = "A helpful coding assistant",
     AGENT_INSTRUCTIONS: str = "You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks",
     LISTEN_PORT: int = 12345,
-    LISTEN_ADDRESS: IPv4Address = IPv4Address("127.0.0.1"),
+    LISTEN_ADDRESS: IPv4Address | Literal["localhost"] = IPv4Address("127.0.0.1"),
     AGENT_API_KEY: str | None = None,
     OAUTH2_ISSUER_URL: str | None = None,
     OAUTH2_JWKS_URL: str | None = None,
