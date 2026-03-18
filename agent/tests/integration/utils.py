@@ -48,7 +48,7 @@ def start_agent_server(config: Config):
     app = create_app(config)
     server_config = uvicorn.Config(
         app,
-        host="127.0.0.1",
+        host=str(config.LISTEN_ADDRESS),
         port=config.LISTEN_PORT,
     )
     server = uvicorn.Server(server_config)

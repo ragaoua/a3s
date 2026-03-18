@@ -37,8 +37,9 @@ async def test_agent_card_contains_proper_security_scheme(
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://localhost:{config.LISTEN_PORT}"
+            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
+            assert agent_card.url == agent_url
 
             if isinstance(config.AUTH, OAuth2Auth):
                 assert OAUTH2_ISSUER_URL is not None

@@ -10,7 +10,7 @@ def main() -> None:
     server = uvicorn.Server(
         uvicorn.Config(
             app,
-            host="127.0.0.1",
+            host=str(config.LISTEN_ADDRESS),
             port=config.LISTEN_PORT,
         )
     )

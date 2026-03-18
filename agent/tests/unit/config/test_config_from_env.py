@@ -28,7 +28,7 @@ def clear_from_env_cache():
     from_env.cache_clear()
 
 
-def _set_base_test_env_with(
+def _set_base_test_env(
     monkeypatch: pytest.MonkeyPatch,
     LLM_API_URI: str = "endpoint",
     LLM_API_KEY: str = "fakekey",
@@ -36,7 +36,6 @@ def _set_base_test_env_with(
     AGENT_NAME: str = "Cody",
     AGENT_DESCRIPTION: str = "A helpful coding assistant",
     AGENT_INSTRUCTIONS: str = "You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks",
-    LISTEN_PORT: str = "12345",
 ) -> None:
     monkeypatch.setenv("LLM_API_URI", LLM_API_URI)
     monkeypatch.setenv("LLM_API_KEY", LLM_API_KEY)
@@ -44,11 +43,10 @@ def _set_base_test_env_with(
     monkeypatch.setenv("AGENT_NAME", AGENT_NAME)
     monkeypatch.setenv("AGENT_DESCRIPTION", AGENT_DESCRIPTION)
     monkeypatch.setenv("AGENT_INSTRUCTIONS", AGENT_INSTRUCTIONS)
-    monkeypatch.setenv("LISTEN_PORT", LISTEN_PORT)
 
 
 def test_config_loads_in_no_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
 
     config = Config()  # pyright: ignore[reportCallIssue]
@@ -57,7 +55,7 @@ def test_config_loads_in_no_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_config_loads_in_api_key_auth_mode(monkeypatch: pytest.MonkeyPatch) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("AGENT_API_KEY", "test-api-key")
 
     config = Config()  # pyright: ignore[reportCallIssue]
@@ -67,7 +65,7 @@ def test_config_loads_in_api_key_auth_mode(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_config_rejects_empty_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("AGENT_API_KEY", "")
 
     with pytest.raises(ValidationError) as exc:
@@ -79,7 +77,7 @@ def test_config_rejects_empty_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_config_loads_in_oauth2_mode_with_jwks_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("OAUTH2_ISSUER_URL", "https://issuer.example")
     monkeypatch.setenv("OAUTH2_JWKS_URL", "https://issuer.example/jwks")
 
@@ -93,7 +91,7 @@ def test_config_loads_in_oauth2_mode_with_jwks_url(
 def test_config_loads_in_oauth2_mode_without_jwks_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("OAUTH2_ISSUER_URL", "https://issuer.example")
 
     config = Config()  # pyright: ignore[reportCallIssue]
@@ -106,7 +104,7 @@ def test_config_loads_in_oauth2_mode_without_jwks_url(
 def test_config_rejects_empty_oauth2_issuer_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("OAUTH2_ISSUER_URL", "")
 
     with pytest.raises(ValidationError) as exc:
@@ -130,7 +128,7 @@ def test_config_rejects_conflicting_or_no_auth_modes(
     oauth2_issuer_url: str | None,
     no_auth: str | None,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
 
     if agent_api_key is not None:
         monkeypatch.setenv("AGENT_API_KEY", agent_api_key)
@@ -150,7 +148,7 @@ def test_config_accepts_truthy_values_for_no_auth(
     monkeypatch: pytest.MonkeyPatch,
     no_auth: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", no_auth)
 
     config = Config()  # pyright: ignore[reportCallIssue]
@@ -163,7 +161,7 @@ def test_config_requires_other_modes_when_no_auth_is_falsey(
     monkeypatch: pytest.MonkeyPatch,
     no_auth_value: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", no_auth_value)
 
     with pytest.raises(ValidationError) as exc:
@@ -177,7 +175,7 @@ def test_config_rejects_invalid_listen_port(
     monkeypatch: pytest.MonkeyPatch,
     invalid_port: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("LISTEN_PORT", invalid_port)
 
@@ -185,6 +183,21 @@ def test_config_rejects_invalid_listen_port(
         Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
     assert any(error["loc"] == ("LISTEN_PORT",) for error in exc.value.errors())
+
+
+@pytest.mark.parametrize("invalid_address", ["localhost", "999.0.0.1", "", "::1"])
+def test_config_rejects_invalid_listen_address(
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_address: str,
+) -> None:
+    _set_base_test_env(monkeypatch)
+    monkeypatch.setenv("NO_AUTH", "1")
+    monkeypatch.setenv("LISTEN_ADDRESS", invalid_address)
+
+    with pytest.raises(ValidationError) as exc:
+        Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
+
+    assert any(error["loc"] == ("LISTEN_ADDRESS",) for error in exc.value.errors())
 
 
 @pytest.mark.parametrize(
@@ -207,7 +220,7 @@ def test_config_rejects_blank_value_for_required_field(
     env_var: str,
     blank_value: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv(env_var, blank_value)
 
@@ -232,9 +245,9 @@ def test_config_raises_when_required_env_var_is_missing(
     monkeypatch: pytest.MonkeyPatch,
     missing_env_var: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
-    monkeypatch.delenv(missing_env_var)
+    monkeypatch.delenv(missing_env_var, raising=True)
 
     with pytest.raises(ValidationError) as exc:
         Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
@@ -245,13 +258,25 @@ def test_config_raises_when_required_env_var_is_missing(
 def test_config_uses_default_listen_port_when_env_var_is_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
-    monkeypatch.delenv("LISTEN_PORT")
+    monkeypatch.delenv("LISTEN_PORT", raising=False)
 
     config = Config()  # pyright: ignore[reportCallIssue]
 
     assert config.LISTEN_PORT == 8000
+
+
+def test_config_uses_default_listen_address_when_env_var_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_base_test_env(monkeypatch)
+    monkeypatch.setenv("NO_AUTH", "1")
+    monkeypatch.delenv("LISTEN_ADDRESS", raising=False)
+
+    config = Config()  # pyright: ignore[reportCallIssue]
+
+    assert str(config.LISTEN_ADDRESS) == "127.0.0.1"
 
 
 @pytest.mark.parametrize(
@@ -269,7 +294,7 @@ def test_config_string_field_is_snapshot_at_instantiation(
     monkeypatch: pytest.MonkeyPatch,
     env_var: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv(env_var, "original")
 
@@ -282,7 +307,7 @@ def test_config_string_field_is_snapshot_at_instantiation(
 def test_config_listen_port_is_snapshot_at_instantiation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("LISTEN_PORT", "123")
 
@@ -291,6 +316,20 @@ def test_config_listen_port_is_snapshot_at_instantiation(
     monkeypatch.setenv("LISTEN_PORT", "456")
 
     assert config.LISTEN_PORT == 123
+
+
+def test_config_listen_address_is_snapshot_at_instantiation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_base_test_env(monkeypatch)
+    monkeypatch.setenv("NO_AUTH", "1")
+    monkeypatch.setenv("LISTEN_ADDRESS", "127.0.0.1")
+
+    config = Config()  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("LISTEN_ADDRESS", "127.0.0.2")
+
+    assert str(config.LISTEN_ADDRESS) == "127.0.0.1"
 
 
 @pytest.mark.parametrize(
@@ -308,7 +347,7 @@ def test_config_new_instance_picks_up_updated_string_env_vars(
     monkeypatch: pytest.MonkeyPatch,
     env_var: str,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv(env_var, "original")
 
@@ -323,7 +362,7 @@ def test_config_new_instance_picks_up_updated_string_env_vars(
 def test_config_new_instance_picks_up_updated_listen_port(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("LISTEN_PORT", "123")
 
@@ -336,8 +375,24 @@ def test_config_new_instance_picks_up_updated_listen_port(
     assert config.LISTEN_PORT == 456
 
 
+def test_config_new_instance_picks_up_updated_listen_address(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_base_test_env(monkeypatch)
+    monkeypatch.setenv("NO_AUTH", "1")
+    monkeypatch.setenv("LISTEN_ADDRESS", "127.0.0.1")
+
+    config = Config()  # pyright: ignore[reportCallIssue]
+
+    monkeypatch.setenv("LISTEN_ADDRESS", "127.0.0.2")
+
+    config = Config()  # pyright: ignore[reportCallIssue]
+
+    assert str(config.LISTEN_ADDRESS) == "127.0.0.2"
+
+
 def test_from_env_returns_cached_instance(monkeypatch: pytest.MonkeyPatch) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "true")
 
     first = from_env()
@@ -349,7 +404,7 @@ def test_from_env_returns_cached_instance(monkeypatch: pytest.MonkeyPatch) -> No
 def test_from_env_returns_new_instance_after_cache_clear(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
 
     first = from_env()
@@ -362,9 +417,9 @@ def test_from_env_returns_new_instance_after_cache_clear(
 def test_from_env_exits_when_config_validation_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
-    monkeypatch.delenv("LLM_API_URI")
+    monkeypatch.delenv("LLM_API_URI", raising=True)
 
     with pytest.raises(SystemExit) as exc:
         from_env()  # pyright: ignore[reportUnusedCallResult]
@@ -375,7 +430,7 @@ def test_from_env_exits_when_config_validation_fails(
 def test_from_env_mcp_servers_respects_cache_until_cleared(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _set_base_test_env_with(monkeypatch)
+    _set_base_test_env(monkeypatch)
     monkeypatch.setenv("NO_AUTH", "1")
     monkeypatch.setenv("MCP_SERVERS", "mcp://one")
 

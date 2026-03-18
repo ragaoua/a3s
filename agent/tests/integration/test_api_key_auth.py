@@ -13,7 +13,6 @@ from tests.utils import get_base_test_config_ignoring_env_file_with
 
 @pytest.mark.asyncio
 async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
-
     config = get_base_test_config_ignoring_env_file_with(AGENT_API_KEY="123")
 
     server, server_thread = start_agent_server(config)
@@ -23,7 +22,7 @@ async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
             headers={ApiKeyAuthMiddleware.HEADER_NAME: "abc"},
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://localhost:{config.LISTEN_PORT}"
+            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))
@@ -56,7 +55,7 @@ async def test_agent_sends_401_when_no_api_key_is_provided() -> None:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://localhost:{config.LISTEN_PORT}"
+            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))
@@ -90,7 +89,7 @@ async def test_agent_is_reachable_when_api_key_auth_is_enabled() -> None:
             headers={ApiKeyAuthMiddleware.HEADER_NAME: "123"},
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://localhost:{config.LISTEN_PORT}"
+            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))

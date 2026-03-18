@@ -10,6 +10,9 @@ Create a `.env` file (see [.env.example](.env.example)) then run the a2a agent:
 uv run a3s-agent
 ```
 
+By default, the agent listens on `127.0.0.1:8000`. You can override this with
+`LISTEN_ADDRESS` and `LISTEN_PORT`.
+
 See it in action:
 
 ```bash

@@ -91,10 +91,7 @@ def request_converter(
 
 def create_a2a_app(
     agent: LlmAgent,
-    *,
     config: Config,
-    host: str = "localhost",
-    protocol: str = "http",
 ) -> Starlette:
     adk_logger = logging.getLogger("google_adk")
     adk_logger.setLevel(logging.INFO)
@@ -123,7 +120,7 @@ def create_a2a_app(
         push_config_store=push_config_store,
     )
 
-    rpc_url = f"{protocol}://{host}:{config.LISTEN_PORT}"
+    rpc_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
 
     app = Starlette()
 
@@ -217,7 +214,7 @@ def create_app(config: Config) -> Starlette:
         ],
     )
 
-    app = create_a2a_app(root_agent, config=config)
+    app = create_a2a_app(root_agent, config)
 
     if isinstance(config.AUTH, APIKeyAuth):
         logger.info("Auth mode: API Key")

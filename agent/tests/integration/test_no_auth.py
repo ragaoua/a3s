@@ -21,7 +21,7 @@ async def test_agent_is_reachable_in_no_auth_mode() -> None:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://localhost:{config.LISTEN_PORT}"
+            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))

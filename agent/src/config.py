@@ -1,3 +1,4 @@
+from ipaddress import IPv4Address
 import sys
 from functools import lru_cache
 from typing import Annotated, Self
@@ -85,6 +86,7 @@ class Config(BaseSettings):
     AGENT_DESCRIPTION: NonEmptyStr = Field()
     AGENT_INSTRUCTIONS: NonEmptyStr = Field()
     LISTEN_PORT: int = Field(default=8000)
+    LISTEN_ADDRESS: IPv4Address = Field(default=IPv4Address("127.0.0.1"))
 
     AGENT_API_KEY: NonEmptyStr | None = Field(default=None, exclude=True)
     OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(default=None, exclude=True)
@@ -98,6 +100,14 @@ class Config(BaseSettings):
     @classmethod
     def parse_mcp_servers(cls, value):
         return normalize_mcp_servers(value)
+
+    @field_validator("LISTEN_ADDRESS", mode="before")
+    @classmethod
+    def parse_listen_address(cls, value):
+        try:
+            return IPv4Address(value)
+        except Exception as exc:
+            raise ValueError("LISTEN_ADDRESS must be a valid IPv4 address") from exc
 
     @property
     def AUTH(self):

@@ -1,3 +1,4 @@
+from ipaddress import IPv4Address
 import pytest
 from pydantic import ValidationError
 
@@ -12,6 +13,15 @@ def test_config_loads_in_no_auth_mode() -> None:
     config = get_base_test_config_ignoring_env_file_with(NO_AUTH=True)
 
     assert config.AUTH is None
+
+
+def test_config_accepts_custom_listen_address() -> None:
+    config = get_base_test_config_ignoring_env_file_with(
+        NO_AUTH=True,
+        LISTEN_ADDRESS=IPv4Address("0.0.0.0"),
+    )
+
+    assert str(config.LISTEN_ADDRESS) == "0.0.0.0"
 
 
 def test_config_loads_in_api_key_auth_mode() -> None:
