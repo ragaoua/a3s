@@ -19,6 +19,7 @@ from a2a.types import (
     OAuthFlows,
     SecurityScheme,
 )
+from authlib.oauth2.rfc8414 import get_well_known_url
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.a2a.converters.request_converter import (
@@ -148,8 +149,9 @@ def create_a2a_app(
                                 scopes={},
                                 token_url="",
                             )
+                        oauth2_metadata_url=get_well_known_url(
+                            config.AUTH.oauth2_issuer_url, external=True
                         ),
-                        # oauth2MetadataUrl=,
                     )
                 ),
             }

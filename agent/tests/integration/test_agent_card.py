@@ -1,4 +1,5 @@
 from a2a.types import APIKeySecurityScheme, In, OAuth2SecurityScheme
+from authlib.oauth2.rfc8414 import get_well_known_url
 import httpx
 import pytest
 
@@ -40,11 +41,16 @@ async def test_agent_card_contains_proper_security_scheme(
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
 
             if isinstance(config.AUTH, OAuth2Auth):
+                assert OAUTH2_ISSUER_URL is not None
                 assert agent_card.security_schemes is not None
                 schemes = agent_card.security_schemes.items()
 
                 security_scheme = agent_card.security_schemes["OAuth2SecurityScheme"]
                 assert isinstance(security_scheme.root, OAuth2SecurityScheme)
+
+                assert security_scheme.root.oauth2_metadata_url == get_well_known_url(
+                    OAUTH2_ISSUER_URL, external=True
+                )
             elif isinstance(config.AUTH, APIKeyAuth):
                 assert agent_card.security_schemes is not None
                 schemes = agent_card.security_schemes.items()
