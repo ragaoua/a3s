@@ -39,10 +39,9 @@ from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from starlette.applications import Starlette
 from starlette.requests import Request
-import uvicorn
 
 from .auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
-from .config import APIKeyAuth, Config, OAuth2Auth, from_env
+from .config import APIKeyAuth, Config, OAuth2Auth
 from .loggingManager import LoggingManager
 
 logger = LoggingManager().get_logger(__name__)
