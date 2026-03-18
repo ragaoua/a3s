@@ -149,6 +149,7 @@ def create_a2a_app(
                                 scopes={},
                                 token_url="",
                             )
+                        ),
                         oauth2_metadata_url=get_well_known_url(
                             config.AUTH.oauth2_issuer_url, external=True
                         ),
