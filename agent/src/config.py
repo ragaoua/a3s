@@ -84,7 +84,7 @@ class Config(BaseSettings):
     AGENT_NAME: NonEmptyStr = Field()
     AGENT_DESCRIPTION: NonEmptyStr = Field()
     AGENT_INSTRUCTIONS: NonEmptyStr = Field()
-    LISTEN_PORT: int = Field()
+    LISTEN_PORT: int = Field(default=8000)
 
     AGENT_API_KEY: NonEmptyStr | None = Field(default=None, exclude=True)
     OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(default=None, exclude=True)

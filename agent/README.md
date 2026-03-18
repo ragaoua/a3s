@@ -27,7 +27,6 @@ Build and run the image:
 
 ```bash
 podman build -t agent .
-LISTEN_PORT=""
 podman run \
     --interactive \
     --tty \

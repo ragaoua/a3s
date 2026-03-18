@@ -226,7 +226,6 @@ def test_config_rejects_blank_value_for_required_field(
         "AGENT_NAME",
         "AGENT_DESCRIPTION",
         "AGENT_INSTRUCTIONS",
-        "LISTEN_PORT",
     ],
 )
 def test_config_raises_when_required_env_var_is_missing(
@@ -241,6 +240,18 @@ def test_config_raises_when_required_env_var_is_missing(
         Config()  # pyright: ignore[reportUnusedCallResult, reportCallIssue]
 
     assert any(error["loc"] == (missing_env_var,) for error in exc.value.errors())
+
+
+def test_config_uses_default_listen_port_when_env_var_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _set_base_test_env_with(monkeypatch)
+    monkeypatch.setenv("NO_AUTH", "1")
+    monkeypatch.delenv("LISTEN_PORT")
+
+    config = Config()  # pyright: ignore[reportCallIssue]
+
+    assert config.LISTEN_PORT == 8000
 
 
 @pytest.mark.parametrize(
