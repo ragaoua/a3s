@@ -170,17 +170,8 @@ class Config(BaseSettings):
 @lru_cache(maxsize=1)
 def from_env() -> Config:
     try:
-        config = Config()  # pyright: ignore[reportCallIssue]
-        print(config)
-        return config
+        return Config()  # pyright: ignore[reportCallIssue]
     except Exception as e:
-        print("===========================")
-        print("===========================")
-        print("===========================")
-        print("EXITING")
-        print("===========================")
-        print("===========================")
-        print("===========================")
         logger.debug("Failed to load config", exc_info=True)
         if isinstance(e, ValidationError):
             for error in e.errors(include_url=False):
