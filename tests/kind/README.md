@@ -1,13 +1,13 @@
 Create a local Kind cluster:
 
 ```bash
-KIND_EXPERIMENTAL_PROVIDER=podman kind create cluster --name a3s-local
+KIND_EXPERIMENTAL_PROVIDER=podman kind create --config kind.yaml
 ```
 
 Load the agent image (see [../agent/README.md](../agent/README.md) ) into Kind:
 
 ```bash
-KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive --name a3s-local <(podman save localhost/agent --format oci-archive)
+KIND_EXPERIMENTAL_PROVIDER=podman kind load image-archive --name a3s-kind <(podman save localhost/a3s-agent --format oci-archive)
 # NOTE: `KIND_EXPERIMENTAL_PROVIDER=podman kind load docker-image agent --name a3s-local`
 # doesn't work. It seems to be a known issue with loading podman images in king, for which
 # the above is a workaround (see https://github.com/kubernetes-sigs/kind/issues/2038).

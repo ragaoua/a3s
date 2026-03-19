@@ -95,7 +95,7 @@ class AgentService {
 					containers: [
 						{
 							name: params.name.toLowerCase(),
-							image: 'localhost/agent',
+							image: 'localhost/a3s-agent',
 							imagePullPolicy: 'Never',
 							env: [
 								{ name: 'MODEL', value: params.model },

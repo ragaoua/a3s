@@ -37,7 +37,7 @@ podman run \
     --name a3s \
     --env-file .env \
     --publish "$LISTEN_PORT":"$LISTEN_PORT" \
-    localhost/agent
+    localhost/a3s-agent
 ```
 
 **Note**: for testing, use host.containers.internal instead of localhost
