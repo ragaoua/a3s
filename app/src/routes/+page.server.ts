@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
-import { containersService } from '$lib/server/service/agentService';
+import { agentService } from '$lib/server/service/agentService';
 
 export const actions: Actions = {
 	default: async ({ request }) => {
@@ -41,7 +41,7 @@ export const actions: Actions = {
 			authParams = { oauth2IssuerUrl, oauth2JwksUrl };
 		}
 
-		await containersService.deployToInternalKubernetesCluster({
+		await agentService.deployToKubernetes({
 			model,
 			name,
 			description,

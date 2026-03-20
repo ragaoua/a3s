@@ -66,47 +66,33 @@ kubectl --context "${KUBE_CONTEXT}" apply \
   -f "${KIND_DIR}/role.yaml" \
   -f "${KIND_DIR}/role_binding.yaml"
 
-log "Applying app pod..."
-kubectl --context "${KUBE_CONTEXT}" apply -f - <<EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    run: app
-  name: app
-  namespace: app-ns
-spec:
-  serviceAccountName: app-sa
-  restartPolicy: Never
-  containers:
-    - name: app
-      image: ${APP_IMAGE}
-      imagePullPolicy: Never
-      env:
-        - name: K8S_AGENTS_NAMESPACE
-          value: agents-ns
-        - name: ORIGIN
-          value: http://localhost:8080
-        - name: NODE_TLS_REJECT_UNAUTHORIZED
-          value: "0"
-EOF
+log "Generating token for service account app-sa..."
+sa_token="$(
+  kubectl --context "${KUBE_CONTEXT}" \
+    create token app-sa -n app-ns
+  )"
 
-log "Applying NodePort service..."
-kubectl --context "${KUBE_CONTEXT}" apply -f - <<EOF
-apiVersion: v1
-kind: Service
-metadata:
-  name: app-svc
-  namespace: app-ns
-spec:
-  type: NodePort
-  selector:
-    run: app
-  ports:
-    - protocol: TCP
-      port: 3000
-      targetPort: 3000
-      nodePort: 30080
-EOF
+log "Building app..."
+bun --cwd="${APP_DIR}" run build
 
-log "Done. App should be reachable at http://localhost:8080"
+log "Reading Kubernetes API server URL and CA data..."
+k8s_server_url="$(
+  kubectl config view --raw --minify --context "${KUBE_CONTEXT}" \
+    -o jsonpath='{.clusters[0].cluster.server}'
+  )"
+k8s_ca_data="$(
+  kubectl config view --raw --minify --context "${KUBE_CONTEXT}" \
+    -o jsonpath='{.clusters[0].cluster.certificate-authority-data}'
+  )"
+
+log "Running app..."
+K8S_SERVER_URL="$k8s_server_url" \
+  K8S_CA_DATA="$k8s_ca_data" \
+  K8S_SERVICE_ACCOUNT_TOKEN="$sa_token" \
+  K8S_CLUSTER_NAME=a3s-kind \
+  K8S_SERVICE_ACCOUNT="app-sa" \
+  K8S_SERVICE_ACCOUNT_NAMESPACE=app-ns \
+  K8S_AGENTS_NAMESPACE=agents-ns \
+  ORIGIN="http://localhost:3000" \
+  NODE_TLS_REJECT_UNAUTHORIZED="0" \
+  bun --cwd="${APP_DIR}" build/index.js

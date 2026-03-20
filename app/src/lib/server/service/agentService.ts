@@ -15,73 +15,39 @@ interface DeployAgentParams {
 	oauth2JwksUrl?: string;
 }
 
-class AgentService {
-	private getRequiredEnv(name: string): string {
-		const value = env[name];
+interface KubernetesClusterParams {
+	clusterName: string;
+	server: string;
+	serviceAccount: string;
+	serviceAccountToken: string;
+	serviceAccountNamespace: string;
+	agentsNamespace: string;
+	caData: string;
+}
 
-		if (!value) {
-			throw new Error(`Missing required environment variable: ${name}`);
-		}
+abstract class AgentService {
+	abstract deployToKubernetes(params: DeployAgentParams): void;
 
-		return value;
-	}
+	protected async runPod(kc: KubeConfig, namespace: string, agentParams: DeployAgentParams) {
+		const core = kc.makeApiClient(CoreV1Api);
 
-	private generateAgentApiKey(): string {
-		return randomBytes(32).toString('hex');
-	}
-
-	async deployToKubernetes(params: DeployAgentParams) {
-		const clusterName = this.getRequiredEnv('K8S_CLUSTER_NAME');
-		const server = this.getRequiredEnv('K8S_SERVER_URL');
-		const serviceAccount = this.getRequiredEnv('K8S_SERVICE_ACCOUNT');
-		const serviceAccountToken = this.getRequiredEnv('K8S_SERVICE_ACCOUNT_TOKEN');
-		const namespace = this.getRequiredEnv('K8S_NAMESPACE');
-		const caData = this.getRequiredEnv('K8S_CA_DATA');
-
-		const kc = new KubeConfig();
-
-		kc.loadFromOptions({
-			clusters: [
-				{
-					name: clusterName,
-					server,
-					caData
-				}
-			],
-			users: [
-				{
-					name: serviceAccount,
-					token: serviceAccountToken
-				}
-			],
-			contexts: [
-				{
-					cluster: clusterName,
-					user: serviceAccount,
-					namespace
-				}
-			]
-		});
-
-		const mcpServersValue = params.mcpServers.join(',');
+		const mcpServersValue = agentParams.mcpServers.join(',');
 		const listenPort = 10000;
 
 		const authVars: V1EnvVar[] = [];
-		if (params.oauth2IssuerUrl) {
-			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: params.oauth2IssuerUrl });
-			if (params.oauth2JwksUrl) {
-				authVars.push({ name: 'OAUTH2_JWKS_URL', value: params.oauth2JwksUrl });
+		if (agentParams.oauth2IssuerUrl) {
+			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: agentParams.oauth2IssuerUrl });
+			if (agentParams.oauth2JwksUrl) {
+				authVars.push({ name: 'OAUTH2_JWKS_URL', value: agentParams.oauth2JwksUrl });
 			}
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
-			const agentApiKey = this.generateAgentApiKey();
+			const agentApiKey = randomBytes(32).toString('hex');
 			authVars.push({ name: 'AGENT_API_KEY', value: agentApiKey });
 			console.log(
 				`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
 			);
 		}
-
-		const core = kc.makeApiClient(CoreV1Api);
 
 		const pod = await core.createNamespacedPod({
 			namespace,
@@ -89,108 +55,22 @@ class AgentService {
 				apiVersion: 'v1',
 				kind: 'Pod',
 				metadata: {
-					generateName: params.name.toLowerCase()
+					generateName: agentParams.name.toLowerCase()
 				},
 				spec: {
 					restartPolicy: 'Never',
 					containers: [
 						{
-							name: params.name.toLowerCase(),
+							name: agentParams.name.toLowerCase(),
 							image: 'localhost/a3s-agent',
 							imagePullPolicy: 'Never',
 							env: [
-								{ name: 'MODEL', value: params.model },
-								{ name: 'AGENT_NAME', value: params.name },
-								{ name: 'AGENT_INSTRUCTIONS', value: params.instructions },
-								{ name: 'AGENT_DESCRIPTION', value: params.description },
-								{ name: 'LLM_API_KEY', value: params.apiKey },
-								{ name: 'LLM_API_URI', value: params.apiUrl },
-								{ name: 'LISTEN_PORT', value: String(listenPort) },
-								{ name: 'MCP_SERVERS', value: mcpServersValue },
-								...authVars
-							],
-							stdin: true,
-							tty: true,
-							ports: [{ containerPort: listenPort }]
-						}
-					]
-				}
-			}
-		});
-
-		console.log(
-			`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
-		);
-	}
-
-	private async getNamespace(): Promise<string> {
-		const namespaceFromEnv = env.K8S_NAMESPACE;
-		if (namespaceFromEnv) {
-			return namespaceFromEnv;
-		}
-
-		const namespaceFile = '/var/run/secrets/kubernetes.io/serviceaccount/namespace';
-		try {
-			const namespace = (await readFile(namespaceFile, 'utf8')).trim();
-			if (namespace) {
-				return namespace;
-			}
-		} catch {
-			// Fall through to explicit error with expected sources.
-		}
-
-		throw new Error(
-			'Missing Kubernetes namespace. Set K8S_NAMESPACE or ensure in-cluster namespace file is mounted.'
-		);
-	}
-
-	async deployToInternalKubernetesCluster(params: DeployAgentParams) {
-		const kc = new KubeConfig();
-		kc.loadFromCluster();
-
-		const mcpServersValue = params.mcpServers.join(',');
-		const listenPort = 10000;
-
-		const authVars: V1EnvVar[] = [];
-		if (params.oauth2IssuerUrl) {
-			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: params.oauth2IssuerUrl });
-			if (params.oauth2JwksUrl) {
-				authVars.push({ name: 'OAUTH2_JWKS_URL', value: params.oauth2JwksUrl });
-			}
-			console.log('Agent will be configured with OAuth2 Authorization.');
-		} else {
-			const agentApiKey = this.generateAgentApiKey();
-			authVars.push({ name: 'AGENT_API_KEY', value: agentApiKey });
-			console.log(
-				`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
-			);
-		}
-
-		const namespace = await this.getNamespace();
-		const core = kc.makeApiClient(CoreV1Api);
-
-		const pod = await core.createNamespacedPod({
-			namespace,
-			body: {
-				apiVersion: 'v1',
-				kind: 'Pod',
-				metadata: {
-					generateName: params.name.toLowerCase()
-				},
-				spec: {
-					restartPolicy: 'Never',
-					containers: [
-						{
-							name: params.name.toLowerCase(),
-							image: 'localhost/a3s-agent',
-							imagePullPolicy: 'Never',
-							env: [
-								{ name: 'MODEL', value: params.model },
-								{ name: 'AGENT_NAME', value: params.name },
-								{ name: 'AGENT_INSTRUCTIONS', value: params.instructions },
-								{ name: 'AGENT_DESCRIPTION', value: params.description },
-								{ name: 'LLM_API_KEY', value: params.apiKey },
-								{ name: 'LLM_API_URI', value: params.apiUrl },
+								{ name: 'MODEL', value: agentParams.model },
+								{ name: 'AGENT_NAME', value: agentParams.name },
+								{ name: 'AGENT_INSTRUCTIONS', value: agentParams.instructions },
+								{ name: 'AGENT_DESCRIPTION', value: agentParams.description },
+								{ name: 'LLM_API_KEY', value: agentParams.apiKey },
+								{ name: 'LLM_API_URI', value: agentParams.apiUrl },
 								{ name: 'LISTEN_PORT', value: String(listenPort) },
 								{ name: 'MCP_SERVERS', value: mcpServersValue },
 								...authVars
@@ -210,4 +90,105 @@ class AgentService {
 	}
 }
 
-export const containersService = new AgentService();
+class RemoteDeploymentAgentService extends AgentService {
+	constructor(private readonly kubernetesParams: KubernetesClusterParams) {
+		super();
+	}
+
+	async deployToKubernetes(agentParams: DeployAgentParams) {
+		const kc = new KubeConfig();
+		kc.loadFromOptions({
+			clusters: [
+				{
+					name: this.kubernetesParams.clusterName,
+					server: this.kubernetesParams.server,
+					caData: this.kubernetesParams.caData
+				}
+			],
+			users: [
+				{
+					name: this.kubernetesParams.serviceAccount,
+					token: this.kubernetesParams.serviceAccountToken,
+					namespace: this.kubernetesParams.serviceAccountNamespace
+				}
+			],
+			contexts: [
+				{
+					cluster: this.kubernetesParams.clusterName,
+					user: this.kubernetesParams.serviceAccount,
+					namespace: this.kubernetesParams.serviceAccountNamespace
+				}
+			]
+		});
+
+		const namespace = this.kubernetesParams.agentsNamespace;
+
+		await super.runPod(kc, namespace, agentParams);
+	}
+}
+
+class InClusterDeploymentAgentService extends AgentService {
+	private async getNamespace(): Promise<string> {
+		const namespaceFromEnv = env.K8S_AGENTS_NAMESPACE;
+		if (namespaceFromEnv) {
+			return namespaceFromEnv;
+		}
+
+		const namespaceFile = '/var/run/secrets/kubernetes.io/serviceaccount/namespace';
+		try {
+			const namespace = (await readFile(namespaceFile, 'utf8')).trim();
+			if (namespace) {
+				return namespace;
+			}
+		} catch {
+			// Fall through to explicit error with expected sources.
+		}
+
+		throw new Error(
+			'Missing Kubernetes namespace. Set K8S_AGENTS_NAMESPACE or ensure in-cluster namespace file is mounted.'
+		);
+	}
+
+	async deployToKubernetes(params: DeployAgentParams) {
+		const kc = new KubeConfig();
+		kc.loadFromCluster();
+
+		const namespace = await this.getNamespace();
+
+		await super.runPod(kc, namespace, params);
+	}
+}
+
+function getRequiredEnv(name: string): string {
+	const value = env[name];
+
+	if (!value) {
+		throw new Error(`Missing required environment variable: ${name}`);
+	}
+
+	return value;
+}
+
+type K8sDeployMode = 'inCluster' | 'external' | 'auto';
+
+function resolveDeployMode(): 'inCluster' | 'external' {
+	const raw = (env.K8S_DEPLOY_MODE ?? 'auto') as K8sDeployMode;
+	if (raw === 'inCluster' || raw === 'external') return raw;
+	if (raw === 'auto') {
+		return env.KUBERNETES_SERVICE_HOST ? 'inCluster' : 'external';
+	}
+	throw new Error(`Invalid K8S_DEPLOY_MODE: ${raw}`);
+}
+
+export const agentService: AgentService =
+	resolveDeployMode() === 'inCluster'
+		? new InClusterDeploymentAgentService()
+		: new RemoteDeploymentAgentService({
+				clusterName: getRequiredEnv('K8S_CLUSTER_NAME'),
+				server: getRequiredEnv('K8S_SERVER_URL'),
+				serviceAccount: getRequiredEnv('K8S_SERVICE_ACCOUNT'),
+				serviceAccountToken: getRequiredEnv('K8S_SERVICE_ACCOUNT_TOKEN'),
+				serviceAccountNamespace: getRequiredEnv('K8S_SERVICE_ACCOUNT_NAMESPACE'),
+				agentsNamespace: getRequiredEnv('K8S_AGENTS_NAMESPACE'),
+				caData: getRequiredEnv('K8S_CA_DATA')
+			});
