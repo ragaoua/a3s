@@ -41,7 +41,7 @@ export const actions: Actions = {
 			authParams = { oauth2IssuerUrl, oauth2JwksUrl };
 		}
 
-		await containersService.deployToKubernetes({
+		await containersService.deployToInternalKubernetesCluster({
 			model,
 			name,
 			description,

@@ -2,4 +2,4 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: app-sa
-  namespace: default
+  namespace: app-ns

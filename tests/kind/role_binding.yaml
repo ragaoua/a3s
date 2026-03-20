@@ -2,11 +2,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: pod-creator-binding
-  namespace: default
+  namespace: agents-ns
 subjects:
 - kind: ServiceAccount
   name: app-sa
-  namespace: default
+  namespace: app-ns
 roleRef:
   kind: Role
   name: pod-creator-role

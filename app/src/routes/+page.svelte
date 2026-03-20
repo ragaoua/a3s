@@ -89,8 +89,7 @@
 					id="api-url"
 					type="url"
 					value={apiUrl}
-					disabled
-					class="w-full cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-600"
+          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
 				/>
 				<input type="hidden" name="apiUrl" value={apiUrl} />
 			</div>
