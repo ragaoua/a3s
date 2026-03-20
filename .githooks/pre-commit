@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMRD)"
+
+if ! printf '%s\n' "$staged_files" | grep -Eq '^agent/(src|tests)/'; then
+  exit 0
+fi
+
+echo "Detected staged changes in agent/src or agent/tests. Running agent tests..."
+uv run --directory agent pytest -s
