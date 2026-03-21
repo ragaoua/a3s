@@ -5,6 +5,10 @@
 	let instructions = '';
 	let apiKey = '';
 	let apiUrl = '';
+	import FieldSet from './components/FieldSet.svelte';
+	import FormField from './components/FormField.svelte';
+	import RadioGroup from './components/RadioGroup.svelte';
+
 	let mcpServers: string[] = [''];
   let oauth2IssuerUrl = '';
   let oauth2JwksUrl = '';
@@ -25,145 +29,120 @@
 
 </script>
 
-<main class="min-h-screen bg-slate-100 px-4 py-12 text-slate-900">
-	<div class="mx-auto w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+<main class="min-h-screen bg-transparent px-4 py-12 text-neutral-100">
+	<div class="mx-auto w-full max-w-2xl rounded-2xl border border-neutral-800 bg-neutral-900/90 p-8 shadow-xl shadow-black/40 backdrop-blur-sm">
 		<h1 class="text-2xl font-semibold">Create Agent</h1>
-		<p class="mt-2 text-sm text-slate-600">Define your agent and the MCP servers it can reach.</p>
 
 		<form method="POST" class="mt-8 space-y-6">
-			<div class="space-y-2">
-				<label for="model" class="text-sm font-medium">Model</label>
-				<input
-					id="model"
-					name="model"
-					type="text"
-					bind:value={model}
-					placeholder="e.g. Support Assistant"
-					required
-					class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-				/>
-			</div>
+      <FieldSet title="Agent">
+        <FormField
+          label="Agent name"
+          id="agent-name"
+          name="name"
+          bind:value={agentName}
+          placeholder="e.g. Support Assistant"
+          required
+        />
 
-			<div class="space-y-2">
-				<label for="agent-name" class="text-sm font-medium">Agent name</label>
-				<input
-					id="agent-name"
-					name="name"
-					type="text"
-					bind:value={agentName}
-					placeholder="e.g. Support Assistant"
-					required
-					class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-				/>
-			</div>
+        <FormField
+          label="Description"
+          id="description"
+          name="description"
+          bind:value={description}
+          placeholder="Short summary of what this agent does."
+          required
+        />
 
-			<div class="space-y-2">
-				<label for="instructions" class="text-sm font-medium">Instructions</label>
-				<textarea
-					id="instructions"
-					name="instructions"
-					rows="5"
-					bind:value={instructions}
-					placeholder="Describe behavior, goals, and constraints."
-					required
-					class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-				></textarea>
-			</div>
+        <FormField
+          label="Instructions"
+          id="instructions"
+          name="instructions"
+          bind:value={instructions}
+          placeholder="Describe behavior, goals, and constraints."
+          isTextarea
+          required
+        />
+      </FieldSet>
 
-			<div class="space-y-2">
-				<label for="description" class="text-sm font-medium">Description</label>
-				<textarea
-					id="description"
-					name="description"
-					rows="3"
-					bind:value={description}
-					placeholder="Short summary of what this agent does."
-					required
-					class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-				></textarea>
-			</div>
+      <FieldSet title="Model">
+        <FormField
+          label="Model"
+          id="model"
+          name="model"
+          bind:value={model}
+          placeholder="e.g. gpt-5.3-codex, claude-opus-4.6, ..."
+          required
+        />
 
-			<div class="space-y-2">
-				<label for="api-url" class="text-sm font-medium">API URL</label>
-				<input
-					id="api-url"
-					type="url"
-					value={apiUrl}
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-				/>
-				<input type="hidden" name="apiUrl" value={apiUrl} />
-			</div>
+        <FormField
+          label="API URL"
+          id="api-url"
+          name="apiUrl"
+          type="url"
+          bind:value={apiUrl}
+          placeholder="e.g. https://api.anthropic.com/v1/, https://local.myorg.llm/v1, ..."
+          required
+        />
 
-      <div class="space-y-2">
-        <label for="api-key" class="text-sm font-medium">API key</label>
-        <input
+        <FormField
+          label="API key"
           id="api-key"
           name="apiKey"
           type="password"
           bind:value={apiKey}
           placeholder="Enter API key"
           required
-          class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
         />
-      </div>
-			<fieldset class="space-y-3">
-				<legend class="text-sm font-medium">Authentication</legend>
-				<div class="flex gap-3">
-					<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm">
-						<input type="radio" name="authMode" value="apiKey" bind:group={authMode} />
-						<span>API key</span>
-					</label>
-					<label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm">
-						<input type="radio" name="authMode" value="oauth2" bind:group={authMode} />
-						<span>OAuth2</span>
-					</label>
-				</div>
-			</fieldset>
+			</FieldSet>
 
-			{#if authMode === 'apiKey'}
-				<div class="flex gap-3">
-          <span>An API Key will be generated.</span>
-        </div>
-			{:else}
-				<div class="space-y-2">
-					<label for="oauth2-issuer-url" class="text-sm font-medium">OAuth2 issuer URL</label>
-					<input
-						id="oauth2-issuer-url"
-						name="oauth2IssuerUrl"
-						type="url"
-						bind:value={oauth2IssuerUrl}
-						required={authMode === 'oauth2'}
-            class="w-full cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-600"
-					/>
-				</div>
+      <FieldSet title="Authentication">
+        <RadioGroup
+          name="authMode"
+          bind:group={authMode}
+          choices={[
+            { value: "apiKey", label: "API key" },
+            { value: "oauth2", label: "OAuth2" }
+          ]}
+        />
 
-				<div class="space-y-2">
-					<label for="oauth2-jwks-url" class="text-sm font-medium">OAuth2 JWKS URL</label>
-					<input
-						id="oauth2-jwks-url"
-						name="oauth2JwksUrl"
-						type="url"
-						bind:value={oauth2JwksUrl}
-            class="w-full cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm text-slate-600"
-					/>
+        {#if authMode === 'apiKey'}
+          <div class="flex gap-3">
+					<span class="text-neutral-400">An API Key will be generated.</span>
 				</div>
-			{/if}
+        {:else}
+          <FormField
+            label="OAuth2 issuer URL"
+            id="oauth2-issuer-url"
+            name="oauth2IssuerUrl"
+            type="url"
+            bind:value={oauth2IssuerUrl}
+            required
+          />
 
-			<fieldset class="space-y-3">
-				<legend class="text-sm font-medium">MCP servers</legend>
+          <FormField
+            label="OAuth2 JWKS URL"
+            id="oauth2-jwks-url"
+            name="oauth2JwksUrl"
+            type="url"
+            bind:value={oauth2JwksUrl}
+          />
+        {/if}
+			</FieldSet>
+
+      <FieldSet title="MCP Servers">
         {#each { length: mcpServers.length }, index}
 					<div class="flex items-center gap-2">
-						<input
-							type="url"
-							name="mcpServers"
-							bind:value={mcpServers[index]}
+            <FormField
+              id={`mcp-server-${index}`}
+              name="mcpServers"
+              type="url"
+              bind:value={mcpServers[index]}
 							placeholder="https://example-mcp-server.com"
-							class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-						/>
+            />
 						<button
 							type="button"
 							onclick={() => removeMcpServer(index)}
-							class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+							class="rounded-lg border border-neutral-700 bg-black/45 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
 						>
 							Remove
 						</button>
@@ -173,15 +152,15 @@
 				<button
 					type="button"
 					onclick={addMcpServer}
-					class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+					class="rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
 				>
 					Add MCP server
 				</button>
-			</fieldset>
+			</FieldSet>
 
 			<button
 				type="submit"
-				class="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+				class="w-full rounded-lg bg-neutral-200 px-4 py-2 text-sm font-semibold text-black transition hover:bg-white"
 			>
 				Deploy agent
 			</button>
