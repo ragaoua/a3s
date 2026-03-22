@@ -1,33 +1,11 @@
 <script lang="ts">
-  let model = '';
-	let agentName = '';
-	let description = '';
-	let instructions = '';
-	let apiKey = '';
-	let apiUrl = '';
 	import FieldSet from './components/FieldSet.svelte';
 	import FormField from './components/FormField.svelte';
 	import RadioGroup from './components/RadioGroup.svelte';
+	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
 
-	let mcpServers: string[] = [''];
-  let oauth2IssuerUrl = '';
-  let oauth2JwksUrl = '';
-	let authMode: 'apiKey' | 'oauth2' = 'apiKey';
-
-  export let form: { success?: boolean; agentApiKey?: string } | null;
-
-	const addMcpServer = () => {
-		mcpServers = [...mcpServers, ''];
-	};
-
-	const removeMcpServer = (index: number) => {
-		if (mcpServers.length === 1) {
-			mcpServers = [''];
-			return;
-		}
-
-		mcpServers = mcpServers.filter((_, currentIndex) => currentIndex !== index);
-	};
+  const s = new DeployAgentFormState();
+  const { form } = $props();
 
 </script>
 
@@ -50,7 +28,7 @@
           label="Agent name"
           id="agent-name"
           name="name"
-          bind:value={agentName}
+          bind:value={s.agentName}
           placeholder="e.g. Support Assistant"
           required
         />
@@ -59,7 +37,7 @@
           label="Description"
           id="description"
           name="description"
-          bind:value={description}
+          bind:value={s.description}
           placeholder="Short summary of what this agent does."
           required
         />
@@ -68,7 +46,7 @@
           label="Instructions"
           id="instructions"
           name="instructions"
-          bind:value={instructions}
+          bind:value={s.instructions}
           placeholder="Describe behavior, goals, and constraints."
           isTextarea
           required
@@ -80,7 +58,7 @@
           label="Model"
           id="model"
           name="model"
-          bind:value={model}
+          bind:value={s.model}
           placeholder="e.g. gpt-5.3-codex, claude-opus-4.6, ..."
           required
         />
@@ -90,7 +68,7 @@
           id="api-url"
           name="apiUrl"
           type="url"
-          bind:value={apiUrl}
+          bind:value={s.apiUrl}
           placeholder="e.g. https://api.anthropic.com/v1/, https://local.myorg.llm/v1, ..."
           required
         />
@@ -100,7 +78,7 @@
           id="api-key"
           name="apiKey"
           type="password"
-          bind:value={apiKey}
+          bind:value={s.apiKey}
           placeholder="Enter API key"
           required
         />
@@ -109,14 +87,14 @@
       <FieldSet title="Authentication">
         <RadioGroup
           name="authMode"
-          bind:group={authMode}
+          bind:group={s.authMode}
           choices={[
             { value: "apiKey", label: "API key" },
             { value: "oauth2", label: "OAuth2" }
           ]}
         />
 
-        {#if authMode === 'apiKey'}
+        {#if s.authMode === 'apiKey'}
           <div class="flex gap-3">
 					<span class="text-neutral-400">An API Key will be generated.</span>
 				</div>
@@ -126,7 +104,7 @@
             id="oauth2-issuer-url"
             name="oauth2IssuerUrl"
             type="url"
-            bind:value={oauth2IssuerUrl}
+            bind:value={s.oauth2IssuerUrl}
             required
           />
 
@@ -135,24 +113,24 @@
             id="oauth2-jwks-url"
             name="oauth2JwksUrl"
             type="url"
-            bind:value={oauth2JwksUrl}
+            bind:value={s.oauth2JwksUrl}
           />
         {/if}
 			</FieldSet>
 
       <FieldSet title="MCP Servers">
-        {#each { length: mcpServers.length }, index}
+        {#each { length: s.mcpServers.length }, index}
 					<div class="flex items-center gap-2">
             <FormField
               id={`mcp-server-${index}`}
               name="mcpServers"
               type="url"
-              bind:value={mcpServers[index]}
+              bind:value={s.mcpServers[index]}
 							placeholder="https://example-mcp-server.com"
             />
 						<button
 							type="button"
-							onclick={() => removeMcpServer(index)}
+							onclick={() => s.removeMcpServer(index)}
 							class="rounded-lg border border-neutral-700 bg-black/45 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
 						>
 							Remove
@@ -162,7 +140,7 @@
 
 				<button
 					type="button"
-					onclick={addMcpServer}
+					onclick={() => s.addMcpServer()}
 					class="rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
 				>
 					Add MCP server
