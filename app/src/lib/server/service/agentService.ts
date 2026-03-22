@@ -62,6 +62,12 @@ abstract class AgentService {
 				kind: 'Pod',
 				metadata: {
 					generateName: agentParams.name.toLowerCase(),
+					// NOTE: these can then be used as selectors to create a service
+					// that will make the agent available from the outside.
+					// Problem is, the agent's name is nowhere constraint to be unique,
+					// which means that multiple pods can share the same labels and
+					// be matched by the same ClusterIP, NodePort or whatever.
+					// Something to think about later
 					labels: {
 						run: 'agent',
 						name: agentParams.name
