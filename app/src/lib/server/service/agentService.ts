@@ -53,7 +53,8 @@ abstract class AgentService {
 			);
 		}
 
-		const listenPort = 10000;
+		const listenPort = 8000;
+		const listenAddress = '0.0.0.0';
 		const pod = await core.createNamespacedPod({
 			namespace,
 			body: {
@@ -77,7 +78,7 @@ abstract class AgentService {
 								{ name: 'LLM_API_KEY', value: agentParams.apiKey },
 								{ name: 'LLM_API_URI', value: agentParams.apiUrl },
 								{ name: 'LISTEN_PORT', value: String(listenPort) },
-								{ name: 'LISTEN_ADDRESS', value: '0.0.0.0' },
+								{ name: 'LISTEN_ADDRESS', value: listenAddress },
 								{ name: 'MCP_SERVERS', value: mcpServersValue },
 								...authVars
 							],
