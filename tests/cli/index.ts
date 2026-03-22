@@ -30,6 +30,7 @@ async function main() {
   const agentCard = await client.getAgentCard();
 
   console.log(`Connected to A2A agent: ${agentCard.name}`);
+  let contextId: string | undefined = undefined;
 
   process.stdout.write("User: ");
   for await (const line of console) {
@@ -39,6 +40,7 @@ async function main() {
         role: "user",
         parts: [{ kind: "text", text: line }],
         kind: "message",
+        contextId,
       },
     };
 
@@ -50,6 +52,7 @@ async function main() {
 
     console.log("Agent: ", response);
 
+    contextId = result.contextId;
     process.stdout.write("User: ");
   }
 }
