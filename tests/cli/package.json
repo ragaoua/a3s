@@ -1,0 +1,19 @@
+{
+  "name": "cli",
+  "module": "index.ts",
+  "scripts": {
+    "start": "bun run index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@a2a-js/sdk": "^0.3.13",
+    "uuid": "^13.0.0"
+  }
+}
