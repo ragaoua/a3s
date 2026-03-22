@@ -1,7 +1,28 @@
-import { ClientFactory } from "@a2a-js/sdk/client";
+import {
+  type BeforeArgs,
+  type CallInterceptor,
+  ClientFactory,
+  ClientFactoryOptions,
+} from "@a2a-js/sdk/client";
 import type { Message, MessageSendParams, Task } from "@a2a-js/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "bun";
+
+class ApiKeyInterceptor implements CallInterceptor {
+  constructor(private readonly apiKey: string) {}
+
+  async before(args: BeforeArgs): Promise<void> {
+    args.options = {
+      ...args.options,
+      serviceParameters: {
+        ...args.options?.serviceParameters,
+        "API-Key": this.apiKey,
+      },
+    };
+  }
+
+  async after(): Promise<void> {}
+}
 
 function getMessageResponse(message: Message) {
   return message.parts
@@ -25,7 +46,14 @@ function getTaskResponse(task: Task) {
 
 async function main() {
   const port = env.PORT ?? "8000";
-  const factory = new ClientFactory();
+  const apiKey = env.API_KEY ?? "";
+  const factory = new ClientFactory(
+    ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
+      clientConfig: {
+        interceptors: apiKey ? [new ApiKeyInterceptor(apiKey)] : [],
+      },
+    }),
+  );
   const client = await factory.createFromUrl(`http://localhost:${port}`);
   const agentCard = await client.getAgentCard();
 
