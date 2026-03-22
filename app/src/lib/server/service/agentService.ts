@@ -61,7 +61,11 @@ abstract class AgentService {
 				apiVersion: 'v1',
 				kind: 'Pod',
 				metadata: {
-					generateName: agentParams.name.toLowerCase()
+					generateName: agentParams.name.toLowerCase(),
+					labels: {
+						run: 'agent',
+						name: agentParams.name
+					}
 				},
 				spec: {
 					restartPolicy: 'Never',
