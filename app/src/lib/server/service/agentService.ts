@@ -30,9 +30,13 @@ interface KubernetesClusterParams {
 }
 
 abstract class AgentService {
-	abstract deployToKubernetes(params: DeployAgentParams): Promise<DeployAgentResult>;
+	protected abstract getKubeConfig(): KubeConfig;
 
-	protected async runPod(kc: KubeConfig, namespace: string, agentParams: DeployAgentParams) {
+	protected abstract getNamespace(): Promise<string>;
+
+	async deployToKubernetes(agentParams: DeployAgentParams): Promise<DeployAgentResult> {
+		const kc = this.getKubeConfig();
+		const namespace = await this.getNamespace();
 		const core = kc.makeApiClient(CoreV1Api);
 
 		const mcpServersValue = agentParams.mcpServers.join(',');
@@ -114,7 +118,11 @@ class RemoteDeploymentAgentService extends AgentService {
 		super();
 	}
 
-	async deployToKubernetes(agentParams: DeployAgentParams) {
+	protected async getNamespace() {
+		return this.kubernetesParams.agentsNamespace;
+	}
+
+	protected getKubeConfig() {
 		const kc = new KubeConfig();
 		kc.loadFromOptions({
 			clusters: [
@@ -140,14 +148,12 @@ class RemoteDeploymentAgentService extends AgentService {
 			]
 		});
 
-		const namespace = this.kubernetesParams.agentsNamespace;
-
-		return super.runPod(kc, namespace, agentParams);
+		return kc;
 	}
 }
 
 class InClusterDeploymentAgentService extends AgentService {
-	private async getNamespace(): Promise<string> {
+	protected async getNamespace() {
 		const namespaceFromEnv = env.K8S_AGENTS_NAMESPACE;
 		if (namespaceFromEnv) {
 			return namespaceFromEnv;
@@ -168,13 +174,10 @@ class InClusterDeploymentAgentService extends AgentService {
 		);
 	}
 
-	async deployToKubernetes(params: DeployAgentParams) {
+	protected getKubeConfig() {
 		const kc = new KubeConfig();
 		kc.loadFromCluster();
-
-		const namespace = await this.getNamespace();
-
-		return super.runPod(kc, namespace, params);
+		return kc;
 	}
 }
 
