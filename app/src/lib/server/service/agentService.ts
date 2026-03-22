@@ -77,6 +77,7 @@ abstract class AgentService {
 								{ name: 'LLM_API_KEY', value: agentParams.apiKey },
 								{ name: 'LLM_API_URI', value: agentParams.apiUrl },
 								{ name: 'LISTEN_PORT', value: String(listenPort) },
+								{ name: 'LISTEN_ADDRESS', value: '0.0.0.0' },
 								{ name: 'MCP_SERVERS', value: mcpServersValue },
 								...authVars
 							],
