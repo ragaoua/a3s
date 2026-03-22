@@ -19,6 +19,13 @@ interface DeployAgentResult {
 	agentApiKey?: string;
 }
 
+export interface AgentSummary {
+	agentName: string;
+	podName: string;
+	status: string;
+	createdAt: string;
+}
+
 interface KubernetesClusterParams {
 	clusterName: string;
 	server: string;
@@ -110,6 +117,30 @@ abstract class AgentService {
 		);
 
 		return { agentApiKey };
+	}
+
+	async listAgents(): Promise<AgentSummary[]> {
+		const kc = this.getKubeConfig();
+		const core = kc.makeApiClient(CoreV1Api);
+
+		const namespace = await this.getNamespace();
+		const podList = await core.listNamespacedPod({
+			namespace,
+			labelSelector: 'run=agent'
+		});
+
+		return podList.items
+			.map((pod) => {
+				const createdAt = pod.metadata?.creationTimestamp;
+
+				return {
+					podName: pod.metadata?.name ?? '<unknown-pod>',
+					agentName: pod.metadata?.labels?.name ?? pod.metadata?.name ?? '<unknown-agent>',
+					status: pod.status?.phase ?? 'Unknown',
+					createdAt: createdAt ? new Date(createdAt).toISOString() : ''
+				} satisfies AgentSummary;
+			})
+			.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 	}
 }
 

@@ -9,5 +9,5 @@ subjects:
   namespace: app-ns
 roleRef:
   kind: Role
-  name: pod-creator-role
+  name: agent-pod-operator
   apiGroup: rbac.authorization.k8s.io
