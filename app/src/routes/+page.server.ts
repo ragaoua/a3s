@@ -41,7 +41,7 @@ export const actions: Actions = {
 			authParams = { oauth2IssuerUrl, oauth2JwksUrl };
 		}
 
-		await agentService.deployToKubernetes({
+		const { agentApiKey } = await agentService.deployToKubernetes({
 			model,
 			name,
 			description,
@@ -53,7 +53,8 @@ export const actions: Actions = {
 		});
 
 		return {
-			success: true
+			success: true,
+			agentApiKey
 		};
 	}
 };

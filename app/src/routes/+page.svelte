@@ -14,6 +14,8 @@
   let oauth2JwksUrl = '';
 	let authMode: 'apiKey' | 'oauth2' = 'apiKey';
 
+  export let form: { success?: boolean; agentApiKey?: string } | null;
+
 	const addMcpServer = () => {
 		mcpServers = [...mcpServers, ''];
 	};
@@ -34,6 +36,15 @@
 		<h1 class="text-2xl font-semibold">Create Agent</h1>
 
 		<form method="POST" class="mt-8 space-y-6">
+			{#if form?.success}
+				<div class="rounded-lg border border-emerald-600/70 bg-emerald-900/30 px-4 py-3 text-sm text-emerald-100">
+					<p class="font-semibold">Agent deployed successfully.</p>
+					{#if form.agentApiKey}
+						<p class="mt-1 break-all font-mono text-emerald-200">API key: {form.agentApiKey}</p>
+					{/if}
+				</div>
+			{/if}
+
       <FieldSet title="Agent">
         <FormField
           label="Agent name"

@@ -15,6 +15,10 @@ interface DeployAgentParams {
 	oauth2JwksUrl?: string;
 }
 
+interface DeployAgentResult {
+	agentApiKey?: string;
+}
+
 interface KubernetesClusterParams {
 	clusterName: string;
 	server: string;
@@ -26,15 +30,15 @@ interface KubernetesClusterParams {
 }
 
 abstract class AgentService {
-	abstract deployToKubernetes(params: DeployAgentParams): void;
+	abstract deployToKubernetes(params: DeployAgentParams): Promise<DeployAgentResult>;
 
 	protected async runPod(kc: KubeConfig, namespace: string, agentParams: DeployAgentParams) {
 		const core = kc.makeApiClient(CoreV1Api);
 
 		const mcpServersValue = agentParams.mcpServers.join(',');
-		const listenPort = 10000;
 
 		const authVars: V1EnvVar[] = [];
+		let agentApiKey: string | undefined;
 		if (agentParams.oauth2IssuerUrl) {
 			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: agentParams.oauth2IssuerUrl });
 			if (agentParams.oauth2JwksUrl) {
@@ -42,13 +46,14 @@ abstract class AgentService {
 			}
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
-			const agentApiKey = randomBytes(32).toString('hex');
+			agentApiKey = randomBytes(32).toString('hex');
 			authVars.push({ name: 'AGENT_API_KEY', value: agentApiKey });
 			console.log(
 				`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
 			);
 		}
 
+		const listenPort = 10000;
 		const pod = await core.createNamespacedPod({
 			namespace,
 			body: {
@@ -87,6 +92,8 @@ abstract class AgentService {
 		console.log(
 			`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
 		);
+
+		return { agentApiKey };
 	}
 }
 
@@ -123,7 +130,7 @@ class RemoteDeploymentAgentService extends AgentService {
 
 		const namespace = this.kubernetesParams.agentsNamespace;
 
-		await super.runPod(kc, namespace, agentParams);
+		return super.runPod(kc, namespace, agentParams);
 	}
 }
 
@@ -155,7 +162,7 @@ class InClusterDeploymentAgentService extends AgentService {
 
 		const namespace = await this.getNamespace();
 
-		await super.runPod(kc, namespace, params);
+		return super.runPod(kc, namespace, params);
 	}
 }
 
