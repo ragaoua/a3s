@@ -12,7 +12,7 @@ WORKDIR /app
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1.2.23-alpine
+FROM oven/bun:1.3.5
 
 WORKDIR /app
 
