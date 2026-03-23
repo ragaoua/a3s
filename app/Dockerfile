@@ -18,8 +18,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000 \
-    ORIGIN=http://localhost:${PORT}
+    PORT=3000
+ENV ORIGIN=http://localhost:${PORT}
 
 COPY --from=build /app/build ./build
 COPY --from=build /app/package.json ./package.json
