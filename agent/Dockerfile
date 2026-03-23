@@ -12,11 +12,15 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH=
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/src /app/src
+RUN groupadd --system app && useradd --system --gid app --create-home app
 
-CMD ["/app/.venv/bin/a3s-agent"]
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --from=builder --chown=app:app /app/src /app/src
+
+USER app
+
+CMD ["a3s-agent"]
