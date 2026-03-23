@@ -4,9 +4,12 @@ name: a3s-kind
 nodes:
   - role: control-plane
     extraPortMappings:
-      - containerPort: 30080
+      - containerPort: 30080 # Used to expose the app via service
         hostPort: 8080
         protocol: TCP
-      - containerPort: 30081
+      - containerPort: 30081 # Used to expose test agent via service
         hostPort: 8000
+        protocol: TCP
+      - containerPort: 30082 # Used to expose test MCP server via service
+        hostPort: 10000
         protocol: TCP

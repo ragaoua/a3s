@@ -2,7 +2,8 @@
   "name": "demo-mcp",
   "module": "index.ts",
   "scripts": {
-    "start": "bun run src/index.ts"
+    "start": "bun run src/index.ts",
+    "build": "bun build --compile src/index.ts --outfile dist/index"
   },
   "devDependencies": {
     "@types/bun": "latest"
