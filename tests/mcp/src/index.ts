@@ -15,7 +15,7 @@ const isStateless = process.argv.includes("--stateless");
 const mcpServerUrl = new URL(`http://${CONFIG.host}:${CONFIG.port}`);
 const mcpEndpointUrl = new URL("mcp", mcpServerUrl);
 
-const app = createMcpExpressApp();
+const app = createMcpExpressApp({ host: CONFIG.host });
 
 app.use(createRequestLogger());
 
