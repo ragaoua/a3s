@@ -90,7 +90,8 @@
           bind:group={s.authMode}
           choices={[
             { value: "apiKey", label: "API key" },
-            { value: "oauth2", label: "OAuth2" }
+            { value: "oauth2", label: "OAuth2" },
+            { value: "none", label: "Disabled" }
           ]}
         />
 
@@ -98,7 +99,7 @@
           <div class="flex gap-3">
 					<span class="text-neutral-400">An API Key will be generated.</span>
 				</div>
-        {:else}
+        {:else if s.authMode === 'oauth2'}
           <FormField
             label="OAuth2 issuer URL"
             id="oauth2-issuer-url"
@@ -115,6 +116,10 @@
             type="url"
             bind:value={s.oauth2JwksUrl}
           />
+        {:else}
+          <div class="flex gap-3">
+					<span class="text-neutral-400">Authentication will be disabled.</span>
+				</div>
         {/if}
 			</FieldSet>
 

@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
 import { agentService } from '$lib/server/service/agentService';
+import type { Auth } from '$lib/types/auth';
 
 export const actions: Actions = {
 	default: async ({ request }) => {
@@ -25,20 +26,24 @@ export const actions: Actions = {
 			});
 		}
 
-		if (authMode !== 'apiKey' && authMode !== 'oauth2') {
+		if (authMode !== 'apiKey' && authMode !== 'oauth2' && authMode !== 'none') {
 			return fail(400, {
-				error: 'Authentication mode must be either apiKey or oauth2.'
+				error: 'Authentication mode must be one of apiKey, oauth2, or none.'
 			});
 		}
 
-		let authParams;
+		let auth: Auth;
 		if (authMode === 'oauth2') {
 			if (!oauth2IssuerUrl) {
 				return fail(400, {
 					error: 'OAuth2 issuer URL is required when OAuth2 auth is selected.'
 				});
 			}
-			authParams = { oauth2IssuerUrl, oauth2JwksUrl };
+			auth = { type: 'oauth2', oauth2IssuerUrl, oauth2JwksUrl };
+		} else if (authMode === 'apiKey') {
+			auth = { type: 'apiKey' };
+		} else {
+			auth = { type: 'none' };
 		}
 
 		const { agentApiKey } = await agentService.deployToKubernetes({
@@ -49,7 +54,7 @@ export const actions: Actions = {
 			apiKey,
 			apiUrl,
 			mcpServers,
-			...authParams
+			auth
 		});
 
 		return {

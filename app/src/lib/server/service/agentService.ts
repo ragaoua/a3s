@@ -2,6 +2,7 @@ import { CoreV1Api, KubeConfig, type V1EnvVar } from '@kubernetes/client-node';
 import { env } from '$env/dynamic/private';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import type { Auth } from '$lib/types/auth';
 
 interface DeployAgentParams {
 	model: string;
@@ -11,8 +12,7 @@ interface DeployAgentParams {
 	apiKey: string;
 	apiUrl: string;
 	mcpServers: string[];
-	oauth2IssuerUrl?: string;
-	oauth2JwksUrl?: string;
+	auth: Auth;
 }
 
 interface DeployAgentResult {
@@ -50,10 +50,13 @@ abstract class AgentService {
 
 		const authVars: V1EnvVar[] = [];
 		let agentApiKey: string | undefined;
-		if (agentParams.oauth2IssuerUrl) {
-			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: agentParams.oauth2IssuerUrl });
-			if (agentParams.oauth2JwksUrl) {
-				authVars.push({ name: 'OAUTH2_JWKS_URL', value: agentParams.oauth2JwksUrl });
+		if (agentParams.auth.type === 'none') {
+			authVars.push({ name: 'NO_AUTH', value: '1' });
+			console.log('Agent will be configured with no authentication.');
+		} else if (agentParams.auth.type === 'oauth2') {
+			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: agentParams.auth.oauth2IssuerUrl });
+			if (agentParams.auth.oauth2JwksUrl) {
+				authVars.push({ name: 'OAUTH2_JWKS_URL', value: agentParams.auth.oauth2JwksUrl });
 			}
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
