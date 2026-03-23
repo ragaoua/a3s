@@ -10,6 +10,7 @@ import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { randomUUID } from "node:crypto";
 
 const authIsEnabled = !process.argv.includes("--no-auth");
+const isStateless = process.argv.includes("--stateless");
 
 const mcpServerUrl = new URL(`http://${CONFIG.host}:${CONFIG.port}`);
 const mcpEndpointUrl = new URL("mcp", mcpServerUrl);
@@ -21,32 +22,36 @@ app.use(createRequestLogger());
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
 const mcpHandler = async (req: Request, res: Response) => {
-  const sid = req.headers["mcp-session-id"] as string | undefined;
+  let transport: StreamableHTTPServerTransport | undefined;
 
-  let transport: StreamableHTTPServerTransport | undefined = sid
-    ? transports[sid]
-    : undefined;
+  if (!isStateless) {
+    if (isInitializeRequest(req.body)) {
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (sessionId) => {
+          transports[sessionId] = transport as StreamableHTTPServerTransport;
+        },
+      });
+    } else {
+      const sid = req.headers["mcp-session-id"] as string | undefined;
+      transport = sid ? transports[sid] : undefined;
+      if (!transport) {
+        return res.status(400).json({
+          jsonrpc: "2.0",
+          error: { code: -32000, message: "Bad Request: invalid session" },
+          id: null,
+        });
+      }
+    }
 
-  if (!transport && isInitializeRequest(req.body)) {
-    const server = getServer();
-
-    transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => randomUUID(),
-      onsessioninitialized: (sessionId) => {
-        transports[sessionId] = transport as StreamableHTTPServerTransport;
-      },
-    });
-
-    await server.connect(transport);
+    const sid = req.headers["mcp-session-id"] as string | undefined;
+    transport = sid ? transports[sid] : undefined;
+  } else {
+    transport = new StreamableHTTPServerTransport();
   }
 
-  if (!transport) {
-    return res.status(400).json({
-      jsonrpc: "2.0",
-      error: { code: -32000, message: "Bad Request: invalid session" },
-      id: null,
-    });
-  }
+  const server = getServer();
+  await server.connect(transport);
 
   try {
     await transport.handleRequest(req, res, req.body);
@@ -67,11 +72,9 @@ const resourceMetadataUrl =
 if (authIsEnabled) {
   const authHandler = getExpressAuthRouter(resourceMetadataUrl);
 
-  console.log("Authentication enabled - JWT validation required");
   app.post("/mcp", authHandler, mcpHandler);
   app.get("/mcp", authHandler, mcpHandler);
 } else {
-  console.log("⚠️  Authentication disabled - running in no-auth mode");
   app.post("/mcp", mcpHandler);
   app.get("/mcp", mcpHandler);
 }
@@ -80,9 +83,10 @@ app.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`🚀 MCP Server running on ${mcpServerUrl.origin}`);
   console.log(`📡 MCP endpoint available at ${mcpEndpointUrl}`);
   console.log(`🔐 OAuth metadata available at ${resourceMetadataUrl}`);
-  console.log(
-    `Auth mode: ${authIsEnabled ? "ENABLED" : "DISABLED (--no-auth)"}`,
-  );
+  console.log(`🔑 Auth mode: ${authIsEnabled ? "ENABLED" : "DISABLED"}`);
+  if (isStateless) {
+    console.log("📍 Server running in stateless mode");
+  }
 });
 
 // Handle server shutdown
