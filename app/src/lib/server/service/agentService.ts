@@ -225,13 +225,13 @@ function getRequiredEnv(name: string): string {
 	return value;
 }
 
-type K8sDeployMode = 'inCluster' | 'external' | 'auto';
+type K8sDeployMode = 'inCluster' | 'remote' | 'auto';
 
-function resolveDeployMode(): 'inCluster' | 'external' {
+function resolveDeployMode(): 'inCluster' | 'remote' {
 	const raw = (env.K8S_DEPLOY_MODE ?? 'auto') as K8sDeployMode;
-	if (raw === 'inCluster' || raw === 'external') return raw;
+	if (raw === 'inCluster' || raw === 'remote') return raw;
 	if (raw === 'auto') {
-		return env.KUBERNETES_SERVICE_HOST ? 'inCluster' : 'external';
+		return env.KUBERNETES_SERVICE_HOST ? 'inCluster' : 'remote';
 	}
 	throw new Error(`Invalid K8S_DEPLOY_MODE: ${raw}`);
 }
