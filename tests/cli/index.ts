@@ -3,8 +3,9 @@ import {
   type CallInterceptor,
   ClientFactory,
   ClientFactoryOptions,
+  JsonRpcTransport,
 } from "@a2a-js/sdk/client";
-import type { Message, MessageSendParams, Task } from "@a2a-js/sdk";
+import type { MessageSendParams, Part } from "@a2a-js/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "bun";
 
@@ -22,26 +23,6 @@ class ApiKeyInterceptor implements CallInterceptor {
   }
 
   async after(): Promise<void> {}
-}
-
-function getMessageResponse(message: Message) {
-  return message.parts
-    .filter((part) => part.kind === "text")
-    .map((part) => part.text)
-    .join("");
-}
-
-function getTaskResponse(task: Task) {
-  if (task.status.state === "completed") {
-    const parts = task.artifacts
-      ? task.artifacts.flatMap((artifact) => artifact.parts)
-      : [];
-    return parts
-      .filter((part) => part.kind === "text")
-      .map((part) => part.text)
-      .join("");
-  }
-  return task.status.message ?? "<empty response>";
 }
 
 async function main() {
@@ -72,15 +53,29 @@ async function main() {
       },
     };
 
-    const result = await client.sendMessage(sendParams);
-    const response =
-      result.kind === "task"
-        ? getTaskResponse(result)
-        : getMessageResponse(result);
+    process.stdout.write("Agent: ");
+    let wroteResponse = false;
 
-    console.log("Agent: ", response);
+    for await (const event of client.sendMessageStream(sendParams)) {
+      if (event.kind === "artifact-update" && !event.lastChunk) {
+        const chunk = event.artifact.parts
+          .filter((part) => part.kind === "text")
+          .map((part) => part.text ?? "")
+          .join("");
+        process.stdout.write(chunk);
+        wroteResponse = true;
+      }
 
-    contextId = result.contextId;
+      if (event.contextId !== undefined) {
+        contextId = event.contextId;
+      }
+    }
+
+    if (!wroteResponse) {
+      process.stdout.write("<empty response>");
+    }
+    process.stdout.write("\n");
+
     process.stdout.write("User: ");
   }
 }

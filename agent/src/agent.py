@@ -21,6 +21,7 @@ from a2a.types import (
 )
 from authlib.oauth2.rfc8414 import get_well_known_url
 from google.adk.agents import LlmAgent
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.a2a.converters.request_converter import (
     AgentRunRequest,
@@ -85,6 +86,10 @@ def request_converter(
             "authorization_header": authorization_header,
         }
 
+    if run_request.run_config is None:
+        run_request.run_config = RunConfig()
+    run_request.run_config.streaming_mode = StreamingMode.SSE
+
     return run_request
 
 
@@ -112,6 +117,7 @@ def create_a2a_app(
         config=A2aAgentExecutorConfig(
             request_converter=request_converter,
         ),
+        use_legacy=False,
     )
     request_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
@@ -165,7 +171,7 @@ def create_a2a_app(
             description=agent.description,
             url=rpc_url,
             version="0.0.1",
-            capabilities=AgentCapabilities(),
+            capabilities=AgentCapabilities(streaming=True),
             skills=[
                 AgentSkill(
                     id=agent.name,
