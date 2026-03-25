@@ -75,8 +75,11 @@ accessible, even when auth is enabled.
 #### OAuth2
 
 Setting `OAUTH2_ISSUER_URL` to an authorization server enables OAuth2 mode.
-Optionally set `OAUTH2_JWKS_URL` to override the JWKS endpoint that is
-discovered otherwise.
+Optionally set:
+
+- `OAUTH2_AUDIENCE` to validate the access token audience (`aud` claim). If
+  unset, no audience validation will be enforced.
+- `OAUTH2_JWKS_URL` to override the JWKS endpoint that is discovered otherwise.
 
 Upon receiving a request, the agent will look for a bearer token in the
 `Authorization` HTTP header. It will then fetch the authorization server's JWKS

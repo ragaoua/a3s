@@ -41,6 +41,12 @@ abstract class AgentService {
 
 	protected abstract getNamespace(): Promise<string>;
 
+	private pushIfValue(vars: V1EnvVar[], name: string, value?: string) {
+		if (value) {
+			vars.push({ name, value });
+		}
+	}
+
 	async deployToKubernetes(agentParams: DeployAgentParams): Promise<DeployAgentResult> {
 		const kc = this.getKubeConfig();
 		const namespace = await this.getNamespace();
@@ -55,9 +61,8 @@ abstract class AgentService {
 			console.log('Agent will be configured with no authentication.');
 		} else if (agentParams.auth.type === 'oauth2') {
 			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: agentParams.auth.oauth2IssuerUrl });
-			if (agentParams.auth.oauth2JwksUrl) {
-				authVars.push({ name: 'OAUTH2_JWKS_URL', value: agentParams.auth.oauth2JwksUrl });
-			}
+			this.pushIfValue(authVars, 'OAUTH2_JWKS_URL', agentParams.auth.oauth2JwksUrl);
+			this.pushIfValue(authVars, 'OAUTH2_AUDIENCE', agentParams.auth.oauth2Audience);
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
 			agentApiKey = randomBytes(32).toString('hex');

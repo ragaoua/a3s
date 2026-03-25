@@ -17,6 +17,7 @@ def get_base_test_config_ignoring_env_file_with(
     AGENT_API_KEY: str | None = None,
     OAUTH2_ISSUER_URL: str | None = None,
     OAUTH2_JWKS_URL: str | None = None,
+    OAUTH2_AUDIENCE: str | None = None,
     NO_AUTH: bool = False,
     MCP_SERVERS: list[str] | None = None,
 ) -> Config:
@@ -36,6 +37,7 @@ def get_base_test_config_ignoring_env_file_with(
         AGENT_API_KEY=AGENT_API_KEY,
         OAUTH2_ISSUER_URL=OAUTH2_ISSUER_URL,
         OAUTH2_JWKS_URL=OAUTH2_JWKS_URL,
+        OAUTH2_AUDIENCE=OAUTH2_AUDIENCE,
         NO_AUTH=NO_AUTH,
         MCP_SERVERS=list(MCP_SERVERS) if MCP_SERVERS is not None else [],
     )

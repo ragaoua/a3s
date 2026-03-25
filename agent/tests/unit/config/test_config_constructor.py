@@ -30,7 +30,9 @@ def test_config_accepts_custom_listen_address(LISTEN_ADDRESS: str) -> None:
 
 
 def test_config_loads_in_api_key_auth_mode() -> None:
-    config = get_base_test_config_ignoring_env_file_with(AGENT_API_KEY="test-api-key")
+    config = get_base_test_config_ignoring_env_file_with(
+        AGENT_API_KEY="test-api-key",
+    )
 
     assert isinstance(config.AUTH, APIKeyAuth)
     assert config.AUTH.api_key == "test-api-key"
@@ -39,37 +41,40 @@ def test_config_loads_in_api_key_auth_mode() -> None:
 def test_config_rejects_empty_api_key() -> None:
     with pytest.raises(ValidationError) as exc:
         get_base_test_config_ignoring_env_file_with(
-            AGENT_API_KEY=""
+            AGENT_API_KEY="",
         )  # pyright: ignore[reportUnusedCallResult]
 
     assert any(error["loc"] == ("Auth",) for error in exc.value.errors())
 
 
-def test_config_loads_in_oauth2_mode_with_jwks_url() -> None:
+@pytest.mark.parametrize(
+    ("oauth2_jwks_url"),
+    [None, "https://issuer.example/jwks"],
+)
+@pytest.mark.parametrize(
+    "oauth2_audience",
+    [None, "api://agent"],
+)
+def test_config_loads_in_oauth2_mode(
+    oauth2_jwks_url: str | None,
+    oauth2_audience: str | None,
+) -> None:
     config = get_base_test_config_ignoring_env_file_with(
         OAUTH2_ISSUER_URL="https://issuer.example",
-        OAUTH2_JWKS_URL="https://issuer.example/jwks",
+        OAUTH2_JWKS_URL=oauth2_jwks_url,
+        OAUTH2_AUDIENCE=oauth2_audience,
     )
 
     assert isinstance(config.AUTH, OAuth2Auth)
     assert config.AUTH.oauth2_issuer_url == "https://issuer.example"
-    assert config.AUTH.oauth2_jwks_url == "https://issuer.example/jwks"
-
-
-def test_config_loads_in_oauth2_mode_without_jwks_url() -> None:
-    config = get_base_test_config_ignoring_env_file_with(
-        OAUTH2_ISSUER_URL="https://issuer.example"
-    )
-
-    assert isinstance(config.AUTH, OAuth2Auth)
-    assert config.AUTH.oauth2_issuer_url == "https://issuer.example"
-    assert config.AUTH.oauth2_jwks_url is None
+    assert config.AUTH.oauth2_jwks_url == oauth2_jwks_url
+    assert config.AUTH.oauth2_audience == oauth2_audience
 
 
 def test_config_rejects_empty_oauth2_issuer_url() -> None:
     with pytest.raises(ValidationError) as exc:
         get_base_test_config_ignoring_env_file_with(
-            OAUTH2_ISSUER_URL=""
+            OAUTH2_ISSUER_URL="",
         )  # pyright: ignore[reportUnusedCallResult]
 
     assert any(error["loc"] == ("Auth",) for error in exc.value.errors())

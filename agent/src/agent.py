@@ -234,6 +234,7 @@ def create_app(config: Config) -> Starlette:
             issuer_url=config.AUTH.oauth2_issuer_url,
             jwks_url=config.AUTH.oauth2_jwks_url,
             realm=root_agent.name,
+            audience=config.AUTH.oauth2_audience,
         )
     else:
         logger.info("Auth disabled.")

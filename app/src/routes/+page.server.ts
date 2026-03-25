@@ -13,6 +13,7 @@ export const actions: Actions = {
 		const authMode = String(formData.get('authMode') ?? 'apiKey').trim();
 		const apiKey = String(formData.get('apiKey') ?? '').trim();
 		const oauth2IssuerUrl = String(formData.get('oauth2IssuerUrl') ?? '').trim();
+		const oauth2Audience = String(formData.get('oauth2Audience') ?? '').trim();
 		const oauth2JwksUrl = String(formData.get('oauth2JwksUrl') ?? '').trim();
 		const apiUrl = String(formData.get('apiUrl') ?? '').trim();
 		const mcpServers = formData
@@ -39,7 +40,12 @@ export const actions: Actions = {
 					error: 'OAuth2 issuer URL is required when OAuth2 auth is selected.'
 				});
 			}
-			auth = { type: 'oauth2', oauth2IssuerUrl, oauth2JwksUrl };
+			auth = {
+				type: 'oauth2',
+				oauth2IssuerUrl,
+				oauth2Audience,
+				oauth2JwksUrl
+			};
 		} else if (authMode === 'apiKey') {
 			auth = { type: 'apiKey' };
 		} else {

@@ -30,6 +30,7 @@ class APIKeyAuth:
 class OAuth2Auth:
     oauth2_issuer_url: str
     oauth2_jwks_url: str | None
+    oauth2_audience: str | None
 
 
 def validate_auth_config(
@@ -37,6 +38,7 @@ def validate_auth_config(
     agent_api_key: str | None,
     oauth2_issuer_url: str | None,
     oauth2_jwks_url: str | None,
+    oauth2_audience: str | None,
     no_auth: bool,
 ) -> APIKeyAuth | OAuth2Auth | None:
     has_api_key = bool(agent_api_key)
@@ -53,7 +55,7 @@ def validate_auth_config(
 
     if has_oauth2:
         assert oauth2_issuer_url is not None
-        return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url)
+        return OAuth2Auth(oauth2_issuer_url, oauth2_jwks_url, oauth2_audience)
     if has_api_key:
         assert agent_api_key is not None
         return APIKeyAuth(agent_api_key)
@@ -93,6 +95,7 @@ class Config(BaseSettings):
     AGENT_API_KEY: NonEmptyStr | None = Field(default=None, exclude=True)
     OAUTH2_ISSUER_URL: NonEmptyStr | None = Field(default=None, exclude=True)
     OAUTH2_JWKS_URL: NonEmptyStr | None = Field(default=None, exclude=True)
+    OAUTH2_AUDIENCE: NonEmptyStr | None = Field(default=None, exclude=True)
     NO_AUTH: bool = Field(default=False, exclude=True)
     _auth: APIKeyAuth | OAuth2Auth | None = PrivateAttr()
 
@@ -131,6 +134,7 @@ class Config(BaseSettings):
             agent_api_key = model.AGENT_API_KEY
             oauth2_issuer_url = model.OAUTH2_ISSUER_URL
             oauth2_jwks_url = model.OAUTH2_JWKS_URL
+            oauth2_audience = model.OAUTH2_AUDIENCE
             no_auth = model.NO_AUTH
         else:
             agent_api_key = data["AGENT_API_KEY"] if "AGENT_API_KEY" in data else None
@@ -139,6 +143,9 @@ class Config(BaseSettings):
             )
             oauth2_jwks_url = (
                 data["OAUTH2_JWKS_URL"] if "OAUTH2_JWKS_URL" in data else None
+            )
+            oauth2_audience = (
+                data["OAUTH2_AUDIENCE"] if "OAUTH2_AUDIENCE" in data else None
             )
             if "NO_AUTH" in data:
                 no_auth_raw_value = data["NO_AUTH"]
@@ -157,6 +164,7 @@ class Config(BaseSettings):
                 agent_api_key=agent_api_key,
                 oauth2_issuer_url=oauth2_issuer_url,
                 oauth2_jwks_url=oauth2_jwks_url,
+                oauth2_audience=oauth2_audience,
                 no_auth=no_auth,
             )
             if model is not None:
@@ -169,6 +177,7 @@ class Config(BaseSettings):
                     "input": {
                         "AGENT_API_KEY": agent_api_key,
                         "OAUTH2_ISSUER_URL": oauth2_issuer_url,
+                        "OAUTH2_AUDIENCE": oauth2_audience,
                         "NO_AUTH": no_auth,
                     },
                     "ctx": {"error": e},

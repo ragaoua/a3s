@@ -60,6 +60,30 @@
             "multivalued": "false",
             "usermodel.clientRoleMapping.clientId": "chatbot-app"
           }
+        },
+        {
+          "name": "a3s-test-audience-1",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "a3s-test-1",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "a3s-test-audience-2",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "a3s-test-2",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
         }
       ]
     }

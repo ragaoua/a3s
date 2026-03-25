@@ -74,31 +74,32 @@ def test_config_rejects_empty_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     assert any(error["loc"] == ("Auth",) for error in exc.value.errors())
 
 
-def test_config_loads_in_oauth2_mode_with_jwks_url(
+@pytest.mark.parametrize(
+    ("oauth2_jwks_url"),
+    [None, "https://issuer.example/jwks"],
+)
+@pytest.mark.parametrize(
+    "oauth2_audience",
+    [None, "api://agent"],
+)
+def test_config_loads_in_oauth2_mode(
     monkeypatch: pytest.MonkeyPatch,
+    oauth2_jwks_url: str | None,
+    oauth2_audience: str | None,
 ) -> None:
     _set_base_test_env(monkeypatch)
     monkeypatch.setenv("OAUTH2_ISSUER_URL", "https://issuer.example")
-    monkeypatch.setenv("OAUTH2_JWKS_URL", "https://issuer.example/jwks")
+    if oauth2_jwks_url is not None:
+        monkeypatch.setenv("OAUTH2_JWKS_URL", oauth2_jwks_url)
+    if oauth2_audience is not None:
+        monkeypatch.setenv("OAUTH2_AUDIENCE", oauth2_audience)
 
     config = Config()  # pyright: ignore[reportCallIssue]
 
     assert isinstance(config.AUTH, OAuth2Auth)
     assert config.AUTH.oauth2_issuer_url == "https://issuer.example"
-    assert config.AUTH.oauth2_jwks_url == "https://issuer.example/jwks"
-
-
-def test_config_loads_in_oauth2_mode_without_jwks_url(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _set_base_test_env(monkeypatch)
-    monkeypatch.setenv("OAUTH2_ISSUER_URL", "https://issuer.example")
-
-    config = Config()  # pyright: ignore[reportCallIssue]
-
-    assert isinstance(config.AUTH, OAuth2Auth)
-    assert config.AUTH.oauth2_issuer_url == "https://issuer.example"
-    assert config.AUTH.oauth2_jwks_url is None
+    assert config.AUTH.oauth2_jwks_url == oauth2_jwks_url
+    assert config.AUTH.oauth2_audience == oauth2_audience
 
 
 def test_config_rejects_empty_oauth2_issuer_url(

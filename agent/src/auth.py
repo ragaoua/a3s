@@ -59,7 +59,6 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
     - Support for OIDC in addition to plain oauth2 for jwks discovery
         (use authlib.oidc.discovery.get_well_known_url)
     - Proper handling of token validation errors
-    - Audience validation (maybe other claims too ?)
     """
 
     def __init__(
@@ -68,11 +67,13 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         issuer_url: str,
         jwks_url: str | None,
         realm: str,
+        audience: str | None,
     ):
         super().__init__(app)
         self.issuer_url = issuer_url.rstrip("/")
         self.jwks_url = jwks_url
         self.realm = realm
+        self.audience = audience
 
     def _fetch_json(self, url: str) -> dict[str, Any]:
         try:
@@ -105,10 +106,16 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         return JsonWebKey.import_key_set(jwks_raw)
 
     def _decode_access_token(self, token: str, jwk_set: KeySet):
+        claims_options: dict[str, dict[str, Any]] = {
+            "iss": {"essential": True, "value": self.issuer_url},
+        }
+        if self.audience:
+            claims_options["aud"] = {"essential": True, "value": self.audience}
+
         claims = jwt.decode(
             token,
             jwk_set,
-            claims_options={"iss": {"essential": True, "value": self.issuer_url}},
+            claims_options=claims_options,
         )
         claims.validate()
         return claims

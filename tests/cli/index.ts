@@ -25,13 +25,40 @@ class ApiKeyInterceptor implements CallInterceptor {
   async after(): Promise<void> {}
 }
 
+class AccessTokenInterceptor implements CallInterceptor {
+  constructor(private readonly accessToken: string) {}
+
+  async before(args: BeforeArgs): Promise<void> {
+    args.options = {
+      ...args.options,
+      serviceParameters: {
+        ...args.options?.serviceParameters,
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+    };
+  }
+
+  async after(): Promise<void> {}
+}
+
 async function main() {
   const port = env.PORT ?? "8000";
-  const apiKey = env.API_KEY ?? "";
+  const apiKey = env.API_KEY;
+  const accessToken = env.ACCESS_TOKEN;
+  if (apiKey && accessToken) {
+    console.error("Set only one of API_KEY or ACCESS_TOKEN");
+    return 1;
+  }
+
+  const interceptor: CallInterceptor | undefined = apiKey
+    ? new ApiKeyInterceptor(apiKey)
+    : accessToken
+      ? new AccessTokenInterceptor(accessToken)
+      : undefined;
   const factory = new ClientFactory(
     ClientFactoryOptions.createFrom(ClientFactoryOptions.default, {
       clientConfig: {
-        interceptors: apiKey ? [new ApiKeyInterceptor(apiKey)] : [],
+        interceptors: interceptor ? [interceptor] : [],
       },
     }),
   );

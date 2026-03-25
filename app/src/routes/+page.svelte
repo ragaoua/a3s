@@ -110,6 +110,14 @@
           />
 
           <FormField
+            label="OAuth2 audience"
+            id="oauth2-audience"
+            name="oauth2Audience"
+            bind:value={s.oauth2Audience}
+            placeholder="Audience claim to validate"
+          />
+
+          <FormField
             label="OAuth2 JWKS URL"
             id="oauth2-jwks-url"
             name="oauth2JwksUrl"

@@ -5,5 +5,6 @@ export type Auth =
 	| {
 			type: 'oauth2';
 			oauth2IssuerUrl: string;
+			oauth2Audience?: string;
 			oauth2JwksUrl?: string;
 	  };
