@@ -47,13 +47,10 @@ Exported variables override those set in `.env`.
 - `LISTEN_ADDRESS`: defaults to "127.0.0.1"
 - `LISTEN_PORT`: defaults to "8000"
 - `LOG_LEVEL`: defaults to "INFO". Possible levels are:
-  - "CRITICAL"
-  - "FATAL"
   - "ERROR"
-  - "WARN" or "WARNING"
+  - "WARNING"
   - "INFO"
   - "DEBUG"
-  - "NOTSET"
 - `LOG_FORMAT`: "json" or "plain". Defaults to "plain"
 
 ### LLM support
