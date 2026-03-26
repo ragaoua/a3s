@@ -82,9 +82,12 @@ Upon receiving a request, the agent will look for a bearer token in the
 `Authorization` HTTP header. It will then fetch the authorization server's JWKS
 to validate the token and grant (or deny) access.
 
+For more information about how token validation is implemented, check out
+[token-validation.md](agent/docs/token-validation.md)
+
 #### API Key
 
-Set `AGENT_API_KEY` to any arbitray string value to enable API Key auth mode.
+Set `AGENT_API_KEY` to any arbitrary string value to enable API Key auth mode.
 
 Upon receiving a request, the agent will look for an `API-Key` HTTP header,
 and check its value against the configured API key.
@@ -165,35 +168,15 @@ your RBAC setup).
 
 ## Current limitations and planned features
 
-Many things are missing and planned, including but not limited to:
+Deployments currently create standalone pods directly (no built-in
+Service/Ingress/lifecycle orchestration). It is left to the Kubernetes admin to
+set up according to the use cases and internal policies.
 
-- Agent:
-  - Auth:
-    - Will add an extended authenticated agent card that describes agent's
-      skills and tools.
-    - API Key:
-      - Only one API Key is generated per agent. Multiple keys, rotation,
-        revocation will be implemented.
-      - API Key is shown to user upon agent deployment, and there's no way to
-        get it back or regenerate it. This isn't ideal and will be tackled.
-    - OAuth2:
-      - incoming `Authorization: Bearer ...` is ALWAYS propagated to MCP server
-        calls. This will be configurable since it's not always the desired
-        behavior.
-      - No access filtering is done: any client that presents a valid token is
-        authorized. This is not ideal and access control will be implemented
-        based on JWT claims.
-      - Support for OIDC will be implemented.
-      - Token validation errors aren't properly handled.
-      - Audience validation will be implemented.
+Right now, the platform only supports deploying and listing agents. More
+management features will be added.
 
-- Platform:
-  - Deployments currently create standalone pods directly (no built-in
-    Service/Ingress/lifecycle orchestration). It is left to the Kubernetes
-    admin to set up according to the use cases and internal policies.
-  - The agent should probably be running as a deployment, not a pod.
-  - Right now, the app only supports deploying and listing agents. More
-    management features will be added.
+Check out [TODO.md](TODO.md) for more information about planned features and
+future work.
 
 ## Dev environment setup: Git hooks
 
