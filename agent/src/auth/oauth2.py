@@ -1,53 +1,36 @@
 import json
-from hmac import compare_digest
 from json import JSONDecodeError
-from typing import Any, Iterable, final
+from typing import Any, final
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-from authlib.jose import JsonWebKey, KeySet, jwt
+from authlib.jose import JWTClaims, JsonWebKey, KeySet
 from authlib.jose.errors import JoseError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
+from authlib.oauth2.rfc9068 import JWTBearerTokenValidator
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 from typing_extensions import override
 
+from src.auth.constants import EXCLUDED_PATHS
 from src.loggingManager import LoggingManager
 
 logger = LoggingManager().get_logger(__name__)
 
-excluded_paths: Iterable[str] = ("/.well-known/agent-card.json",)
 
-
-@final
-class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
-    HEADER_NAME = "API-Key"
-
-    def __init__(
-        self,
-        app: ASGIApp,
-        api_key: str,
-    ):
-        super().__init__(app)
-        self.api_key = api_key
+class RFC9068AccessTokenValidator(JWTBearerTokenValidator):
+    def __init__(self, *, issuer: str, resource_server: str | None, jwk_set: KeySet):
+        super().__init__(
+            issuer=issuer,
+            resource_server=resource_server,
+        )
+        self._jwk_set = jwk_set
 
     @override
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        if request.url.path in excluded_paths:
-            return await call_next(request)
-
-        received_key = request.headers.get("API-Key", "")
-        if not compare_digest(received_key, self.api_key):
-            return JSONResponse(
-                status_code=401,
-                content={"detail": "Unauthorized"},
-                headers={"WWW-Authenticate": self.HEADER_NAME},
-            )
-
-        request.state.api_key = received_key
-        return await call_next(request)
+    def get_jwks(self):
+        return self._jwk_set
 
 
 @final
@@ -105,19 +88,17 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwks_raw = self._fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
 
-    def _decode_access_token(self, token: str, jwk_set: KeySet):
-        claims_options: dict[str, dict[str, Any]] = {
-            "iss": {"essential": True, "value": self.issuer_url},
-        }
-        if self.audience:
-            claims_options["aud"] = {"essential": True, "value": self.audience}
-
-        claims = jwt.decode(
-            token,
-            jwk_set,
-            claims_options=claims_options,
+    def _get_validated_access_token_claims(
+        self, token: str, jwk_set: KeySet
+    ) -> JWTClaims:
+        validator = RFC9068AccessTokenValidator(
+            issuer=self.issuer_url,
+            resource_server=self.audience,
+            jwk_set=jwk_set,
         )
+        claims = validator.authenticate_token(token)
         claims.validate()
+
         return claims
 
     def _unauthorized_error_response(
@@ -141,7 +122,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
     @override
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        if request.url.path in excluded_paths:
+        if request.url.path in EXCLUDED_PATHS:
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization")
@@ -162,7 +143,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwk_set = self._fetch_jwk_set(jwks_url)
 
         try:
-            token_payload = self._decode_access_token(token, jwk_set)
+            token_payload = self._get_validated_access_token_claims(token, jwk_set)
             request.state.token_claims = dict(token_payload)
             request.state.authorization_header = f"Bearer {token}"
         except Exception as err:

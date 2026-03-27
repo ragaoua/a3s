@@ -13,9 +13,9 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     - Support key management: generation, rotation, revocation
       - The app would stop displaying the API Key upon deployment
   - OAuth2:
-    - Maybe support setting multiple audiences ("one-of") for instead of just the one ?
+    - Maybe support setting multiple audiences ("one-of") instead of just the one ?
     - Implement token validation policies (and/or):
-      - Signature check (useful for opaque tokens with no introspection endpoint)
+      - Signature check
         - Configure the alg allowlist ?
       - RFC 9068 (stricter validation)
       - Token introspection

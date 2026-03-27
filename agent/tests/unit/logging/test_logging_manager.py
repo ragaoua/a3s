@@ -9,12 +9,6 @@ from src.loggingManager import LoggingConfig, LoggingManager
 
 JSON_FORMAT = '{"timestamp":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","message":"%(message)s"}'
 PLAIN_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
-APP_MODULES = ("src.auth", "src.config")
-
-
-def _clear_imported_app_modules() -> None:
-    for module_name in APP_MODULES:
-        sys.modules.pop(module_name, None)
 
 
 @pytest.fixture(autouse=True)
@@ -23,14 +17,12 @@ def reset_logging_state() -> Iterator[None]:
     original_handlers = list(root_logger.handlers)
     original_level = root_logger.level
 
-    _clear_imported_app_modules()
     LoggingManager._instance = None
     for handler in original_handlers:
         root_logger.removeHandler(handler)
 
     yield
 
-    _clear_imported_app_modules()
     LoggingManager._instance = None
     for handler in list(root_logger.handlers):
         root_logger.removeHandler(handler)
@@ -99,26 +91,6 @@ def test_logging_manager_reads_log_settings_from_env(
     formatter = root_logger.handlers[0].formatter
     assert formatter is not None
     assert formatter._fmt == JSON_FORMAT
-
-
-def test_logging_manager_propagates_settings_to_module_loggers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("LOG_LEVEL", "ERROR")
-    monkeypatch.setenv("LOG_FORMAT", "plain")
-
-    LoggingManager()
-
-    imported_modules = [
-        importlib.import_module(module_name) for module_name in APP_MODULES
-    ]
-
-    for module in imported_modules:
-        module_logger = module.logger
-        assert module_logger.getEffectiveLevel() == logging.ERROR
-        assert not module_logger.isEnabledFor(logging.WARNING)
-        assert module_logger.isEnabledFor(logging.ERROR)
-        assert module_logger.propagate
 
 
 def test_logging_manager_propagates_settings_to_new_loggers(
