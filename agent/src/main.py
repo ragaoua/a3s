@@ -4,11 +4,12 @@ import logging
 
 import uvicorn
 
-from .agent import create_app
-from .config import from_env
+from src.agent import create_app
+from src.config import load_config
+from src.logging import setup_logging
 
 
-logger = logging.getLogger("uvicorn.error")
+logger = logging.getLogger(__name__)
 
 
 def _watch_stdin_for_quit(server: uvicorn.Server) -> None:
@@ -24,14 +25,15 @@ def _watch_stdin_for_quit(server: uvicorn.Server) -> None:
 
 
 def main() -> None:
-    config = from_env()
+    config = load_config()
+    setup_logging(config.logging)
     app = create_app(config)
 
     server = uvicorn.Server(
         uvicorn.Config(
             app,
-            host=str(config.LISTEN_ADDRESS),
-            port=config.LISTEN_PORT,
+            host=str(config.server.listen_address),
+            port=config.server.listen_port,
         )
     )
 

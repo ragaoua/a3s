@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://a3s.local/schemas/agent.config.schema.json",
+  "title": "A3S Agent Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "llm": { "$ref": "#/$defs/LlmConfig" },
+    "agent": { "$ref": "#/$defs/AgentConfig" },
+    "server": {
+      "$ref": "#/$defs/ServerConfig",
+      "default": {}
+    },
+    "auth": {
+      "oneOf": [
+        { "$ref": "#/$defs/OAuthConfig" },
+        { "$ref": "#/$defs/ApiKeyAuthConfig" },
+        { "const": "none" }
+      ]
+    },
+    "mcp_servers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      },
+      "default": []
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "default": {}
+    }
+  },
+  "required": ["llm", "agent", "auth"],
+  "$defs": {
+    "NonEmptyStr": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "IPv4Address": {
+      "type": "string",
+      "format": "ipv4"
+    },
+    "LlmConfig": {
+      "type": "object",
+      "properties": {
+        "api_url": { "$ref": "#/$defs/Url" },
+        "api_key": { "$ref": "#/$defs/NonEmptyStr" },
+        "model": { "$ref": "#/$defs/NonEmptyStr" }
+      },
+      "required": ["api_url", "api_key", "model"]
+    },
+    "AgentConfig": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "#/$defs/NonEmptyStr" },
+        "description": { "$ref": "#/$defs/NonEmptyStr" },
+        "instructions": { "$ref": "#/$defs/NonEmptyStr" }
+      },
+      "required": ["name", "description", "instructions"]
+    },
+    "ServerConfig": {
+      "type": "object",
+      "properties": {
+        "listen_address": {
+          "oneOf": [
+            { "$ref": "#/$defs/IPv4Address" },
+            { "const": "localhost" }
+          ],
+          "default": "127.0.0.1"
+        },
+        "listen_port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8000
+        }
+      }
+    },
+    "OAuthConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "oauth2",
+          "default": "oauth2"
+        },
+        "issuer_url": { "$ref": "#/$defs/Url" },
+        "jwks_url": {
+          "anyOf": [
+            { "$ref": "#/$defs/Url" },
+            { "type": "null" }
+          ],
+          "default": null
+        },
+        "audience": {
+          "anyOf": [
+            { "$ref": "#/$defs/NonEmptyStr" },
+            { "type": "null" }
+          ],
+          "default": null
+        }
+      },
+      "required": ["mode", "issuer_url"]
+    },
+    "ApiKeyAuthConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "api_key",
+          "default": "api_key"
+        },
+        "api_key": { "$ref": "#/$defs/NonEmptyStr" }
+      },
+      "required": ["mode", "api_key"]
+    },
+    "LoggingConfig": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["INFO", "DEBUG", "WARNING", "ERROR"],
+          "default": "INFO"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["plain", "json"],
+          "default": "plain"
+        }
+      }
+    }
+  }
+}

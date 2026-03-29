@@ -1,19 +1,10 @@
-import { CoreV1Api, KubeConfig, type V1EnvVar } from '@kubernetes/client-node';
+import { CoreV1Api, KubeConfig } from '@kubernetes/client-node';
 import { env } from '$env/dynamic/private';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import type { Auth } from '$lib/types/auth';
-
-interface DeployAgentParams {
-	model: string;
-	name: string;
-	description: string;
-	instructions: string;
-	apiKey: string;
-	apiUrl: string;
-	mcpServers: string[];
-	auth: Auth;
-}
+import YAML from 'yaml';
+import type { AgentRuntimeConfig } from '../../types/agentRuntimeConfig';
+import type { AgentConfigForm } from '$lib/types/agentConfigForm';
 
 interface DeployAgentResult {
 	agentApiKey?: string;
@@ -41,90 +32,148 @@ abstract class AgentService {
 
 	protected abstract getNamespace(): Promise<string>;
 
-	private pushIfValue(vars: V1EnvVar[], name: string, value?: string) {
-		if (value) {
-			vars.push({ name, value });
-		}
-	}
-
-	async deployToKubernetes(agentParams: DeployAgentParams): Promise<DeployAgentResult> {
+	async deployToKubernetes(agentConfig: AgentConfigForm): Promise<DeployAgentResult> {
 		const kc = this.getKubeConfig();
 		const namespace = await this.getNamespace();
 		const core = kc.makeApiClient(CoreV1Api);
 
-		const mcpServersValue = agentParams.mcpServers.join(',');
+		const agentRuntimeConfig = this.buildAgentRuntimeConfig(agentConfig);
 
-		const authVars: V1EnvVar[] = [];
-		let agentApiKey: string | undefined;
-		if (agentParams.auth.type === 'none') {
-			authVars.push({ name: 'NO_AUTH', value: '1' });
+		if (agentRuntimeConfig.auth === 'none') {
 			console.log('Agent will be configured with no authentication.');
-		} else if (agentParams.auth.type === 'oauth2') {
-			authVars.push({ name: 'OAUTH2_ISSUER_URL', value: agentParams.auth.oauth2IssuerUrl });
-			this.pushIfValue(authVars, 'OAUTH2_JWKS_URL', agentParams.auth.oauth2JwksUrl);
-			this.pushIfValue(authVars, 'OAUTH2_AUDIENCE', agentParams.auth.oauth2Audience);
+		} else if (agentRuntimeConfig.auth.mode === 'oauth2') {
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
-			agentApiKey = randomBytes(32).toString('hex');
-			authVars.push({ name: 'AGENT_API_KEY', value: agentApiKey });
 			console.log(
-				`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
+				`Agent will be configured with API Key Authorization.\nUse API Key ${agentRuntimeConfig.auth.api_key}`
 			);
 		}
 
-		const listenPort = 8000;
-		const listenAddress = '0.0.0.0';
-		const pod = await core.createNamespacedPod({
+		const configSecretName = `a3s-agent-config-${randomBytes(8).toString('hex')}`;
+		await core.createNamespacedSecret({
 			namespace,
 			body: {
 				apiVersion: 'v1',
-				kind: 'Pod',
+				kind: 'Secret',
 				metadata: {
-					generateName: agentParams.name.toLowerCase(),
-					// NOTE: these can then be used as selectors to create a service
-					// that will make the agent available from the outside.
-					// Problem is, the agent's name is nowhere constraint to be unique,
-					// which means that multiple pods can share the same labels and
-					// be matched by the same ClusterIP, NodePort or whatever.
-					// Something to think about later
+					name: configSecretName,
 					labels: {
-						run: 'agent',
-						name: agentParams.name
+						run: 'agent'
 					}
 				},
-				spec: {
-					restartPolicy: 'Never',
-					containers: [
-						{
-							name: agentParams.name.toLowerCase(),
-							image: 'localhost/a3s-agent',
-							imagePullPolicy: 'Never',
-							env: [
-								{ name: 'MODEL', value: agentParams.model },
-								{ name: 'AGENT_NAME', value: agentParams.name },
-								{ name: 'AGENT_INSTRUCTIONS', value: agentParams.instructions },
-								{ name: 'AGENT_DESCRIPTION', value: agentParams.description },
-								{ name: 'LLM_API_KEY', value: agentParams.apiKey },
-								{ name: 'LLM_API_URI', value: agentParams.apiUrl },
-								{ name: 'LISTEN_PORT', value: String(listenPort) },
-								{ name: 'LISTEN_ADDRESS', value: listenAddress },
-								{ name: 'MCP_SERVERS', value: mcpServersValue },
-								...authVars
-							],
-							stdin: true,
-							tty: true,
-							ports: [{ containerPort: listenPort }]
-						}
-					]
+				type: 'Opaque',
+				stringData: {
+					'agent.yaml': YAML.stringify(agentRuntimeConfig)
 				}
 			}
 		});
 
-		console.log(
-			`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
-		);
+		try {
+			const pod = await core.createNamespacedPod({
+				namespace,
+				body: {
+					apiVersion: 'v1',
+					kind: 'Pod',
+					metadata: {
+						generateName: agentRuntimeConfig.agent.name.toLowerCase(),
+						// NOTE: these can then be used as selectors to create a service
+						// that will make the agent available from the outside.
+						// Problem is, the agent's name is nowhere constrained to be unique,
+						// which means that multiple pods can share the same labels and
+						// be matched by the same ClusterIP, NodePort or whatever.
+						// Something to think about later
+						labels: {
+							run: 'agent',
+							name: agentRuntimeConfig.agent.name
+						}
+					},
+					spec: {
+						restartPolicy: 'Never',
+						containers: [
+							{
+								name: agentRuntimeConfig.agent.name.toLowerCase(),
+								image: 'localhost/a3s-agent',
+								imagePullPolicy: 'Never',
+								stdin: true,
+								tty: true,
+								ports: [{ containerPort: agentRuntimeConfig.server.listen_port }],
+								volumeMounts: [
+									{
+										name: 'agent-config',
+										mountPath: '/app/config',
+										readOnly: true
+									}
+								]
+							}
+						],
+						volumes: [
+							{
+								name: 'agent-config',
+								secret: {
+									secretName: configSecretName,
+									items: [{ key: 'agent.yaml', path: 'agent.yaml' }]
+								}
+							}
+						]
+					}
+				}
+			});
 
-		return { agentApiKey };
+			console.log(
+				`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
+			);
+
+			if (agentRuntimeConfig.auth !== 'none' && agentRuntimeConfig.auth.mode === 'api_key') {
+				return { agentApiKey: agentRuntimeConfig.auth.api_key };
+			} else {
+				return {};
+			}
+		} catch (error) {
+			try {
+				await core.deleteNamespacedSecret({
+					name: configSecretName,
+					namespace
+				});
+			} catch (cleanupError) {
+				console.warn(`Failed to clean up agent config secret ${configSecretName}:`, cleanupError);
+			}
+
+			throw error;
+		}
+	}
+
+	private buildAgentRuntimeConfig(agentConfig: AgentConfigForm): AgentRuntimeConfig {
+		return {
+			llm: {
+				api_url: agentConfig.apiUrl,
+				api_key: agentConfig.apiKey,
+				model: agentConfig.model
+			},
+			agent: {
+				name: agentConfig.name,
+				description: agentConfig.description,
+				instructions: agentConfig.instructions
+			},
+			server: {
+				listen_address: '0.0.0.0',
+				listen_port: 8000
+			},
+			auth:
+				agentConfig.authMode === 'none'
+					? 'none'
+					: agentConfig.authMode === 'oauth2'
+						? {
+								mode: 'oauth2',
+								issuer_url: agentConfig.oauth2IssuerUrl,
+								jwks_url: agentConfig.oauth2JwksUrl,
+								audience: agentConfig.oauth2Audience
+							}
+						: {
+								mode: 'api_key',
+								api_key: randomBytes(32).toString('hex')
+							},
+			mcp_servers: agentConfig.mcpServers
+		};
 	}
 
 	async listAgents(): Promise<AgentSummary[]> {

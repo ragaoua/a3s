@@ -15,9 +15,9 @@ from starlette.types import ASGIApp
 from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
-from src.loggingManager import LoggingManager
+from src.logging import get_logger
 
-logger = LoggingManager().get_logger(__name__)
+logger = get_logger(__name__)
 
 
 class RFC9068AccessTokenValidator(JWTBearerTokenValidator):

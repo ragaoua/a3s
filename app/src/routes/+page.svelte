@@ -21,6 +21,11 @@
 						<p class="mt-1 break-all font-mono text-emerald-200">API key: {form.agentApiKey}</p>
 					{/if}
 				</div>
+      {:else if form?.error}
+				<div class="rounded-lg border border-orange-600/70 bg-orange-900/30 px-4 py-3 text-sm text-orange-100">
+					<p class="font-semibold">Error while deploying agent.</p>
+						<p class="mt-1 break-all font-mono text-orange-200">{form.error}</p>
+				</div>
 			{/if}
 
       <FieldSet title="Agent">

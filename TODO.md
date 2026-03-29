@@ -40,7 +40,6 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - Handle MCP elicitations
   - AG-UI support ?
   - Add builtin code execution tool (with opt-in/out configuration)
-  - Add configuration file for the agent, keep env variables to override conf file
   - Persist session/memory/artifacts, instead of using inMemory, ephemeral services
 - Technical enablers:
   - Improve error handling:

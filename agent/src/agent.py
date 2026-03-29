@@ -9,10 +9,10 @@ from a2a.server.tasks import (
     InMemoryTaskStore,
 )
 from a2a.types import (
-    APIKeySecurityScheme,
     AgentCapabilities,
     AgentCard,
     AgentSkill,
+    APIKeySecurityScheme,
     AuthorizationCodeOAuthFlow,
     In,
     OAuth2SecurityScheme,
@@ -20,15 +20,15 @@ from a2a.types import (
     SecurityScheme,
 )
 from authlib.oauth2.rfc8414 import get_well_known_url
-from google.adk.agents import LlmAgent
-from google.adk.agents.run_config import RunConfig, StreamingMode
-from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.a2a.converters.request_converter import (
     AgentRunRequest,
     convert_a2a_request_to_agent_run_request,
 )
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.executor.config import A2aAgentExecutorConfig
+from google.adk.agents import LlmAgent
+from google.adk.agents.readonly_context import ReadonlyContext
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.auth.credential_service.in_memory_credential_service import (
     InMemoryCredentialService,
@@ -41,11 +41,13 @@ from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from starlette.applications import Starlette
 from starlette.requests import Request
 
-from .auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
-from .config import APIKeyAuth, Config, OAuth2Auth
-from .loggingManager import LoggingManager
+from src.config import Config
+from src.config.types import ApiKeyAuthConfig, OAuthConfig
 
-logger = LoggingManager().get_logger(__name__)
+from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
+from src.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
@@ -125,12 +127,12 @@ def create_a2a_app(
         push_config_store=push_config_store,
     )
 
-    rpc_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
+    rpc_url = f"http://{config.server.listen_address}:{config.server.listen_port}"
 
     app = Starlette()
 
     async def setup_a2a():
-        if isinstance(config.AUTH, APIKeyAuth):
+        if isinstance(config.auth, ApiKeyAuthConfig):
             security_schemes = {
                 "APIKeySecurityScheme": SecurityScheme(
                     APIKeySecurityScheme(
@@ -139,7 +141,7 @@ def create_a2a_app(
                     )
                 ),
             }
-        elif isinstance(config.AUTH, OAuth2Auth):
+        elif isinstance(config.auth, OAuthConfig):
             security_schemes = {
                 "OAuth2SecurityScheme": SecurityScheme(
                     OAuth2SecurityScheme(
@@ -153,7 +155,7 @@ def create_a2a_app(
                             )
                         ),
                         oauth2_metadata_url=get_well_known_url(
-                            config.AUTH.oauth2_issuer_url, external=True
+                            str(config.auth.issuer_url), external=True
                         ),
                     )
                 ),
@@ -203,38 +205,40 @@ def create_a2a_app(
 def create_app(config: Config) -> Starlette:
     root_agent = LlmAgent(
         model=LiteLlm(
-            model=f"openai/{config.MODEL}",
-            api_base=config.LLM_API_URI,
-            api_key=config.LLM_API_KEY,
+            model=f"openai/{config.llm.model}",
+            api_base=config.llm.api_url,
+            api_key=config.llm.api_key.get_secret_value(),
         ),
-        name=config.AGENT_NAME,
-        description=config.AGENT_DESCRIPTION,
-        instruction=config.AGENT_INSTRUCTIONS,
+        name=config.agent.name,
+        description=config.agent.description,
+        instruction=config.agent.instructions,
         tools=[
             McpToolset(
-                connection_params=StreamableHTTPConnectionParams(url=url),
+                connection_params=StreamableHTTPConnectionParams(url=str(url)),
                 header_provider=header_provider,
             )
-            for url in config.MCP_SERVERS
+            for url in config.mcp_servers
         ],
     )
 
     app = create_a2a_app(root_agent, config)
 
-    if isinstance(config.AUTH, APIKeyAuth):
+    if isinstance(config.auth, ApiKeyAuthConfig):
         logger.info("Auth mode: API Key")
         app.add_middleware(
             ApiKeyAuthMiddleware,
-            api_key=config.AUTH.api_key,
+            api_key=config.auth.api_key.get_secret_value(),
         )
-    elif isinstance(config.AUTH, OAuth2Auth):
+    elif isinstance(config.auth, OAuthConfig):
         logger.info("Auth mode: OAuth2")
         app.add_middleware(
             OAuth2BearerAuthMiddleware,
-            issuer_url=config.AUTH.oauth2_issuer_url,
-            jwks_url=config.AUTH.oauth2_jwks_url,
+            issuer_url=str(config.auth.issuer_url),
+            jwks_url=str(config.auth.jwks_url)
+            if config.auth.jwks_url is not None
+            else None,
             realm=root_agent.name,
-            audience=config.AUTH.oauth2_audience,
+            audience=config.auth.audience,
         )
     else:
         logger.info("Auth disabled.")
