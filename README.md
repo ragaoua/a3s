@@ -164,7 +164,7 @@ Regarding Kubernetes deployment of agents, the platform operates in 2 modes:
 In any case, a service account must be configured with proper permissions in
 the namespace dedicated to running agents. It must be able to :
 
-- Create, list and delete pods
+- Create and list pods
 - Create and delete secrets and config maps
 
 Use `K8S_AGENTS_NAMESPACE` to configure the namespace in which the agent pods
