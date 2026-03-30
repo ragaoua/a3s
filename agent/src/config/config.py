@@ -10,6 +10,7 @@ from pydantic import (
     ValidationError,
 )
 from pydantic_core import InitErrorDetails, Url
+from yaml.parser import ParserError
 
 from src.config.constants import (
     CONFIG_FILE_ENV_VAR_NAME,
@@ -98,7 +99,10 @@ def read_yaml_config(config_file: Path) -> dict[str, Any]:
     if not config_file.exists():
         raise ValueError(f"File not found: {config_file}")
 
-    data = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    try:
+        data = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ValueError(f"Error while parsing YAML file {config_file}: {e}")
 
     if not isinstance(data, dict):
         raise ValueError(f"Invalid YAML in {config_file}")
