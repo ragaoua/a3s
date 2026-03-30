@@ -4,7 +4,7 @@ OAuth2 mode is enabled.
 Token signature validation:
 
 - Token signature verification is done against JWKS configured under
-  `auth.policies.jwks`.
+  `auth.policies.jwks`. The `iss` claim is validated against `auth.issuer_url`.
 - With `auth.policies.jwks.discovered: true`, the JWKS endpoint is discovered
   from the authorization server metadata. With `auth.policies.jwks.discovered:
 false`, the agent uses `auth.policies.jwks.url` to fetch the JWKS.

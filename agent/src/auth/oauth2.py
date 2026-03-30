@@ -86,10 +86,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
     def _get_rfc9068_claims_options(self, resource_server: str):
         return {
-            "iss": {
-                "essential": True,
-                "validate": lambda claims, iss: iss == self.issuer_url,
-            },
+            "iss": {"essential": True, "value": self.issuer_url},
             "exp": {"essential": True},
             "aud": {"essential": True, "value": resource_server},
             "sub": {"essential": True},
@@ -106,7 +103,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         }
 
     def _validate_access_token(self, token: str, jwk_set: KeySet):
-        claims_options: dict[str, Any] = {}
+        claims_options: dict[str, Any] = {
+            "iss": {"essential": True, "value": self.issuer_url},
+        }
         claims_cls: type[JWTClaims] | None = None
 
         if isinstance(self.config.rfc9068, OAuthEnabledRfc9068PolicyConfig):
