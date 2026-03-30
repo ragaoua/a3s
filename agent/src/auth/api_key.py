@@ -27,8 +27,8 @@ class ApiKeyAuthMiddleware(BaseHTTPMiddleware):
         if request.url.path in EXCLUDED_PATHS:
             return await call_next(request)
 
-        received_key = request.headers.get(self.HEADER_NAME, "")
-        if not compare_digest(received_key, self.api_key):
+        received_key = request.headers.get(self.HEADER_NAME)
+        if received_key is None or not compare_digest(received_key, self.api_key):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Unauthorized"},
