@@ -144,7 +144,6 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         try:
             token_payload = self._get_validated_access_token_claims(token, jwk_set)
-            request.state.token_claims = dict(token_payload)
             request.state.authorization_header = f"Bearer {token}"
         except Exception as err:
             logger.error("Token validation failed: %s", err)

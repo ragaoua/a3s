@@ -128,7 +128,6 @@ async def test_dispatch_sets_request_state_and_calls_next_on_valid_token(
     )
 
     async def call_next(req: Request) -> Response:
-        assert req.state.token_claims == expected_claims
         assert req.state.authorization_header == "Bearer valid-token"
         return JSONResponse({"ok": True}, status_code=200)
 
