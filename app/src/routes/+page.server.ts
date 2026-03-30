@@ -3,28 +3,25 @@ import type { Actions } from './$types';
 import { agentService } from '$lib/server/service/agentService';
 import { agentConfigFormSchema } from '../lib/types/agentConfigForm';
 
-function getTrimmedStringOrNull(formData: FormData, name: string): string | null {
-	const rawValue = formData.get(name);
-
-	if (rawValue === null) return null;
-
-	return String(rawValue).trim();
+function trimOrUndefined(formData: FormData, name: string): string | undefined {
+	const value = String(formData.get(name) ?? '').trim();
+	return value === '' ? undefined : value;
 }
 
 export const actions: Actions = {
 	default: async ({ request }) => {
 		const formData = await request.formData();
 		const formDataDict = {
-			model: getTrimmedStringOrNull(formData, 'model'),
-			name: getTrimmedStringOrNull(formData, 'name'),
-			description: getTrimmedStringOrNull(formData, 'description'),
-			instructions: getTrimmedStringOrNull(formData, 'instructions'),
-			authMode: getTrimmedStringOrNull(formData, 'authMode'),
-			apiKey: getTrimmedStringOrNull(formData, 'apiKey'),
-			oauth2IssuerUrl: getTrimmedStringOrNull(formData, 'oauth2IssuerUrl'),
-			oauth2Audience: getTrimmedStringOrNull(formData, 'oauth2Audience'),
-			oauth2JwksUrl: getTrimmedStringOrNull(formData, 'oauth2JwksUrl'),
-			apiUrl: getTrimmedStringOrNull(formData, 'apiUrl'),
+			model: trimOrUndefined(formData, 'model'),
+			name: trimOrUndefined(formData, 'name'),
+			description: trimOrUndefined(formData, 'description'),
+			instructions: trimOrUndefined(formData, 'instructions'),
+			authMode: trimOrUndefined(formData, 'authMode'),
+			apiKey: trimOrUndefined(formData, 'apiKey'),
+			oauth2IssuerUrl: trimOrUndefined(formData, 'oauth2IssuerUrl'),
+			oauth2Audience: trimOrUndefined(formData, 'oauth2Audience'),
+			oauth2JwksUrl: trimOrUndefined(formData, 'oauth2JwksUrl'),
+			apiUrl: trimOrUndefined(formData, 'apiUrl'),
 			mcpServers: formData
 				.getAll('mcpServers')
 				.map((value) => String(value).trim())

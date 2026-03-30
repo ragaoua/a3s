@@ -162,8 +162,10 @@ Regarding Kubernetes deployment of agents, the platform operates in 2 modes:
   using the credentials of the service account used by the app's pod.
 
 In any case, a service account must be configured with proper permissions in
-the namespace dedicated to running agents ; it must be able to create and list
-pods as well as create secrets.
+the namespace dedicated to running agents. It must be able to :
+
+- Create, list and delete pods
+- Create and delete secrets and config maps
 
 Use `K8S_AGENTS_NAMESPACE` to configure the namespace in which the agent pods
 will be deployed.
@@ -192,6 +194,11 @@ Use `K8S_DEPLOY_MODE` to select the deployment mode:
 Deployments currently create standalone pods directly (no built-in
 Service/Ingress/lifecycle orchestration). It is left to the Kubernetes admin to
 set up according to the use cases and internal policies.
+
+Each deployment also creates a dedicated ConfigMap and Secret for the agent
+configuration. These resources are not automatically garbage-collected when the
+pod is deleted, so they currently need manual cleanup until lifecycle
+management is implemented.
 
 Right now, the platform only supports deploying and listing agents. More
 management features will be added.

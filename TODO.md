@@ -61,6 +61,7 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     a way to configure) a clusterIP/nodePort/loadbalancer/ingress service for external
     access to the agent ?
   - Run a deployment for agents, not a simple pod
+  - Clean up per-agent ConfigMaps and Secrets when agent pods are deleted
 - Technical enablers:
   - Test:
     - Unit tests

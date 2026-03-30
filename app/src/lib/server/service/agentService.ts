@@ -3,7 +3,7 @@ import { env } from '$env/dynamic/private';
 import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import YAML from 'yaml';
-import type { AgentRuntimeConfig } from '../../types/agentRuntimeConfig';
+import { agentRuntimeConfigSchema, type AgentRuntimeConfig } from '../../types/agentRuntimeConfig';
 import type { AgentConfigForm } from '$lib/types/agentConfigForm';
 
 interface DeployAgentResult {
@@ -27,6 +27,13 @@ interface KubernetesClusterParams {
 	caData: string;
 }
 
+interface AgentDeploymentConfig {
+	runtimeConfig: AgentRuntimeConfig;
+	secretData: Record<string, string>;
+}
+
+const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
+
 abstract class AgentService {
 	protected abstract getKubeConfig(): KubeConfig;
 
@@ -37,45 +44,67 @@ abstract class AgentService {
 		const namespace = await this.getNamespace();
 		const core = kc.makeApiClient(CoreV1Api);
 
-		const agentRuntimeConfig = this.buildAgentRuntimeConfig(agentConfig);
+		const { runtimeConfig, secretData } = this.buildAgentDeploymentConfig(agentConfig);
 
-		if (agentRuntimeConfig.auth === 'none') {
+		if (runtimeConfig.auth === 'none') {
 			console.log('Agent will be configured with no authentication.');
-		} else if (agentRuntimeConfig.auth.mode === 'oauth2') {
+		} else if (runtimeConfig.auth.mode === 'oauth2') {
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
 			console.log(
-				`Agent will be configured with API Key Authorization.\nUse API Key ${agentRuntimeConfig.auth.api_key}`
+				`Agent will be configured with API Key Authorization.\nUse API Key ${runtimeConfig.auth.api_key}`
 			);
 		}
 
-		const configSecretName = `a3s-agent-config-${randomBytes(8).toString('hex')}`;
-		await core.createNamespacedSecret({
-			namespace,
-			body: {
-				apiVersion: 'v1',
-				kind: 'Secret',
-				metadata: {
-					name: configSecretName,
-					labels: {
-						run: 'agent'
-					}
-				},
-				type: 'Opaque',
-				stringData: {
-					'agent.yaml': YAML.stringify(agentRuntimeConfig)
-				}
-			}
-		});
+		const resourceSuffix = randomBytes(8).toString('hex');
+		const configMapName = `a3s-${runtimeConfig.agent.name.toLowerCase()}-config-${resourceSuffix}`;
+		const secretName = `a3s-${runtimeConfig.agent.name.toLowerCase()}-secret-${resourceSuffix}`;
+		let configMapCreated = false;
+		let secretCreated = false;
 
 		try {
+			await core.createNamespacedConfigMap({
+				namespace,
+				body: {
+					apiVersion: 'v1',
+					kind: 'ConfigMap',
+					metadata: {
+						name: configMapName,
+						labels: {
+							run: 'agent'
+						}
+					},
+					data: {
+						'agent.yaml': YAML.stringify(runtimeConfig)
+					}
+				}
+			});
+			configMapCreated = true;
+
+			await core.createNamespacedSecret({
+				namespace,
+				body: {
+					apiVersion: 'v1',
+					kind: 'Secret',
+					metadata: {
+						name: secretName,
+						labels: {
+							run: 'agent'
+						}
+					},
+					type: 'Opaque',
+					stringData: secretData
+				}
+			});
+			secretCreated = true;
+
 			const pod = await core.createNamespacedPod({
 				namespace,
 				body: {
 					apiVersion: 'v1',
 					kind: 'Pod',
 					metadata: {
-						generateName: agentRuntimeConfig.agent.name.toLowerCase(),
+						generateName: runtimeConfig.agent.name.toLowerCase(),
 						// NOTE: these can then be used as selectors to create a service
 						// that will make the agent available from the outside.
 						// Problem is, the agent's name is nowhere constrained to be unique,
@@ -84,19 +113,28 @@ abstract class AgentService {
 						// Something to think about later
 						labels: {
 							run: 'agent',
-							name: agentRuntimeConfig.agent.name
+							name: runtimeConfig.agent.name
 						}
 					},
 					spec: {
 						restartPolicy: 'Never',
 						containers: [
 							{
-								name: agentRuntimeConfig.agent.name.toLowerCase(),
+								name: runtimeConfig.agent.name.toLowerCase(),
 								image: 'localhost/a3s-agent',
 								imagePullPolicy: 'Never',
 								stdin: true,
 								tty: true,
-								ports: [{ containerPort: agentRuntimeConfig.server.listen_port }],
+								ports: [{ containerPort: runtimeConfig.server.listen_port }],
+								env: Object.keys(secretData).map((envVarName) => ({
+									name: envVarName,
+									valueFrom: {
+										secretKeyRef: {
+											name: secretName,
+											key: envVarName
+										}
+									}
+								})),
 								volumeMounts: [
 									{
 										name: 'agent-config',
@@ -109,8 +147,8 @@ abstract class AgentService {
 						volumes: [
 							{
 								name: 'agent-config',
-								secret: {
-									secretName: configSecretName,
+								configMap: {
+									name: configMapName,
 									items: [{ key: 'agent.yaml', path: 'agent.yaml' }]
 								}
 							}
@@ -122,31 +160,48 @@ abstract class AgentService {
 			console.log(
 				`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
 			);
-
-			if (agentRuntimeConfig.auth !== 'none' && agentRuntimeConfig.auth.mode === 'api_key') {
-				return { agentApiKey: agentRuntimeConfig.auth.api_key };
-			} else {
-				return {};
-			}
 		} catch (error) {
-			try {
-				await core.deleteNamespacedSecret({
-					name: configSecretName,
-					namespace
-				});
-			} catch (cleanupError) {
-				console.warn(`Failed to clean up agent config secret ${configSecretName}:`, cleanupError);
+			if (secretCreated) {
+				try {
+					await core.deleteNamespacedSecret({
+						name: secretName,
+						namespace
+					});
+				} catch (cleanupError) {
+					console.warn(`Failed to clean up agent secret ${secretName}:`, cleanupError);
+				}
+			}
+
+			if (configMapCreated) {
+				try {
+					await core.deleteNamespacedConfigMap({
+						name: configMapName,
+						namespace
+					});
+				} catch (cleanupError) {
+					console.warn(`Failed to clean up agent config map ${configMapName}:`, cleanupError);
+				}
 			}
 
 			throw error;
 		}
+
+		if (AGENT_API_KEY_ENV_VAR in secretData) {
+			return { agentApiKey: secretData[AGENT_API_KEY_ENV_VAR] };
+		} else {
+			return {};
+		}
 	}
 
-	private buildAgentRuntimeConfig(agentConfig: AgentConfigForm): AgentRuntimeConfig {
-		return {
+	private buildAgentDeploymentConfig(agentConfig: AgentConfigForm): AgentDeploymentConfig {
+		const agentApiKey =
+			agentConfig.authMode === 'apiKey' ? randomBytes(32).toString('hex') : undefined;
+		const llmApiKeyEnvVar = 'A3S_LLM_API_KEY';
+
+		const config: AgentRuntimeConfig = {
 			llm: {
 				api_url: agentConfig.apiUrl,
-				api_key: agentConfig.apiKey,
+				api_key: `\${${llmApiKeyEnvVar}}`,
 				model: agentConfig.model
 			},
 			agent: {
@@ -170,9 +225,17 @@ abstract class AgentService {
 							}
 						: {
 								mode: 'api_key',
-								api_key: randomBytes(32).toString('hex')
+								api_key: `\${${AGENT_API_KEY_ENV_VAR}}`
 							},
 			mcp_servers: agentConfig.mcpServers
+		};
+
+		return {
+			runtimeConfig: agentRuntimeConfigSchema.parse(config),
+			secretData: {
+				[llmApiKeyEnvVar]: agentConfig.apiKey,
+				...(agentApiKey ? { [AGENT_API_KEY_ENV_VAR]: agentApiKey } : {})
+			}
 		};
 	}
 
