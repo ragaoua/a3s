@@ -22,6 +22,7 @@ from src.config.types import (
     LoggingConfig,
     OAuthConfig,
     ServerConfig,
+    StrictModel,
 )
 
 # matches ${var}
@@ -72,7 +73,7 @@ def substitute_env_vars(config: dict[str, Any]) -> dict[str, Any]:
     return resolved_config
 
 
-class Config(BaseModel):
+class Config(StrictModel):
     model_config = ConfigDict(extra="forbid")
 
     llm: LlmConfig
