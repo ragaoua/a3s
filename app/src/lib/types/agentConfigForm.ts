@@ -21,7 +21,7 @@ export const agentConfigFormSchema = z.discriminatedUnion('authMode', [
 		authMode: z.literal('oauth2'),
 		oauth2IssuerUrl: z.url(),
 		oauth2JwksUrl: z.url().optional(),
-		oauth2Audience: z.url().optional()
+		oauth2Audience: z.string().optional()
 	})
 ]);
 
