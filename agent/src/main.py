@@ -2,6 +2,7 @@ import sys
 import threading
 import logging
 
+from pydantic import ValidationError
 import uvicorn
 
 from src.agent import create_app
@@ -9,6 +10,8 @@ from src.config import load_config
 from src.logging import setup_logging
 
 
+# We're not using LoggingManager because it
+# depends on the config which we haven't yet loaded
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +28,17 @@ def _watch_stdin_for_quit(server: uvicorn.Server) -> None:
 
 
 def main() -> None:
-    config = load_config()
+    try:
+        config = load_config()
+    except (ValidationError, ValueError) as e:
+        logging.basicConfig(level="ERROR")
+        if isinstance(e, ValidationError):
+            for error in e.errors(include_url=False):
+                logging.error("%s: %s", ".".join(map(str, error["loc"])), error["msg"])
+        else:
+            logging.error(e)
+        raise SystemExit(1)
+
     setup_logging(config.logging)
     app = create_app(config)
 
