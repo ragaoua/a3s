@@ -7,7 +7,7 @@ export class DeployAgentFormState {
 	apiUrl: string = $state('');
 	apiKey: string = $state('');
 
-	authMode: 'apiKey' | 'oauth2' = $state('apiKey');
+	authMode: 'apiKey' | 'oauth2' | 'none' = $state('apiKey');
 	oauth2IssuerUrl = $state('');
 	oauth2Audience = $state('');
 	oauth2JwksUrl = $state('');
