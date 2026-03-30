@@ -7,6 +7,9 @@ source "${SCRIPT_DIR}/common.sh"
 
 prepare_kind_cluster
 
+log "Building app..."
+bun --cwd="${APP_DIR}" run build
+
 MCP_NODE_IP="$(get_mcp_node_internal_ip)"
 log "MCP server should be reachable at http://${MCP_NODE_IP}:30082/mcp"
 

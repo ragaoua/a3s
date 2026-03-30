@@ -1,0 +1,288 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A3S Agent Config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "llm": { "$ref": "#/$defs/LlmConfig" },
+    "agent": { "$ref": "#/$defs/AgentConfig" },
+    "server": {
+      "$ref": "#/$defs/ServerConfig",
+      "default": {
+        "listen_address": "127.0.0.1",
+        "listen_port": 8000
+      }
+    },
+    "auth": {
+      "anyOf": [
+        { "$ref": "#/$defs/OAuthConfig" },
+        { "$ref": "#/$defs/ApiKeyAuthConfig" },
+        { "const": "none", "type": "string" }
+      ],
+      "title": "Auth"
+    },
+    "mcp_servers": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "format": "uri",
+            "minLength": 1,
+            "type": "string"
+          },
+          { "$ref": "#/$defs/EnvVarPlaceholder" }
+        ]
+      },
+      "default": [],
+      "title": "Mcp Servers"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "default": {
+        "level": "INFO",
+        "format": "plain"
+      }
+    }
+  },
+  "required": ["llm", "agent", "auth"],
+  "$defs": {
+    "EnvVarPlaceholder": {
+      "type": "string",
+      "pattern": "^\\$\\{[^}]+\\}$"
+    },
+    "LlmConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Api Url",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Api Key",
+              "type": "string",
+              "writeOnly": true
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Model",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["api_url", "api_key", "model"],
+      "title": "LlmConfig",
+      "type": "object"
+    },
+    "AgentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "description": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Description",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "instructions": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Instructions",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["name", "description", "instructions"],
+      "title": "AgentConfig",
+      "type": "object"
+    },
+    "ServerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "listen_address": {
+          "anyOf": [
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "const": "localhost",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ],
+          "default": "127.0.0.1",
+          "title": "Listen Address"
+        },
+        "listen_port": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535,
+              "default": 8000,
+              "title": "Listen Port"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "title": "ServerConfig",
+      "type": "object"
+    },
+    "OAuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "const": "oauth2",
+              "default": "oauth2",
+              "title": "Mode",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "issuer_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Issuer Url",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "jwks_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            { "type": "null" },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ],
+          "default": null,
+          "title": "Jwks Url"
+        },
+        "audience": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            { "type": "null" },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ],
+          "default": null,
+          "title": "Audience"
+        }
+      },
+      "required": ["issuer_url"],
+      "title": "OAuthConfig",
+      "type": "object"
+    },
+    "ApiKeyAuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "const": "api_key",
+              "default": "api_key",
+              "title": "Mode",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Api Key",
+              "type": "string",
+              "writeOnly": true
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["api_key"],
+      "title": "ApiKeyAuthConfig",
+      "type": "object"
+    },
+    "LoggingConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["INFO", "DEBUG", "WARNING", "ERROR"],
+              "default": "INFO",
+              "title": "Level"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["plain", "json"],
+              "default": "plain",
+              "title": "Format"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "title": "LoggingConfig",
+      "type": "object"
+    }
+  }
+}

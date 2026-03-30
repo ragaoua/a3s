@@ -2,7 +2,7 @@ import httpx
 import pytest
 from a2a.client import A2AClient
 
-from tests.utils import get_base_test_config_ignoring_env_file_with
+from tests.utils import get_base_test_config
 
 from tests.integration.utils import (
     run_single_turn_test,
@@ -13,7 +13,7 @@ from tests.integration.utils import (
 
 @pytest.mark.asyncio
 async def test_agent_is_reachable_in_no_auth_mode() -> None:
-    config = get_base_test_config_ignoring_env_file_with(NO_AUTH=True)
+    config = get_base_test_config(auth="none")
 
     server, server_thread = start_agent_server(config)
 
@@ -21,7 +21,9 @@ async def test_agent_is_reachable_in_no_auth_mode() -> None:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
+            agent_url = (
+                f"http://{config.server.listen_address}:{config.server.listen_port}"
+            )
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))

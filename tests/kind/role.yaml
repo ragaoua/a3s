@@ -4,6 +4,9 @@ metadata:
   name: agent-pod-operator
   namespace: agents-ns
 rules:
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["create", "list"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "list"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["create", "delete"]

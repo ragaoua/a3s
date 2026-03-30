@@ -48,8 +48,8 @@ def start_agent_server(config: Config):
     app = create_app(config)
     server_config = uvicorn.Config(
         app,
-        host=str(config.LISTEN_ADDRESS),
-        port=config.LISTEN_PORT,
+        host=str(config.server.listen_address),
+        port=config.server.listen_port,
     )
     server = uvicorn.Server(server_config)
     thread = threading.Thread(target=server.run, daemon=True)

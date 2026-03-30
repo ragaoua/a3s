@@ -1,35 +1,34 @@
-from a2a.types import APIKeySecurityScheme, In, OAuth2SecurityScheme
-from authlib.oauth2.rfc8414 import get_well_known_url
+from typing import Literal
+
 import httpx
 import pytest
+from a2a.types import APIKeySecurityScheme, In, OAuth2SecurityScheme
+from authlib.oauth2.rfc8414 import get_well_known_url
+from pydantic import SecretStr
+from pydantic_core import Url
 
 from src.auth import ApiKeyAuthMiddleware
-from src.config import APIKeyAuth, OAuth2Auth
+from src.config.types import ApiKeyAuthConfig, OAuthConfig
 from tests.integration.utils import (
     start_agent_server,
     wait_for_agent_card,
 )
-from tests.utils import get_base_test_config_ignoring_env_file_with
+from tests.utils import get_base_test_config
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("AGENT_API_KEY", "OAUTH2_ISSUER_URL"),
+    ("auth"),
     [
-        (None, None),  # No auth
-        ("abcdef", None),  # API Key auth
-        (None, "https://issuer.example"),  # OAuth2 auth
+        "none",
+        ApiKeyAuthConfig(api_key=SecretStr("abcdef")),  # API Key auth
+        OAuthConfig(issuer_url=Url("https://issuer.example")),  # OAuth2 auth
     ],
 )
 async def test_agent_card_contains_proper_security_scheme(
-    AGENT_API_KEY: str | None,
-    OAUTH2_ISSUER_URL: str | None,
+    auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"],
 ) -> None:
-    config = get_base_test_config_ignoring_env_file_with(
-        NO_AUTH=AGENT_API_KEY is None and OAUTH2_ISSUER_URL is None,
-        AGENT_API_KEY=AGENT_API_KEY,
-        OAUTH2_ISSUER_URL=OAUTH2_ISSUER_URL,
-    )
+    config = get_base_test_config(auth=auth)
 
     server, server_thread = start_agent_server(config)
 
@@ -37,24 +36,24 @@ async def test_agent_card_contains_proper_security_scheme(
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
+            agent_url = (
+                f"http://{config.server.listen_address}:{config.server.listen_port}"
+            )
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             assert agent_card.url == agent_url
 
-            if isinstance(config.AUTH, OAuth2Auth):
-                assert OAUTH2_ISSUER_URL is not None
+            if isinstance(config.auth, OAuthConfig):
+                assert config.auth.issuer_url is not None
                 assert agent_card.security_schemes is not None
-                schemes = agent_card.security_schemes.items()
 
                 security_scheme = agent_card.security_schemes["OAuth2SecurityScheme"]
                 assert isinstance(security_scheme.root, OAuth2SecurityScheme)
 
                 assert security_scheme.root.oauth2_metadata_url == get_well_known_url(
-                    OAUTH2_ISSUER_URL, external=True
+                    str(config.auth.issuer_url), external=True
                 )
-            elif isinstance(config.AUTH, APIKeyAuth):
+            elif isinstance(config.auth, ApiKeyAuthConfig):
                 assert agent_card.security_schemes is not None
-                schemes = agent_card.security_schemes.items()
 
                 security_scheme = agent_card.security_schemes["APIKeySecurityScheme"]
                 assert isinstance(security_scheme.root, APIKeySecurityScheme)

@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=../schemas/agent.config.schema.json
+
+llm:
+  api_url: https://api.openai.com/v1
+  api_key: "${A3S_LLM_API_KEY}"
+  model: gpt-4o-mini
+
+agent:
+  name: Cody
+  description: A helpful coding assistant
+  instructions: |
+    You are a coding agent. Use the tools provided to access the user's requests
+    regarding coding tasks.
+
+server:
+  listen_address: 127.0.0.1
+  listen_port: 8000
+
+mcp_servers: ["http://mcp.example.com/mcp"]
+
+auth: none
+# auth:
+#   mode: api_key
+#   api_key: ${A3S_AGENT_API_KEY}
+# auth:
+#   mode: oauth2
+#   issuer_url: http://auth.example.com
+#   jwks_url: null
+#   audience: null
+
+logging:
+  level: "INFO"
+  format: "plain"

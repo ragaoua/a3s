@@ -1,19 +1,25 @@
 import httpx
+from pydantic import SecretStr
 import pytest
 from a2a.client import A2AClient, A2AClientHTTPError
 
 from src.auth import ApiKeyAuthMiddleware
+from src.config.types import ApiKeyAuthConfig
 from tests.integration.utils import (
     run_single_turn_test,
     start_agent_server,
     wait_for_agent_card,
 )
-from tests.utils import get_base_test_config_ignoring_env_file_with
+from tests.utils import get_base_test_config
 
 
 @pytest.mark.asyncio
 async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
-    config = get_base_test_config_ignoring_env_file_with(AGENT_API_KEY="123")
+    config = get_base_test_config(
+        auth=ApiKeyAuthConfig(
+            api_key=SecretStr("123"),
+        ),
+    )
 
     server, server_thread = start_agent_server(config)
 
@@ -22,7 +28,9 @@ async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
             headers={ApiKeyAuthMiddleware.HEADER_NAME: "abc"},
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
+            agent_url = (
+                f"http://{config.server.listen_address}:{config.server.listen_port}"
+            )
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))
@@ -47,7 +55,11 @@ async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
 
 @pytest.mark.asyncio
 async def test_agent_sends_401_when_no_api_key_is_provided() -> None:
-    config = get_base_test_config_ignoring_env_file_with(AGENT_API_KEY="123")
+    config = get_base_test_config(
+        auth=ApiKeyAuthConfig(
+            api_key=SecretStr("123"),
+        ),
+    )
 
     server, server_thread = start_agent_server(config)
 
@@ -55,7 +67,9 @@ async def test_agent_sends_401_when_no_api_key_is_provided() -> None:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
+            agent_url = (
+                f"http://{config.server.listen_address}:{config.server.listen_port}"
+            )
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))
@@ -80,8 +94,11 @@ async def test_agent_sends_401_when_no_api_key_is_provided() -> None:
 
 @pytest.mark.asyncio
 async def test_agent_is_reachable_when_api_key_auth_is_enabled() -> None:
-    config = get_base_test_config_ignoring_env_file_with(AGENT_API_KEY="123")
-
+    config = get_base_test_config(
+        auth=ApiKeyAuthConfig(
+            api_key=SecretStr("123"),
+        ),
+    )
     server, server_thread = start_agent_server(config)
 
     try:
@@ -89,7 +106,9 @@ async def test_agent_is_reachable_when_api_key_auth_is_enabled() -> None:
             headers={ApiKeyAuthMiddleware.HEADER_NAME: "123"},
             timeout=httpx.Timeout(120, connect=10),
         ) as httpx_client:
-            agent_url = f"http://{config.LISTEN_ADDRESS}:{config.LISTEN_PORT}"
+            agent_url = (
+                f"http://{config.server.listen_address}:{config.server.listen_port}"
+            )
             agent_card = await wait_for_agent_card(agent_url, httpx_client)
             print("--- 📇 Resolved agent card ---")
             print(agent_card.model_dump_json(indent=2, exclude_none=True))

@@ -43,6 +43,8 @@
 		"vitest-browser-svelte": "^2.0.2"
 	},
 	"dependencies": {
-		"@kubernetes/client-node": "^1.4.0"
+		"@kubernetes/client-node": "^1.4.0",
+		"yaml": "^2.8.3",
+		"zod": "^4.3.6"
 	}
 }

@@ -5,7 +5,7 @@ import {
   ClientFactoryOptions,
   JsonRpcTransport,
 } from "@a2a-js/sdk/client";
-import type { MessageSendParams, Part } from "@a2a-js/sdk";
+import type { MessageSendParams } from "@a2a-js/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "bun";
 
