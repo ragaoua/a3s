@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import YAML from 'yaml';
 import { agentRuntimeConfigSchema, type AgentRuntimeConfig } from '../../types/agentRuntimeConfig';
 import type { AgentConfigForm } from '$lib/types/agentConfigForm';
+import { AGENT_NAME_ANNOTATION, sanitizeKubernetesName } from './kubernetesName';
 
 interface DeployAgentResult {
 	agentApiKey?: string;
@@ -45,6 +46,7 @@ abstract class AgentService {
 		const core = kc.makeApiClient(CoreV1Api);
 
 		const { runtimeConfig, secretData } = this.buildAgentDeploymentConfig(agentConfig);
+		const kubernetesAgentName = sanitizeKubernetesName(runtimeConfig.agent.name);
 
 		if (runtimeConfig.auth === 'none') {
 			console.log('Agent will be configured with no authentication.');
@@ -57,8 +59,8 @@ abstract class AgentService {
 		}
 
 		const resourceSuffix = randomBytes(8).toString('hex');
-		const configMapName = `a3s-${runtimeConfig.agent.name.toLowerCase()}-config-${resourceSuffix}`;
-		const secretName = `a3s-${runtimeConfig.agent.name.toLowerCase()}-secret-${resourceSuffix}`;
+		const configMapName = `a3s-${kubernetesAgentName}-config-${resourceSuffix}`;
+		const secretName = `a3s-${kubernetesAgentName}-secret-${resourceSuffix}`;
 		let configMapCreated = false;
 		let secretCreated = false;
 
@@ -104,7 +106,10 @@ abstract class AgentService {
 					apiVersion: 'v1',
 					kind: 'Pod',
 					metadata: {
-						generateName: runtimeConfig.agent.name.toLowerCase(),
+						generateName: `${kubernetesAgentName}-`,
+						annotations: {
+							[AGENT_NAME_ANNOTATION]: runtimeConfig.agent.name
+						},
 						// NOTE: these can then be used as selectors to create a service
 						// that will make the agent available from the outside.
 						// Problem is, the agent's name is nowhere constrained to be unique,
@@ -113,14 +118,14 @@ abstract class AgentService {
 						// Something to think about later
 						labels: {
 							run: 'agent',
-							name: runtimeConfig.agent.name
+							name: kubernetesAgentName
 						}
 					},
 					spec: {
 						restartPolicy: 'Never',
 						containers: [
 							{
-								name: runtimeConfig.agent.name.toLowerCase(),
+								name: kubernetesAgentName,
 								image: 'localhost/a3s-agent',
 								imagePullPolicy: 'Never',
 								stdin: true,
@@ -252,10 +257,15 @@ abstract class AgentService {
 		return podList.items
 			.map((pod) => {
 				const createdAt = pod.metadata?.creationTimestamp;
+				const annotations = pod.metadata?.annotations;
 
 				return {
 					podName: pod.metadata?.name ?? '<unknown-pod>',
-					agentName: pod.metadata?.labels?.name ?? pod.metadata?.name ?? '<unknown-agent>',
+					agentName:
+						annotations?.[AGENT_NAME_ANNOTATION] ??
+						pod.metadata?.labels?.name ??
+						pod.metadata?.name ??
+						'<unknown-agent>',
 					status: pod.status?.phase ?? 'Unknown',
 					createdAt: createdAt ? new Date(createdAt).toISOString() : ''
 				} satisfies AgentSummary;
