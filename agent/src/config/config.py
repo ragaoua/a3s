@@ -75,7 +75,7 @@ def substitute_env_vars(config: dict[str, Any]) -> dict[str, Any]:
 
 
 class Config(StrictModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(title="A3S Agent Config", extra="forbid")
 
     llm: LlmConfig
     agent: AgentConfig
