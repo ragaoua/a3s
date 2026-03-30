@@ -24,7 +24,9 @@
 </script>
 
 <main class="min-h-screen bg-transparent px-4 py-12 text-neutral-100">
-	<div class="mx-auto w-full max-w-4xl rounded-2xl border border-neutral-800 bg-neutral-900/90 p-8 shadow-xl shadow-black/40 backdrop-blur-sm">
+	<div
+		class="mx-auto w-full max-w-4xl rounded-2xl border border-neutral-800 bg-neutral-900/90 p-8 shadow-xl shadow-black/40 backdrop-blur-sm"
+	>
 		<h1 class="text-2xl font-semibold">Agents</h1>
 		<p class="mt-2 text-sm text-neutral-400">Currently deployed agent pods in Kubernetes.</p>
 
@@ -40,15 +42,17 @@
 						<div class="flex flex-wrap items-start justify-between gap-3">
 							<div>
 								<h2 class="text-lg font-semibold text-neutral-100">{agent.agentName}</h2>
-								<p class="mt-1 break-all text-xs text-neutral-500">{agent.podName}</p>
+								<p class="mt-1 text-xs break-all text-neutral-500">{agent.podName}</p>
 							</div>
-							<span class={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColor(agent.status)}`}>
+							<span
+								class={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColor(agent.status)}`}
+							>
 								{agent.status}
 							</span>
 						</div>
 						<dl class="mt-4 grid gap-3 text-sm text-neutral-300 sm:grid-cols-3">
 							<div>
-								<dt class="text-xs uppercase tracking-wide text-neutral-500">Created</dt>
+								<dt class="text-xs tracking-wide text-neutral-500 uppercase">Created</dt>
 								<dd class="mt-1">{formatCreatedAt(agent.createdAt)}</dd>
 							</div>
 						</dl>

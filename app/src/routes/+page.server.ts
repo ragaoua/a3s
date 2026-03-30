@@ -19,8 +19,9 @@ export const actions: Actions = {
 			authMode: trimOrUndefined(formData, 'authMode'),
 			apiKey: trimOrUndefined(formData, 'apiKey'),
 			oauth2IssuerUrl: trimOrUndefined(formData, 'oauth2IssuerUrl'),
-			oauth2Audience: trimOrUndefined(formData, 'oauth2Audience'),
 			oauth2JwksUrl: trimOrUndefined(formData, 'oauth2JwksUrl'),
+			oauth2Rfc9068Enabled: formData.has('oauth2Rfc9068Enabled'),
+			oauth2ResourceServer: trimOrUndefined(formData, 'oauth2ResourceServer'),
 			apiUrl: trimOrUndefined(formData, 'apiUrl'),
 			mcpServers: formData
 				.getAll('mcpServers')

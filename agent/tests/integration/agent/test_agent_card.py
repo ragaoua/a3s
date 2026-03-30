@@ -8,7 +8,12 @@ from pydantic import SecretStr
 from pydantic_core import Url
 
 from src.auth import ApiKeyAuthMiddleware
-from src.config.types import ApiKeyAuthConfig, OAuthConfig
+from src.config.types import (
+    ApiKeyAuthConfig,
+    OAuthConfig,
+    OAuthPoliciesConfig,
+    OAuthDiscoveredJwksPolicyConfig,
+)
 from tests.integration.utils import (
     start_agent_server,
     wait_for_agent_card,
@@ -22,7 +27,12 @@ from tests.utils import get_base_test_config
     [
         "none",
         ApiKeyAuthConfig(api_key=SecretStr("abcdef")),  # API Key auth
-        OAuthConfig(issuer_url=Url("https://issuer.example")),  # OAuth2 auth
+        OAuthConfig(
+            issuer_url=Url("https://issuer.example"),
+            policies=OAuthPoliciesConfig(
+                jwks=OAuthDiscoveredJwksPolicyConfig(discovered=True)
+            ),
+        ),  # OAuth2 auth
     ],
 )
 async def test_agent_card_contains_proper_security_scheme(

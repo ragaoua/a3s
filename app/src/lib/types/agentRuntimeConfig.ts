@@ -1,5 +1,25 @@
 import z from 'zod';
 
+const oauthJwksPolicySchema = z.discriminatedUnion('discovered', [
+	z.object({
+		discovered: z.literal(true)
+	}),
+	z.object({
+		discovered: z.literal(false),
+		url: z.url()
+	})
+]);
+
+const oauthRfc9068PolicySchema = z.discriminatedUnion('enabled', [
+	z.object({
+		enabled: z.literal(false)
+	}),
+	z.object({
+		enabled: z.literal(true),
+		resource_server: z.string().min(1)
+	})
+]);
+
 export const agentRuntimeConfigSchema = z.object({
 	llm: z.object({
 		api_url: z.url(),
@@ -24,8 +44,11 @@ export const agentRuntimeConfigSchema = z.object({
 		z.object({
 			mode: z.literal('oauth2'),
 			issuer_url: z.url(),
-			jwks_url: z.url().optional(),
-			audience: z.string().optional()
+			policies: z.object({
+				jwks: oauthJwksPolicySchema,
+				rfc9068: oauthRfc9068PolicySchema,
+				claims: z.record(z.string().min(1), z.string().min(1))
+			})
 		})
 	]),
 	mcp_servers: z.array(z.url())

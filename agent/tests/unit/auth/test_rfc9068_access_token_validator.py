@@ -5,7 +5,13 @@ import pytest
 from authlib.jose import JsonWebKey, KeySet, jwt
 from authlib.jose.errors import InvalidClaimError, MissingClaimError
 
-from src.auth.oauth2 import RFC9068AccessTokenValidator
+from src.auth.oauth2 import OAuth2BearerAuthMiddleware
+from src.config.types import (
+    OAuthDisabledRfc9068PolicyConfig,
+    OAuthDiscoveredJwksPolicyConfig,
+    OAuthEnabledRfc9068PolicyConfig,
+    OAuthPoliciesConfig,
+)
 
 
 ISSUER_URL = "https://issuer.example"
@@ -19,6 +25,30 @@ _JWK_DICT = {
 
 def _build_jwk_set() -> KeySet:
     return JsonWebKey.import_key_set({"keys": [_JWK_DICT]})
+
+
+def _build_middleware(
+    *,
+    resource_server: str | None = RESOURCE_SERVER,
+    claims: dict[str, str] | None = None,
+):
+    async def app(scope, receive, send):
+        return None
+
+    return OAuth2BearerAuthMiddleware(
+        app=app,
+        issuer_url=ISSUER_URL,
+        realm="test-realm",
+        config=OAuthPoliciesConfig(
+            jwks=OAuthDiscoveredJwksPolicyConfig(),
+            rfc9068=(
+                OAuthEnabledRfc9068PolicyConfig(resource_server=resource_server)
+                if resource_server is not None
+                else OAuthDisabledRfc9068PolicyConfig()
+            ),
+            claims=claims or {},
+        ),
+    )
 
 
 def _encode_access_token(*, claims: dict[str, Any], typ: str = "at+jwt") -> str:
@@ -39,30 +69,11 @@ def _default_claims(*, audience: str | Iterable[str]) -> dict[str, Any]:
     }
 
 
-def test_get_jwks_returns_the_configured_key_set() -> None:
-    jwk_set = _build_jwk_set()
-    validator = RFC9068AccessTokenValidator(
-        issuer=ISSUER_URL,
-        resource_server=RESOURCE_SERVER,
-        jwk_set=jwk_set,
-    )
-
-    assert validator.get_jwks() is jwk_set
-
-
 def test_validate_accepts_a_rfc9068_access_token_for_the_configured_audience() -> None:
     token = _encode_access_token(claims=_default_claims(audience=[RESOURCE_SERVER]))
-    validator = RFC9068AccessTokenValidator(
-        issuer=ISSUER_URL,
-        resource_server=RESOURCE_SERVER,
-        jwk_set=_build_jwk_set(),
-    )
+    middleware = _build_middleware()
 
-    claims = validator.authenticate_token(token)
-    claims.validate()
-
-    assert claims["iss"] == ISSUER_URL
-    assert claims["aud"] == [RESOURCE_SERVER]
+    middleware._validate_access_token(token, _build_jwk_set())
 
 
 def test_validate_rejects_a_non_access_token_type() -> None:
@@ -70,16 +81,10 @@ def test_validate_rejects_a_non_access_token_type() -> None:
         claims=_default_claims(audience=[RESOURCE_SERVER]),
         typ="JWT",
     )
-    validator = RFC9068AccessTokenValidator(
-        issuer=ISSUER_URL,
-        resource_server=RESOURCE_SERVER,
-        jwk_set=_build_jwk_set(),
-    )
-
-    claims = validator.authenticate_token(token)
+    middleware = _build_middleware()
 
     with pytest.raises(InvalidClaimError, match="Invalid claim 'typ'"):
-        claims.validate()
+        middleware._validate_access_token(token, _build_jwk_set())
 
 
 def test_validate_ignores_audience_when_resource_server_is_not_configured() -> None:
@@ -88,16 +93,9 @@ def test_validate_ignores_audience_when_resource_server_is_not_configured() -> N
             audience=["api://other"],
         ),
     )
-    validator = RFC9068AccessTokenValidator(
-        issuer=ISSUER_URL,
-        resource_server=None,
-        jwk_set=_build_jwk_set(),
-    )
+    middleware = _build_middleware(resource_server=None)
 
-    claims = validator.authenticate_token(token)
-    claims.validate()
-
-    assert claims["aud"] == ["api://other"]
+    middleware._validate_access_token(token, _build_jwk_set())
 
 
 @pytest.mark.parametrize(
@@ -111,13 +109,26 @@ def test_validate_rejects_tokens_missing_required_rfc9068_claims(
     claims_payload.pop(missing_claim)
 
     token = _encode_access_token(claims=claims_payload)
-    validator = RFC9068AccessTokenValidator(
-        issuer=ISSUER_URL,
-        resource_server=RESOURCE_SERVER,
-        jwk_set=_build_jwk_set(),
-    )
-
-    claims = validator.authenticate_token(token)
+    middleware = _build_middleware()
 
     with pytest.raises(MissingClaimError, match=f"Missing '{missing_claim}' claim"):
-        claims.validate()
+        middleware._validate_access_token(token, _build_jwk_set())
+
+
+def test_validate_uses_custom_claims_to_override_rfc9068_claim_validation() -> None:
+    token = _encode_access_token(claims=_default_claims(audience=["api://override"]))
+    middleware = _build_middleware(claims={"aud": "api://override"})
+
+    middleware._validate_access_token(token, _build_jwk_set())
+
+
+def test_validate_custom_claims_use_exact_string_matching() -> None:
+    token = _encode_access_token(
+        claims={
+            **_default_claims(audience=[RESOURCE_SERVER]),
+            "scope": "read write",
+        }
+    )
+    middleware = _build_middleware(claims={"scope": "read write"})
+
+    middleware._validate_access_token(token, _build_jwk_set())
