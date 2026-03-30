@@ -4,10 +4,11 @@ from typing import Any, final
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-from authlib.jose import JWTClaims, JsonWebKey, KeySet
-from authlib.jose.errors import JoseError
+from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
+from authlib.jose.errors import DecodeError, JoseError
+from authlib.oauth2.rfc6750 import InvalidTokenError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
-from authlib.oauth2.rfc9068 import JWTBearerTokenValidator
+from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -15,22 +16,14 @@ from starlette.types import ASGIApp
 from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
+from src.config.types import (
+    OAuthEnabledRfc9068PolicyConfig,
+    OAuthPoliciesConfig,
+    OAuthStaticJwksPolicyConfig,
+)
 from src.logging import get_logger
 
 logger = get_logger(__name__)
-
-
-class RFC9068AccessTokenValidator(JWTBearerTokenValidator):
-    def __init__(self, *, issuer: str, resource_server: str | None, jwk_set: KeySet):
-        super().__init__(
-            issuer=issuer,
-            resource_server=resource_server,
-        )
-        self._jwk_set = jwk_set
-
-    @override
-    def get_jwks(self):
-        return self._jwk_set
 
 
 @final
@@ -48,15 +41,13 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         self,
         app: ASGIApp,
         issuer_url: str,
-        jwks_url: str | None,
         realm: str,
-        audience: str | None,
+        config: OAuthPoliciesConfig,
     ):
         super().__init__(app)
         self.issuer_url = issuer_url.rstrip("/")
-        self.jwks_url = jwks_url
         self.realm = realm
-        self.audience = audience
+        self.config = config
 
     def _fetch_json(self, url: str) -> dict[str, Any]:
         try:
@@ -84,22 +75,63 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         return jwks_uri
 
-    def _fetch_jwk_set(self, jwks_url: str) -> KeySet:
+    def _fetch_jwk_set(self) -> KeySet:
+        jwks_url = (
+            str(self.config.jwks.url)
+            if isinstance(self.config.jwks, OAuthStaticJwksPolicyConfig)
+            else self._discover_jwks_uri()
+        )
         jwks_raw = self._fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
 
-    def _get_validated_access_token_claims(
-        self, token: str, jwk_set: KeySet
-    ) -> JWTClaims:
-        validator = RFC9068AccessTokenValidator(
-            issuer=self.issuer_url,
-            resource_server=self.audience,
-            jwk_set=jwk_set,
-        )
-        claims = validator.authenticate_token(token)
-        claims.validate()
+    def _get_rfc9068_claims_options(self, resource_server: str):
+        return {
+            "iss": {
+                "essential": True,
+                "validate": lambda claims, iss: iss == self.issuer_url,
+            },
+            "exp": {"essential": True},
+            "aud": {"essential": True, "value": resource_server},
+            "sub": {"essential": True},
+            "client_id": {"essential": True},
+            "iat": {"essential": True},
+            "jti": {"essential": True},
+            "auth_time": {"essential": False},
+            "acr": {"essential": False},
+            "amr": {"essential": False},
+            "scope": {"essential": False},
+            "groups": {"essential": False},
+            "roles": {"essential": False},
+            "entitlements": {"essential": False},
+        }
 
-        return claims
+    def _validate_access_token(self, token: str, jwk_set: KeySet):
+        claims_options: dict[str, Any] = {}
+        claims_cls: type[JWTClaims] | None = None
+
+        if isinstance(self.config.rfc9068, OAuthEnabledRfc9068PolicyConfig):
+            claims_cls = JWTAccessTokenClaims
+            claims_options = {
+                **claims_options,
+                **self._get_rfc9068_claims_options(self.config.rfc9068.resource_server),
+            }
+
+        for key, value in self.config.claims.items():
+            claims_options = {
+                **claims_options,
+                key: {"essential": True, "value": value},
+            }
+
+        try:
+            claims = jwt.decode(
+                token,
+                jwk_set,
+                claims_cls=claims_cls,
+                claims_options=claims_options,
+            )
+            claims.validate()
+        except DecodeError as exc:
+            raise InvalidTokenError(realm=self.realm) from exc
 
     def _unauthorized_error_response(
         self,
@@ -131,19 +163,23 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             return self._unauthorized_error_response()
 
         scheme, _, token = auth_header.partition(" ")
-        if scheme.lower() != "bearer" or not token.strip():
+        token = token.strip()
+        if scheme.lower() != "bearer" or not token:
             return self._unauthorized_error_response(
                 error="invalid_request",
                 error_description="Authorization header must use Bearer token",
             )
 
-        token = token.strip()
-
-        jwks_url = self.jwks_url or self._discover_jwks_uri()
-        jwk_set = self._fetch_jwk_set(jwks_url)
+        try:
+            jwk_set = self._fetch_jwk_set()
+        except Exception:
+            logger.exception("JWKS fetch failed")
+            return JSONResponse(
+                status_code=503, content={"detail": "Failed to fetch JWKS"}
+            )
 
         try:
-            token_payload = self._get_validated_access_token_claims(token, jwk_set)
+            self._validate_access_token(token, jwk_set)
             request.state.authorization_header = f"Bearer {token}"
         except Exception as err:
             logger.error("Token validation failed: %s", err)

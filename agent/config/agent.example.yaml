@@ -36,7 +36,6 @@ auth: none
 #       resource_server: my_resource_server_identifier
 #     claims:
 #       scope: read
-#       aud: myaud
 
 logging:
   level: "INFO"

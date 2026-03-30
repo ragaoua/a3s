@@ -57,7 +57,6 @@ class OAuthPoliciesConfig(StrictModel):
     rfc9068: OAuthEnabledRfc9068PolicyConfig | OAuthDisabledRfc9068PolicyConfig = (
         OAuthDisabledRfc9068PolicyConfig()
     )
-
     claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
 
 

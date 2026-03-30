@@ -236,19 +236,11 @@ def create_app(config: Config) -> Starlette:
     elif isinstance(config.auth, OAuthConfig):
         logger.info("Auth mode: OAuth2")
 
-        jwks_url = (
-            str(config.auth.policies.jwks.url)
-            if isinstance(config.auth.policies.jwks, OAuthStaticJwksPolicyConfig)
-            else None
-        )
-        audience = config.auth.policies.claims.get("aud")
-
         app.add_middleware(
             OAuth2BearerAuthMiddleware,
             issuer_url=str(config.auth.issuer_url),
-            jwks_url=jwks_url,
             realm=root_agent.name,
-            audience=audience,
+            config=config.auth.policies,
         )
     else:
         logger.info("Auth disabled.")

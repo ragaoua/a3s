@@ -5,6 +5,12 @@ from starlette.responses import JSONResponse, Response
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
+from src.config.types import (
+    OAuthDisabledRfc9068PolicyConfig,
+    OAuthDiscoveredJwksPolicyConfig,
+    OAuthPoliciesConfig,
+    OAuthStaticJwksPolicyConfig,
+)
 
 
 def _build_request(*, path: str, authorization: str | None = None) -> Request:
@@ -31,16 +37,20 @@ def _build_request(*, path: str, authorization: str | None = None) -> Request:
     return Request(scope, receive)
 
 
-def _build_middleware(*, jwks_url: str | None = "https://issuer.example/jwks"):
+def _build_middleware(*, config: OAuthPoliciesConfig | None = None):
     async def app(scope, receive, send):
         return None
 
     return OAuth2BearerAuthMiddleware(
         app=app,
         issuer_url="https://issuer.example",
-        jwks_url=jwks_url,
         realm="test-realm",
-        audience="api://agent",
+        config=config
+        or OAuthPoliciesConfig(
+            jwks=OAuthStaticJwksPolicyConfig(url="https://issuer.example/jwks"),
+            rfc9068=OAuthDisabledRfc9068PolicyConfig(),
+            claims={},
+        ),
     )
 
 
@@ -114,17 +124,16 @@ async def test_dispatch_sets_request_state_and_calls_next_on_valid_token(
 ) -> None:
     middleware = _build_middleware()
     request = _build_request(path="/rpc", authorization="Bearer valid-token")
-    expected_claims = {"sub": "test-user", "aud": ["api://agent"]}
 
     monkeypatch.setattr(
         middleware,
         "_fetch_jwk_set",
-        lambda _: object(),
+        lambda: object(),
     )
     monkeypatch.setattr(
         middleware,
-        "_get_validated_access_token_claims",
-        lambda _token, _jwk_set: expected_claims,
+        "_validate_access_token",
+        lambda _token, _jwk_set: None,
     )
 
     async def call_next(req: Request) -> Response:
@@ -143,14 +152,12 @@ async def test_dispatch_returns_expired_token_error_when_validation_detects_expi
     middleware = _build_middleware()
     request = _build_request(path="/rpc", authorization="Bearer expired-token")
 
-    monkeypatch.setattr(middleware, "_fetch_jwk_set", lambda _: object())
+    monkeypatch.setattr(middleware, "_fetch_jwk_set", lambda: object())
 
     def _raise_expired(_token: str, _jwk_set: object):
         raise ExpiredTokenError(error="expired_token")
 
-    monkeypatch.setattr(
-        middleware, "_get_validated_access_token_claims", _raise_expired
-    )
+    monkeypatch.setattr(middleware, "_validate_access_token", _raise_expired)
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called for expired tokens")
@@ -168,29 +175,47 @@ async def test_dispatch_returns_expired_token_error_when_validation_detects_expi
 async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    middleware = _build_middleware(jwks_url=None)
-    request = _build_request(path="/rpc", authorization="Bearer valid-token")
     expected_jwks_url = "https://issuer.example/.well-known/jwks.json"
     captured_jwks_url: str | None = None
+    middleware = _build_middleware(
+        config=OAuthPoliciesConfig(
+            jwks=OAuthDiscoveredJwksPolicyConfig(),
+            rfc9068=OAuthDisabledRfc9068PolicyConfig(),
+            claims={},
+        )
+    )
 
     monkeypatch.setattr(middleware, "_discover_jwks_uri", lambda: expected_jwks_url)
 
-    def _fetch_jwk_set(jwks_url: str):
+    def _fetch_json(url: str):
         nonlocal captured_jwks_url
-        captured_jwks_url = jwks_url
-        return object()
+        captured_jwks_url = url
+        return {"keys": []}
 
-    monkeypatch.setattr(middleware, "_fetch_jwk_set", _fetch_jwk_set)
+    monkeypatch.setattr(middleware, "_fetch_json", _fetch_json)
+
+    middleware._fetch_jwk_set()
+
+    assert captured_jwks_url == expected_jwks_url
+
+
+@pytest.mark.asyncio
+async def test_dispatch_returns_503_when_jwks_fetch_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = _build_middleware()
+    request = _build_request(path="/rpc", authorization="Bearer valid-token")
+
     monkeypatch.setattr(
         middleware,
-        "_get_validated_access_token_claims",
-        lambda _token, _jwk_set: {"sub": "test-user"},
+        "_fetch_jwk_set",
+        lambda: (_ for _ in ()).throw(ValueError("boom")),
     )
 
     async def call_next(_: Request) -> Response:
-        return JSONResponse({"ok": True}, status_code=200)
+        pytest.fail("call_next should not be called when JWKS fetch fails")
 
     response = await middleware.dispatch(request, call_next)
 
-    assert response.status_code == 200
-    assert captured_jwks_url == expected_jwks_url
+    assert response.status_code == 503
+    assert response.body == b'{"detail":"Failed to fetch JWKS"}'

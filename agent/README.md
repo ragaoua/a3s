@@ -77,18 +77,18 @@ The agent supports 3 authorization modes configured through the **required**
 
 - `auth: none`: disables auth. Not recommended in prod environments
 - `auth.mode: api_key`: enables auth through API Key
-  - This **requires** that `auth.api_key` be set to any arbitrary string. Use
-    of environment variable substitution is highly recommended;
-- `auth.mode: oauth2`: enables oauth2 authorization
-  - This **requires** that `auth.issuer_url` be set to the authorization
-    server's endpoint
-  - `auth.jwks_url` (optionnal) verrides the issuer's JWKS endpoint. If unset,
-    JWKS endpoint is discovered
-  - `auth.audience` (optionnal) defines the access token audience (`aud` claim)
-    to validate. If unset, no audience validation is enforced.
+- `auth.mode: oauth2`: enables oauth2 authorization.
 
 **Note**: the agent card endpoint (`/.well-known/agent-card.json`) is publicly
 accessible, even when auth is enabled.
+
+### API Key
+
+If API Key auth is configured, the agent will look for an `API-Key` HTTP header
+for every request, and check its value against the configured API key.
+
+This mode **requires** that `auth.api_key` be set to any arbitrary string. Use of
+environment variable substitution is highly recommended;
 
 ### OAuth2
 
@@ -96,13 +96,36 @@ If OAuth2 mode is enabled, the agent will look for a bearer token in the
 `Authorization` HTTP header upon receiving a request. It will then fetch the
 authorization server's JWKS to validate the token and grant (or deny) access.
 
+Only JWT's are supported at the moment.
+
+See `config/agent.example.yaml` for the current config shape.
+
+This mode **requires** that the following configuration parameters be set:
+
+- `auth.issuer_url`: must point to the authorization server.
+- `auth.policies`: configures the token validation policies. Policies are
+  additive: all configured policies are evaluated and applied.
+
+Policies currently implemented are:
+
+- token signature: this is **always** enforced and controlled via the
+  `auth.policies.jwks` configuration parameter. Setting
+  `auth.policies.jwks.discovered: true` discovers the JWKS endpoint from the
+  authorization server metadata. `auth.policies.jwks.discovered: false`
+  requires `auth.policies.jwks.url` and uses that as the JWKS endpoint directly.
+- RFC 9068: `auth.policies.rfc9068.enabled: true` enables RFC 9068 JWT access
+  token validation and requires `auth.policies.rfc9068.resource_server` to be
+  set to validate the token's `aud` claim. `auth.policies.rfc9068.enabled:
+false` disables RFC 9068-specific claim validation (this is the default).
+- Custom claim validation: `auth.policies.claims` adds extra claim validation
+  rules. The current implementation only supports exact string matching. If
+  `auth.policies.claims` contains a claim that is also validated by the RFC 9068
+  policy, the custom rule overrides the built-in RFC validation for that claim.
+  Do not set RFC 9068 required claims in `auth.policies.claims` unless you
+  intentionally want to override that validation.
+
 For more information about how tokens are validated, check out
-[agent/docs/oauth-token-validation.md](agent/docs/oauth-token-validation.md)
-
-### API Key
-
-If API Key auth is configured, the agent will look for an `API-Key` HTTP header
-for every request, and check its value against the configured API key.
+[docs/oauth-token-validation.md](docs/oauth-token-validation.md)
 
 ## MCP configuration
 
