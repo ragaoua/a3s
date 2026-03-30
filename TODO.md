@@ -47,7 +47,7 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     - Errors related to the LLM API (litellm error...)
   - Test deploying to GKE/EKS
   - monkeypatch the llm call. Right now, test_no_auth.py::test_agent_is_reachable_in_no_auth_mode
-    passes but the agent actually throws an error since LLM_API_URI is fake
+    passes but the agent actually throws an error since llm.api_url is fake
   - Test:
     - Write better/more integration tests
     - Unit tests
