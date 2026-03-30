@@ -250,6 +250,7 @@
           "anyOf": [
             {
               "const": true,
+              "default": true,
               "title": "Discovered",
               "type": "boolean"
             },
@@ -257,7 +258,6 @@
           ]
         }
       },
-      "required": ["discovered"],
       "title": "OAuthDiscoveredJwksPolicyConfig",
       "type": "object"
     },

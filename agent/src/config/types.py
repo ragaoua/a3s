@@ -35,7 +35,7 @@ class ServerConfig(StrictModel):
 
 
 class OAuthDiscoveredJwksPolicyConfig(StrictModel):
-    discovered: Literal[True]
+    discovered: Literal[True] = True
 
 
 class OAuthStaticJwksPolicyConfig(StrictModel):
