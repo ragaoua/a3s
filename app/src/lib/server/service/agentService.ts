@@ -225,8 +225,25 @@ abstract class AgentService {
 						? {
 								mode: 'oauth2',
 								issuer_url: agentConfig.oauth2IssuerUrl,
-								jwks_url: agentConfig.oauth2JwksUrl,
-								audience: agentConfig.oauth2Audience
+								policies: {
+									jwks: agentConfig.oauth2JwksUrl
+										? {
+												discovered: false,
+												url: agentConfig.oauth2JwksUrl
+											}
+										: {
+												discovered: true
+											},
+									rfc9068: agentConfig.oauth2Rfc9068Enabled
+										? {
+												enabled: true,
+												resource_server: agentConfig.oauth2ResourceServer ?? ''
+											}
+										: {
+												enabled: false
+											},
+									claims: {}
+								}
 							}
 						: {
 								mode: 'api_key',

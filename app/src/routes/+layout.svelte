@@ -10,10 +10,12 @@
 </script>
 
 <svelte:head><link rel="icon" href={favicon} /></svelte:head>
-<aside class="fixed inset-y-0 left-0 w-64 border-r border-neutral-800 bg-neutral-950/90 p-4 backdrop-blur-sm">
+<aside
+	class="fixed inset-y-0 left-0 w-64 border-r border-neutral-800 bg-neutral-950/90 p-4 backdrop-blur-sm"
+>
 	<nav class="flex h-full flex-col gap-2">
 		<a
-			href={resolve("/")}
+			href={resolve('/')}
 			class={`rounded-lg px-3 py-2 text-sm font-medium transition ${
 				isActive('/')
 					? 'bg-neutral-100 text-black'
@@ -23,7 +25,7 @@
 			Create Agent
 		</a>
 		<a
-			href={resolve("/agents")}
+			href={resolve('/agents')}
 			class={`rounded-lg px-3 py-2 text-sm font-medium transition ${
 				isActive('/agents')
 					? 'bg-neutral-100 text-black'

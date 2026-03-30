@@ -56,6 +56,7 @@ Non-exhaustive list of features and enablers to implement; subject to change.
 ## App
 
 - Auth:
+  - Add UI support for configuring OAuth2 custom claim validation policies
 - Core features
   - After an agent has been deployed, should the platform configure (or provide
     a way to configure) a clusterIP/nodePort/loadbalancer/ingress service for external
