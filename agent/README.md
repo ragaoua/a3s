@@ -1,45 +1,120 @@
-Install the environment:
+# a3s agent engine
+
+The a3s agent engine is a configurable runtime that exposes a GenAI agent
+through HTTP via Google's A2A protocol.
+
+## Running an agent
 
 ```bash
+cd agent
 uv sync
+cp config/agent.example.yaml config/agent.yaml # Edit to set the configuration
+A3S_LLM_API_KEY="your-llm-api-key" uv run a3s-agent
 ```
 
-Create a `.env` file (see [.env.example](.env.example)) then run the a2a agent:
+Alternatively, build the container image and run it:
 
 ```bash
-uv run a3s-agent
-```
-
-By default, the agent listens on `127.0.0.1:8000`. You can override this with
-`LISTEN_ADDRESS` and `LISTEN_PORT`.
-
-See it in action:
-
-```bash
-uv run pytest tests/integration/test_no_auth::test_agent_is_reachable_in_no_auth_mode
-uv run pytest tests/integration/test_api_key_auth::test_agent_is_reachable_when_api_key_auth_is_enabled
-```
-
-Run tests:
-
-```bash
-uv run pytest -s
-```
-
-Build and run the image:
-
-```bash
-podman build -t agent .
-podman run \
+docker build -t a3s-agent ./agent
+docker run \
     --interactive \
     --tty \
     --rm \
-    --name a3s \
-    --env-file .env \
-    --publish "$LISTEN_PORT":"$LISTEN_PORT" \
-    localhost/a3s-agent
+    -p 8000:8000 \
+    -v "$(pwd)/agent/config/agent.yaml:/app/config/agent.yaml:ro" \
+    -e A3S_LLM_API_KEY="your-llm-api-key" \
+    a3s-agent
 ```
 
-**Note**: for testing, use host.containers.internal instead of localhost
-when connecting, from the container, to MCP servers hosted on the host
-of the container.
+The agent is configured from a YAML file. By default, it reads
+`config/agent.yaml` relative to the current working directory. Set
+`A3S_CONFIG_FILE` to use a different config file path.
+
+An example config lives at
+[agent/config/agent.example.yaml](agent/config/agent.example.yaml) and the JSON
+schema lives at
+[agent/schemas/agent.config.schema.json](agent/schemas/agent.config.schema.json).
+
+Variable substitution is supported in config values using the `${ENV_VAR}`
+format. If the environment variable is missing, configuration validation fails.
+This is useful for secrets such as API keys.
+
+**Note**: by design, variable substitution only applies for values that fully
+match `${ENV_VAR}`. So `agent.name: ${AGENT_NAME}` works (if `AGENT_NAME` is
+set), but not `agent.name: prefix_${AGENT_NAME}`. The latter will be left
+unchanged.
+
+## Basic Configuration
+
+Basic configuration settings are:
+
+- `agent.name` (**required**)
+- `agent.description` (**required**)
+- `agent.instructions` (**required**)
+- `server.listen_address`: defaults to `127.0.0.1`
+- `server.listen_port`: defaults to `8000`
+- `logging.level`: defaults to `INFO`. Possible levels are:
+  - "ERROR"
+  - "WARNING"
+  - "INFO"
+  - "DEBUG"
+- `logging.format`: `json` or `plain`. Defaults to `plain`
+
+## LLM Support
+
+The engine supports any OpenAI-compatible API for connecting to an LLM.
+Configure these fields:
+
+- `llm.api_url` (**required**)
+- `llm.api_key` (**required**): use of environment variable substitution is highly
+  recommended;
+- `llm.model` (**required**)
+
+## Authorization
+
+The agent supports 3 authorization modes configured through the **required**
+`auth` field:
+
+- `auth: none`: disables auth. Not recommended in prod environments
+- `auth.mode: api_key`: enables auth through API Key
+  - This **requires** that `auth.api_key` be set to any arbitrary string. Use
+    of environment variable substitution is highly recommended;
+- `auth.mode: oauth2`: enables oauth2 authorization
+  - This **requires** that `auth.issuer_url` be set to the authorization
+    server's endpoint
+  - `auth.jwks_url` (optionnal) verrides the issuer's JWKS endpoint. If unset,
+    JWKS endpoint is discovered
+  - `auth.audience` (optionnal) defines the access token audience (`aud` claim)
+    to validate. If unset, no audience validation is enforced.
+
+**Note**: the agent card endpoint (`/.well-known/agent-card.json`) is publicly
+accessible, even when auth is enabled.
+
+### OAuth2
+
+If OAuth2 mode is enabled, the agent will look for a bearer token in the
+`Authorization` HTTP header upon receiving a request. It will then fetch the
+authorization server's JWKS to validate the token and grant (or deny) access.
+
+For more information about how tokens are validated, check out
+[agent/docs/oauth-token-validation.md](agent/docs/oauth-token-validation.md)
+
+### API Key
+
+If API Key auth is configured, the agent will look for an `API-Key` HTTP header
+for every request, and check its value against the configured API key.
+
+## MCP configuration
+
+Define the MCP servers an agent has access to with `mcp_servers` as a YAML list
+of URLs.
+
+When using API key for auth, or when auth is disabled, MCP servers will only
+be accessible to the agent if they don't require authorization. Otherwise, the
+agent will fail upon receiving a 401 from the MCP servers when trying to
+access.
+
+In OAuth2 mode, the `Authorization` header used by the client is transferred to
+the MCP servers. This allows agents to access MCP servers that require
+authorized access, but it requires the agent and MCP servers to share the
+same authorization server.
