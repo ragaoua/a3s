@@ -17,8 +17,7 @@
       "anyOf": [
         { "$ref": "#/$defs/OAuthConfig" },
         { "$ref": "#/$defs/ApiKeyAuthConfig" },
-        { "const": "none", "type": "string" },
-        { "$ref": "#/$defs/EnvVarPlaceholder" }
+        { "const": "none", "type": "string" }
       ],
       "title": "Auth"
     },
