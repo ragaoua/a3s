@@ -25,8 +25,16 @@ auth: none
 # auth:
 #   mode: oauth2
 #   issuer_url: http://auth.example.com
-#   jwks_url: null
-#   audience: null
+#   policies:
+#     jwks:
+#       # discovered: true
+#       # Or use an explicit JWKS endpoint instead:
+#       # discovered: false
+#       url: http://auth.example.com/.well-known/jwks.json
+#     rfc9068: true
+#     claims:
+#       scope: read
+#       aud: myaud
 
 logging:
   level: "INFO"

@@ -1,6 +1,13 @@
 from ipaddress import IPv4Address
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, StringConstraints
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    StringConstraints,
+)
 from pydantic_core import Url
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -27,11 +34,25 @@ class ServerConfig(StrictModel):
     listen_port: int = Field(default=8000, ge=1, le=65535)
 
 
+class OAuthDiscoveredJwksPolicyConfig(StrictModel):
+    discovered: Literal[True]
+
+
+class OAuthStaticJwksPolicyConfig(StrictModel):
+    discovered: Literal[False] = False
+    url: Url
+
+
+class OAuthPoliciesConfig(StrictModel):
+    jwks: OAuthDiscoveredJwksPolicyConfig | OAuthStaticJwksPolicyConfig
+    rfc9068: bool = False
+    claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
+
+
 class OAuthConfig(StrictModel):
     mode: Literal["oauth2"] = "oauth2"
     issuer_url: Url
-    jwks_url: Url | None = None
-    audience: NonEmptyStr | None = None
+    policies: OAuthPoliciesConfig
 
 
 class ApiKeyAuthConfig(StrictModel):

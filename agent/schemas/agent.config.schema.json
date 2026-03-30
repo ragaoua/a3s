@@ -192,34 +192,104 @@
             { "$ref": "#/$defs/EnvVarPlaceholder" }
           ]
         },
-        "jwks_url": {
+        "policies": {
+          "$ref": "#/$defs/OAuthPoliciesConfig"
+        }
+      },
+      "required": ["issuer_url", "policies"],
+      "title": "OAuthConfig",
+      "type": "object"
+    },
+    "OAuthPoliciesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jwks": {
+          "anyOf": [
+            { "$ref": "#/$defs/OAuthDiscoveredJwksPolicyConfig" },
+            { "$ref": "#/$defs/OAuthStaticJwksPolicyConfig" }
+          ],
+          "title": "Jwks"
+        },
+        "rfc9068": {
+          "anyOf": [
+            {
+              "default": false,
+              "title": "Rfc9068",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "claims": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              { "$ref": "#/$defs/EnvVarPlaceholder" }
+            ]
+          },
+          "title": "Claims"
+        }
+      },
+      "required": ["jwks"],
+      "title": "OAuthPoliciesConfig",
+      "type": "object"
+    },
+    "OAuthDiscoveredJwksPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            {
+              "const": true,
+              "title": "Discovered",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["discovered"],
+      "title": "OAuthDiscoveredJwksPolicyConfig",
+      "type": "object"
+    },
+    "OAuthStaticJwksPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            {
+              "const": false,
+              "default": false,
+              "title": "Discovered",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "url": {
           "anyOf": [
             {
               "format": "uri",
               "minLength": 1,
+              "title": "Url",
               "type": "string"
             },
-            { "type": "null" },
             { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ],
-          "default": null,
-          "title": "Jwks Url"
-        },
-        "audience": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "type": "string"
-            },
-            { "type": "null" },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ],
-          "default": null,
-          "title": "Audience"
+          ]
         }
       },
-      "required": ["issuer_url"],
-      "title": "OAuthConfig",
+      "required": ["url"],
+      "title": "OAuthStaticJwksPolicyConfig",
       "type": "object"
     },
     "ApiKeyAuthConfig": {

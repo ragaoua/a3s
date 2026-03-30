@@ -41,10 +41,14 @@ from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from starlette.applications import Starlette
 from starlette.requests import Request
 
-from src.config import Config
-from src.config.types import ApiKeyAuthConfig, OAuthConfig
-
 from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
+from src.config import Config
+from src.config.types import (
+    ApiKeyAuthConfig,
+    OAuthConfig,
+    OAuthDiscoveredJwksPolicyConfig,
+    OAuthStaticJwksPolicyConfig,
+)
 from src.logging import get_logger
 
 logger = get_logger(__name__)
@@ -231,14 +235,20 @@ def create_app(config: Config) -> Starlette:
         )
     elif isinstance(config.auth, OAuthConfig):
         logger.info("Auth mode: OAuth2")
+
+        jwks_url = (
+            str(config.auth.policies.jwks.url)
+            if isinstance(config.auth.policies.jwks, OAuthStaticJwksPolicyConfig)
+            else None
+        )
+        audience = config.auth.policies.claims.get("aud")
+
         app.add_middleware(
             OAuth2BearerAuthMiddleware,
             issuer_url=str(config.auth.issuer_url),
-            jwks_url=str(config.auth.jwks_url)
-            if config.auth.jwks_url is not None
-            else None,
+            jwks_url=jwks_url,
             realm=root_agent.name,
-            audience=config.auth.audience,
+            audience=audience,
         )
     else:
         logger.info("Auth disabled.")
