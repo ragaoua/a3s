@@ -43,9 +43,21 @@ class OAuthStaticJwksPolicyConfig(StrictModel):
     url: Url
 
 
+class OAuthEnabledRfc9068PolicyConfig(StrictModel):
+    enabled: Literal[True] = True
+    resource_server: NonEmptyStr
+
+
+class OAuthDisabledRfc9068PolicyConfig(StrictModel):
+    enabled: Literal[False] = False
+
+
 class OAuthPoliciesConfig(StrictModel):
     jwks: OAuthDiscoveredJwksPolicyConfig | OAuthStaticJwksPolicyConfig
-    rfc9068: bool = False
+    rfc9068: OAuthEnabledRfc9068PolicyConfig | OAuthDisabledRfc9068PolicyConfig = (
+        OAuthDisabledRfc9068PolicyConfig()
+    )
+
     claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
 
 

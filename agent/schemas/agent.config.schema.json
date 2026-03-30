@@ -213,13 +213,11 @@
         },
         "rfc9068": {
           "anyOf": [
-            {
-              "default": false,
-              "title": "Rfc9068",
-              "type": "boolean"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
+            { "$ref": "#/$defs/OAuthEnabledRfc9068PolicyConfig" },
+            { "$ref": "#/$defs/OAuthDisabledRfc9068PolicyConfig" }
+          ],
+          "default": { "enabled": false },
+          "title": "Rfc9068"
         },
         "claims": {
           "type": "object",
@@ -290,6 +288,55 @@
       },
       "required": ["url"],
       "title": "OAuthStaticJwksPolicyConfig",
+      "type": "object"
+    },
+    "OAuthEnabledRfc9068PolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "anyOf": [
+            {
+              "const": true,
+              "default": true,
+              "title": "Enabled",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "resource_server": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Resource Server",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["resource_server"],
+      "title": "OAuthEnabledRfc9068PolicyConfig",
+      "type": "object"
+    },
+    "OAuthDisabledRfc9068PolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "anyOf": [
+            {
+              "const": false,
+              "default": false,
+              "title": "Enabled",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "title": "OAuthDisabledRfc9068PolicyConfig",
       "type": "object"
     },
     "ApiKeyAuthConfig": {

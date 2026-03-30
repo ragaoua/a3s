@@ -27,11 +27,13 @@ auth: none
 #   issuer_url: http://auth.example.com
 #   policies:
 #     jwks:
-#       # discovered: true
+#       discovered: true
 #       # Or use an explicit JWKS endpoint instead:
-#       # discovered: false
+#       discovered: false
 #       url: http://auth.example.com/.well-known/jwks.json
-#     rfc9068: true
+#     rfc9068:
+#       enabled: true
+#       resource_server: my_resource_server_identifier
 #     claims:
 #       scope: read
 #       aud: myaud
