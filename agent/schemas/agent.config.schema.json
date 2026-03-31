@@ -89,8 +89,7 @@
         }
       },
       "required": ["api_url", "api_key", "model"],
-      "title": "LlmConfig",
-      "type": "object"
+      "title": "LlmConfig"
     },
     "AgentConfig": {
       "type": "object",
@@ -128,8 +127,7 @@
         }
       },
       "required": ["name", "description", "instructions"],
-      "title": "AgentConfig",
-      "type": "object"
+      "title": "AgentConfig"
     },
     "ServerConfig": {
       "type": "object",
@@ -163,8 +161,7 @@
           ]
         }
       },
-      "title": "ServerConfig",
-      "type": "object"
+      "title": "ServerConfig"
     },
     "OAuthConfig": {
       "type": "object",
@@ -197,19 +194,18 @@
         }
       },
       "required": ["issuer_url", "policies"],
-      "title": "OAuthConfig",
-      "type": "object"
+      "title": "OAuthConfig"
     },
     "OAuthPoliciesConfig": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "jwks": {
+        "jwt": {
           "anyOf": [
-            { "$ref": "#/$defs/OAuthDiscoveredJwksPolicyConfig" },
-            { "$ref": "#/$defs/OAuthStaticJwksPolicyConfig" }
+            { "$ref": "#/$defs/OAuthJwtPoliciesConfig" },
+            { "type": "null" }
           ],
-          "title": "Jwks"
+          "default": null
         },
         "introspection": {
           "anyOf": [
@@ -219,6 +215,36 @@
           ],
           "default": null,
           "title": "Introspection"
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["jwt"],
+          "properties": {
+            "jwt": { "not": { "type": "null" } }
+          }
+        },
+        {
+          "required": ["introspection"],
+          "properties": {
+            "introspection": {
+              "not": { "type": "null" }
+            }
+          }
+        }
+      ],
+      "title": "OAuthPoliciesConfig"
+    },
+    "OAuthJwtPoliciesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jwks": {
+          "anyOf": [
+            { "$ref": "#/$defs/OAuthDiscoveredJwksPolicyConfig" },
+            { "$ref": "#/$defs/OAuthStaticJwksPolicyConfig" }
+          ],
+          "title": "Jwks"
         },
         "rfc9068": {
           "anyOf": [
@@ -245,8 +271,7 @@
         }
       },
       "required": ["jwks"],
-      "title": "OAuthPoliciesConfig",
-      "type": "object"
+      "title": "OAuthJwtPoliciesConfig"
     },
     "OAuthDiscoveredIntrospectionPolicyConfig": {
       "type": "object",
@@ -298,8 +323,7 @@
         }
       },
       "required": ["client_id", "client_secret"],
-      "title": "OAuthDiscoveredIntrospectionPolicyConfig",
-      "type": "object"
+      "title": "OAuthDiscoveredIntrospectionPolicyConfig"
     },
     "OAuthDiscoveredJwksPolicyConfig": {
       "type": "object",
@@ -317,8 +341,7 @@
           ]
         }
       },
-      "title": "OAuthDiscoveredJwksPolicyConfig",
-      "type": "object"
+      "title": "OAuthDiscoveredJwksPolicyConfig"
     },
     "OAuthStaticJwksPolicyConfig": {
       "type": "object",
@@ -348,8 +371,7 @@
         }
       },
       "required": ["url"],
-      "title": "OAuthStaticJwksPolicyConfig",
-      "type": "object"
+      "title": "OAuthStaticJwksPolicyConfig"
     },
     "OAuthRfc9068PolicyConfig": {
       "type": "object",
@@ -367,8 +389,7 @@
         }
       },
       "required": ["resource_server"],
-      "title": "OAuthRfc9068PolicyConfig",
-      "type": "object"
+      "title": "OAuthRfc9068PolicyConfig"
     },
     "OAuthStaticIntrospectionPolicyConfig": {
       "type": "object",
@@ -431,8 +452,7 @@
         }
       },
       "required": ["endpoint", "client_id", "client_secret"],
-      "title": "OAuthStaticIntrospectionPolicyConfig",
-      "type": "object"
+      "title": "OAuthStaticIntrospectionPolicyConfig"
     },
     "ApiKeyAuthConfig": {
       "type": "object",
@@ -463,8 +483,7 @@
         }
       },
       "required": ["api_key"],
-      "title": "ApiKeyAuthConfig",
-      "type": "object"
+      "title": "ApiKeyAuthConfig"
     },
     "LoggingConfig": {
       "type": "object",
@@ -493,8 +512,7 @@
           ]
         }
       },
-      "title": "LoggingConfig",
-      "type": "object"
+      "title": "LoggingConfig"
     }
   }
 }

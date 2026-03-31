@@ -2,9 +2,10 @@ import base64
 import json
 from json import JSONDecodeError
 from typing import Any, Literal, final
-from urllib.parse import urlencode
 from urllib.error import HTTPError, URLError
-from urllib.request import Request as UrlRequest, urlopen
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
 from authlib.jose.errors import DecodeError, JoseError
@@ -20,9 +21,10 @@ from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.config.types import (
+    OAuthJwtPoliciesConfig,
     OAuthPoliciesConfig,
-    OAuthStaticJwksPolicyConfig,
     OAuthStaticIntrospectionPolicyConfig,
+    OAuthStaticJwksPolicyConfig,
 )
 from src.logging import get_logger
 
@@ -117,15 +119,28 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
     def _fetch_jwk_set(
         self,
+        *,
+        jwtPoliciesConfig: OAuthJwtPoliciesConfig,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> KeySet:
         jwks_url = (
-            str(self.config.jwks.url)
-            if isinstance(self.config.jwks, OAuthStaticJwksPolicyConfig)
+            str(jwtPoliciesConfig.jwks.url)
+            if isinstance(jwtPoliciesConfig.jwks, OAuthStaticJwksPolicyConfig)
             else self._discover_jwks_uri(metadata)
         )
         jwks_raw = self._fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
+
+    def _requires_authorization_server_metadata(self) -> bool:
+        return (
+            self.config.jwt is not None
+            and not isinstance(self.config.jwt.jwks, OAuthStaticJwksPolicyConfig)
+        ) or (
+            self.config.introspection is not None
+            and not isinstance(
+                self.config.introspection, OAuthStaticIntrospectionPolicyConfig
+            )
+        )
 
     def _get_introspection_request(
         self,
@@ -223,15 +238,16 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             "iss": {"essential": True, "value": self.issuer_url},
         }
         claims_cls: type[JWTClaims] | None = None
+        jwt_config = self.config.jwt
 
-        if self.config.rfc9068 is not None:
+        if jwt_config is not None and jwt_config.rfc9068 is not None:
             claims_cls = JWTAccessTokenClaims
             claims_options = {
                 **claims_options,
-                **self._get_rfc9068_claims_options(self.config.rfc9068.resource_server),
+                **self._get_rfc9068_claims_options(jwt_config.rfc9068.resource_server),
             }
 
-        for key, value in self.config.claims.items():
+        for key, value in (jwt_config.claims if jwt_config is not None else {}).items():
             claims_options = {
                 **claims_options,
                 key: {"essential": True, "value": value},
@@ -286,29 +302,31 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             )
 
         auth_server_metadata: AuthorizationServerMetadata | None = None
-        if not isinstance(
-            self.config.jwks, OAuthStaticJwksPolicyConfig
-        ) and not isinstance(
-            self.config.introspection, OAuthStaticIntrospectionPolicyConfig
-        ):
+        if self._requires_authorization_server_metadata():
             try:
                 auth_server_metadata = self._fetch_authorization_server_metadata()
             except Exception:
                 logger.exception("Authorization server metadata fetch failed")
                 return JSONResponse(
+                    status_code=503,
+                    content={"detail": "Failed to fetch authorization server metadata"},
+                )
+
+        jwk_set: KeySet | None = None
+        if self.config.jwt is not None:
+            try:
+                jwk_set = self._fetch_jwk_set(
+                    jwtPoliciesConfig=self.config.jwt, metadata=auth_server_metadata
+                )
+            except Exception:
+                logger.exception("JWKS fetch failed")
+                return JSONResponse(
                     status_code=503, content={"detail": "Failed to fetch JWKS"}
                 )
 
         try:
-            jwk_set = self._fetch_jwk_set()
-        except Exception:
-            logger.exception("JWKS fetch failed")
-            return JSONResponse(
-                status_code=503, content={"detail": "Failed to fetch JWKS"}
-            )
-
-        try:
-            self._validate_access_token(token, jwk_set)
+            if jwk_set is not None:
+                self._validate_access_token(token, jwk_set)
             self._introspect_access_token(token, auth_server_metadata)
             request.state.authorization_header = f"Bearer {token}"
         except TokenIntrospectionServiceError:

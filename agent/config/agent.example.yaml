@@ -26,11 +26,19 @@ auth: none
 #   mode: oauth2
 #   issuer_url: http://auth.example.com
 #   policies:
-#     jwks:
-#       discovered: true
-#       # Or use an explicit JWKS endpoint instead:
-#       discovered: false
-#       url: http://auth.example.com/.well-known/jwks.json
+#     jwt:
+#       jwks:
+#         discovered: true
+#         # Or use an explicit JWKS endpoint instead:
+#         discovered: false
+#         url: http://auth.example.com/.well-known/jwks.json
+#
+#       # Enable RFC 9068 claims validation
+#       rfc9068:
+#         resource_server: my_resource_server_identifier
+#
+#       claims:
+#         scope: read
 #
 #     # Enable token introspection
 #     introspection:
@@ -44,13 +52,6 @@ auth: none
 #
 #       # Defaults to client_secret_basic.
 #       auth_method: client_secret_post
-#
-#     # Enable RFC 9068 claims validation
-#     rfc9068:
-#       resource_server: my_resource_server_identifier
-#
-#     claims:
-#       scope: read
 
 logging:
   level: "INFO"

@@ -11,6 +11,7 @@ from src.auth import ApiKeyAuthMiddleware
 from src.config.types import (
     ApiKeyAuthConfig,
     OAuthConfig,
+    OAuthJwtPoliciesConfig,
     OAuthPoliciesConfig,
     OAuthDiscoveredJwksPolicyConfig,
 )
@@ -30,7 +31,9 @@ from tests.utils import get_base_test_config
         OAuthConfig(
             issuer_url=Url("https://issuer.example"),
             policies=OAuthPoliciesConfig(
-                jwks=OAuthDiscoveredJwksPolicyConfig(discovered=True)
+                jwt=OAuthJwtPoliciesConfig(
+                    jwks=OAuthDiscoveredJwksPolicyConfig(discovered=True)
+                )
             ),
         ),  # OAuth2 auth
     ],

@@ -4,10 +4,12 @@ OAuth2 mode is enabled.
 Token signature validation:
 
 - Token signature verification is done against JWKS configured under
-  `auth.policies.jwks`. The `iss` claim is validated against `auth.issuer_url`.
-- With `auth.policies.jwks.discovered: true`, the JWKS endpoint is discovered
-  from the authorization server metadata. With `auth.policies.jwks.discovered:
-false`, the agent uses `auth.policies.jwks.url` to fetch the JWKS.
+  `auth.policies.jwt.jwks`. The `iss` claim is validated against
+  `auth.issuer_url`.
+- With `auth.policies.jwt.jwks.discovered: true`, the JWKS endpoint is
+  discovered from the authorization server metadata. With
+  `auth.policies.jwt.jwks.discovered: false`, the agent uses
+  `auth.policies.jwt.jwks.url` to fetch the JWKS.
 - JWKS are fetched for each request (not fetched at server startup, no caching
   implemented).
 - When JWKS discovery is used, the discovered metadata `issuer` must match the
@@ -32,23 +34,23 @@ Token introspection:
 
 RFC 9068 validation:
 
-- When `auth.policies.rfc9068.resource_server` is set, tokens are validated as
+- When `auth.policies.jwt.rfc9068.resource_server` is set, tokens are validated as
   [RFC 9068 JWT access tokens](https://datatracker.ietf.org/doc/rfc9068/). This
   includes RFC 9068 claim validation, `typ` validation, issuer validation
   against `auth.issuer_url`, and audience validation against
-  `auth.policies.rfc9068.resource_server`.
+  `auth.policies.jwt.rfc9068.resource_server`.
 
 Custom claim validation:
 
-- `auth.policies.claims` adds extra claim validation rules on top of the active
-  policy set.
-- `auth.policies.claims` currently supports exact string matching only.
-- If `auth.policies.claims` defines a claim that is already validated by the
+- `auth.policies.jwt.claims` adds extra claim validation rules on top of the
+  active policy set.
+- `auth.policies.jwt.claims` currently supports exact string matching only.
+- If `auth.policies.jwt.claims` defines a claim that is already validated by the
   RFC 9068 policy, the configured claim rule overrides the built-in RFC 9068
   validation for that claim.
 - To keep the default RFC 9068 behavior for required claims such as `iss`,
   `aud`, `sub`, `exp`, `client_id`, `iat`, or `jti`, do not redefine them in
-  `auth.policies.claims`.
+  `auth.policies.jwt.claims`.
 
 Example:
 
@@ -57,8 +59,15 @@ auth:
   mode: oauth2
   issuer_url: https://auth.example.com
   policies:
-    jwks:
-      discovered: true
+    jwt:
+      jwks:
+        discovered: true
+      rfc9068:
+        resource_server: api://agent
+      claims:
+        scope: read write
+        # If set, this overrides the RFC 9068 audience validation.
+        # aud: api://legacy-agent
     introspection:
       discovered: true
       # Or configure the endpoint directly instead:
@@ -67,10 +76,4 @@ auth:
       client_id: ${A3S_AGENT_INTROSPECTION_CLIENT_ID}
       client_secret: ${A3S_AGENT_INTROSPECTION_CLIENT_SECRET}
       auth_method: client_secret_basic
-    rfc9068:
-      resource_server: api://agent
-    claims:
-      scope: read write
-      # If set, this overrides the RFC 9068 audience validation.
-      # aud: api://legacy-agent
 ```

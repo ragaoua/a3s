@@ -7,6 +7,7 @@ from pydantic import (
     Field,
     SecretStr,
     StringConstraints,
+    model_validator,
 )
 from pydantic_core import Url
 
@@ -47,6 +48,12 @@ class OAuthRfc9068PolicyConfig(StrictModel):
     resource_server: NonEmptyStr
 
 
+class OAuthJwtPoliciesConfig(StrictModel):
+    jwks: OAuthDiscoveredJwksPolicyConfig | OAuthStaticJwksPolicyConfig
+    rfc9068: OAuthRfc9068PolicyConfig | None = None
+    claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
+
+
 class OAuthDiscoveredIntrospectionPolicyConfig(StrictModel):
     discovered: Literal[True] = True
     client_id: NonEmptyStr
@@ -67,14 +74,37 @@ class OAuthStaticIntrospectionPolicyConfig(StrictModel):
 
 
 class OAuthPoliciesConfig(StrictModel):
-    jwks: OAuthDiscoveredJwksPolicyConfig | OAuthStaticJwksPolicyConfig
+    model_config = ConfigDict(
+        extra="forbid",
+        # `"anyOf": ...` is necessary here to signal that at least one of jwt
+        # or introspection must be set and not null. This is the JSON schema
+        # transcription of the `validate_policies` method below.
+        json_schema_extra={
+            "anyOf": [
+                {"required": ["jwt"], "properties": {"jwt": {"not": {"type": "null"}}}},
+                {
+                    "required": ["introspection"],
+                    "properties": {"introspection": {"not": {"type": "null"}}},
+                },
+            ],
+        },
+    )
+
+    jwt: OAuthJwtPoliciesConfig | None = None
     introspection: (
         OAuthDiscoveredIntrospectionPolicyConfig
         | OAuthStaticIntrospectionPolicyConfig
         | None
     ) = None
-    rfc9068: OAuthRfc9068PolicyConfig | None = None
-    claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_policies(self):
+        if self.jwt is None and self.introspection is None:
+            raise ValueError(
+                "At least one of 'jwt' or 'introspection' must be configured"
+            )
+
+        return self
 
 
 class OAuthConfig(StrictModel):

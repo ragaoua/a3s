@@ -1,15 +1,14 @@
-from pydantic_core import Url
 import pytest
 from authlib.jose.errors import ExpiredTokenError
-from pydantic import SecretStr
+from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
-    OAuthDiscoveredIntrospectionPolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
+    OAuthJwtPoliciesConfig,
     OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
 )
@@ -49,9 +48,13 @@ def _build_middleware(*, config: OAuthPoliciesConfig | None = None):
         realm="test-realm",
         config=config
         or OAuthPoliciesConfig(
-            jwks=OAuthStaticJwksPolicyConfig(url=Url("https://issuer.example/jwks")),
-            rfc9068=None,
-            claims={},
+            jwt=OAuthJwtPoliciesConfig(
+                jwks=OAuthStaticJwksPolicyConfig(
+                    url=Url("https://issuer.example/jwks")
+                ),
+                rfc9068=None,
+                claims={},
+            )
         ),
     )
 
@@ -130,7 +133,7 @@ async def test_dispatch_sets_request_state_and_calls_next_on_valid_token(
     monkeypatch.setattr(
         middleware,
         "_fetch_jwk_set",
-        lambda: object(),
+        lambda *, jwtPoliciesConfig, metadata=None: object(),
     )
     monkeypatch.setattr(
         middleware,
@@ -154,7 +157,11 @@ async def test_dispatch_returns_expired_token_error_when_validation_detects_expi
     middleware = _build_middleware()
     request = _build_request(path="/rpc", authorization="Bearer expired-token")
 
-    monkeypatch.setattr(middleware, "_fetch_jwk_set", lambda: object())
+    monkeypatch.setattr(
+        middleware,
+        "_fetch_jwk_set",
+        lambda *, jwtPoliciesConfig, metadata=None: object(),
+    )
 
     def _raise_expired(_token: str, _jwk_set: object):
         raise ExpiredTokenError(error="expired_token")
@@ -179,13 +186,13 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
 ) -> None:
     expected_jwks_url = "https://issuer.example/.well-known/jwks.json"
     captured_jwks_url: str | None = None
-    middleware = _build_middleware(
-        config=OAuthPoliciesConfig(
-            jwks=OAuthDiscoveredJwksPolicyConfig(),
-            rfc9068=None,
-            claims={},
-        )
+    config = jwt = OAuthJwtPoliciesConfig(
+        jwks=OAuthDiscoveredJwksPolicyConfig(),
+        rfc9068=None,
+        claims={},
     )
+
+    middleware = _build_middleware(config=OAuthPoliciesConfig(jwt=config))
 
     monkeypatch.setattr(
         middleware,
@@ -200,7 +207,7 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
 
     monkeypatch.setattr(middleware, "_fetch_json", _fetch_json)
 
-    middleware._fetch_jwk_set()
+    middleware._fetch_jwk_set(jwtPoliciesConfig=config)
 
     assert captured_jwks_url == expected_jwks_url
 
@@ -215,7 +222,9 @@ async def test_dispatch_returns_503_when_jwks_fetch_fails(
     monkeypatch.setattr(
         middleware,
         "_fetch_jwk_set",
-        lambda: (_ for _ in ()).throw(ValueError("boom")),
+        lambda *, jwtPoliciesConfig, metadata=None: (_ for _ in ()).throw(
+            ValueError("boom")
+        ),
     )
 
     async def call_next(_: Request) -> Response:
