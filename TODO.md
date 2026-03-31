@@ -13,7 +13,8 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     - Support key management: generation, rotation, revocation
       - The app would stop displaying the API Key upon deployment
   - OAuth2:
-    - Maybe support setting multiple audiences ("one-of") instead of just the one ?
+    - Support oneOf, containsAll etc (instead of simple exact-string matching)
+      strategy for the auth.policies.claims policy
     - Cache auth server metadata
     - Cache introspection results / endpoint usage
     - Cache JWKS
