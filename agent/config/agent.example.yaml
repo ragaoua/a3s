@@ -31,9 +31,11 @@ auth: none
 #       # Or use an explicit JWKS endpoint instead:
 #       discovered: false
 #       url: http://auth.example.com/.well-known/jwks.json
+#
+#     # Omit to disable RFC 9068 claims validation
 #     rfc9068:
-#       enabled: true
 #       resource_server: my_resource_server_identifier
+#
 #     claims:
 #       scope: read
 

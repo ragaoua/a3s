@@ -1,3 +1,4 @@
+from pydantic_core import Url
 import pytest
 from authlib.jose.errors import ExpiredTokenError
 from starlette.requests import Request
@@ -6,7 +7,6 @@ from starlette.responses import JSONResponse, Response
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
-    OAuthDisabledRfc9068PolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
@@ -47,8 +47,8 @@ def _build_middleware(*, config: OAuthPoliciesConfig | None = None):
         realm="test-realm",
         config=config
         or OAuthPoliciesConfig(
-            jwks=OAuthStaticJwksPolicyConfig(url="https://issuer.example/jwks"),
-            rfc9068=OAuthDisabledRfc9068PolicyConfig(),
+            jwks=OAuthStaticJwksPolicyConfig(url=Url("https://issuer.example/jwks")),
+            rfc9068=None,
             claims={},
         ),
     )
@@ -180,7 +180,7 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
     middleware = _build_middleware(
         config=OAuthPoliciesConfig(
             jwks=OAuthDiscoveredJwksPolicyConfig(),
-            rfc9068=OAuthDisabledRfc9068PolicyConfig(),
+            rfc9068=None,
             claims={},
         )
     )

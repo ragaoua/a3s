@@ -17,7 +17,7 @@ from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.config.types import (
-    OAuthEnabledRfc9068PolicyConfig,
+    OAuthRfc9068PolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
 )
@@ -108,7 +108,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         }
         claims_cls: type[JWTClaims] | None = None
 
-        if isinstance(self.config.rfc9068, OAuthEnabledRfc9068PolicyConfig):
+        if self.config.rfc9068 is not None:
             claims_cls = JWTAccessTokenClaims
             claims_options = {
                 **claims_options,

@@ -112,11 +112,11 @@ Policies currently implemented are:
   `auth.policies.jwks` configuration parameter. Setting
   `auth.policies.jwks.discovered: true` discovers the JWKS endpoint from the
   authorization server metadata. `auth.policies.jwks.discovered: false`
-  requires `auth.policies.jwks.url` and uses that as the JWKS endpoint directly.
-- RFC 9068: `auth.policies.rfc9068.enabled: true` enables RFC 9068 JWT access
-  token validation and requires `auth.policies.rfc9068.resource_server` to be
-  set to validate the token's `aud` claim. `auth.policies.rfc9068.enabled:
-false` disables RFC 9068-specific claim validation (this is the default).
+  requires `auth.policies.jwks.url` and uses that as the JWKS endpoint
+  directly.
+- RFC 9068: `auth.policies.rfc9068.resource_server` enables RFC 9068 JWT access
+  token validation, in which case the token's `aud` claim will be validated
+  against this value.
 - Custom claim validation: `auth.policies.claims` adds extra claim validation
   rules. The current implementation only supports exact string matching. If
   `auth.policies.claims` contains a claim that is also validated by the RFC 9068

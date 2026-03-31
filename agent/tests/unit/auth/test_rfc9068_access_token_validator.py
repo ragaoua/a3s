@@ -7,9 +7,8 @@ from authlib.jose.errors import InvalidClaimError, MissingClaimError
 
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
-    OAuthDisabledRfc9068PolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
-    OAuthEnabledRfc9068PolicyConfig,
+    OAuthRfc9068PolicyConfig,
     OAuthPoliciesConfig,
 )
 
@@ -42,9 +41,9 @@ def _build_middleware(
         config=OAuthPoliciesConfig(
             jwks=OAuthDiscoveredJwksPolicyConfig(),
             rfc9068=(
-                OAuthEnabledRfc9068PolicyConfig(resource_server=resource_server)
+                OAuthRfc9068PolicyConfig(resource_server=resource_server)
                 if resource_server is not None
-                else OAuthDisabledRfc9068PolicyConfig()
+                else None
             ),
             claims=claims or {},
         ),

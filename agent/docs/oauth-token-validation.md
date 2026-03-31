@@ -15,10 +15,10 @@ false`, the agent uses `auth.policies.jwks.url` to fetch the JWKS.
 
 RFC 9068 validation:
 
-- With `auth.policies.rfc9068.enabled: true`, tokens are validated as [RFC 9068
-  JWT access tokens](https://datatracker.ietf.org/doc/rfc9068/). This includes
-  RFC 9068 claim validation, `typ` validation, issuer validation against
-  `auth.issuer_url`, and audience validation against
+- When `auth.policies.rfc9068.resource_server` is set, tokens are validated as
+  [RFC 9068 JWT access tokens](https://datatracker.ietf.org/doc/rfc9068/). This
+  includes RFC 9068 claim validation, `typ` validation, issuer validation
+  against `auth.issuer_url`, and audience validation against
   `auth.policies.rfc9068.resource_server`.
 
 Custom claim validation:
@@ -43,7 +43,6 @@ auth:
     jwks:
       discovered: true
     rfc9068:
-      enabled: true
       resource_server: api://agent
     claims:
       scope: read write

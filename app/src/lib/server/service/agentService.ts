@@ -236,12 +236,9 @@ abstract class AgentService {
 											},
 									rfc9068: agentConfig.oauth2Rfc9068Enabled
 										? {
-												enabled: true,
 												resource_server: agentConfig.oauth2ResourceServer ?? ''
 											}
-										: {
-												enabled: false
-											},
+										: undefined,
 									claims: {}
 								}
 							}
