@@ -13,6 +13,23 @@ false`, the agent uses `auth.policies.jwks.url` to fetch the JWKS.
 - When JWKS discovery is used, the discovered metadata `issuer` must match the
   configured `auth.issuer_url` value.
 
+Token introspection:
+
+- `auth.policies.introspection` enables RFC 7662 token introspection.
+- The introspection endpoint must return `{"active": true}`.
+- Under `auth.policies.introspection`, `client_id` and `client_secret` are
+  required. `auth_method` defaults to `client_secret_basic` and
+  `client_secret_post` is also supported.
+- With `auth.policies.introspection.discovered: true`, the introspection
+  endpoint is discovered from the authorization server metadata. With
+  `auth.policies.introspection.discovered: false`, the agent uses
+  `auth.policies.introspection.endpoint`.
+- The agent sends `token` and `token_type_hint=access_token` to the configured
+  or discovered introspection endpoint.
+- If the introspection endpoint reports `active: false`, the request is denied
+  with `401 Unauthorized`. Introspection transport or response parsing failures
+  return `503 Service Unavailable`.
+
 RFC 9068 validation:
 
 - When `auth.policies.rfc9068.resource_server` is set, tokens are validated as
@@ -42,6 +59,14 @@ auth:
   policies:
     jwks:
       discovered: true
+    introspection:
+      discovered: true
+      # Or configure the endpoint directly instead:
+      # discovered: false
+      # endpoint: https://auth.example.com/oauth/introspect
+      client_id: ${A3S_AGENT_INTROSPECTION_CLIENT_ID}
+      client_secret: ${A3S_AGENT_INTROSPECTION_CLIENT_SECRET}
+      auth_method: client_secret_basic
     rfc9068:
       resource_server: api://agent
     claims:

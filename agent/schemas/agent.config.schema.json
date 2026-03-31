@@ -211,6 +211,15 @@
           ],
           "title": "Jwks"
         },
+        "introspection": {
+          "anyOf": [
+            { "$ref": "#/$defs/OAuthDiscoveredIntrospectionPolicyConfig" },
+            { "$ref": "#/$defs/OAuthStaticIntrospectionPolicyConfig" },
+            { "type": "null" }
+          ],
+          "default": null,
+          "title": "Introspection"
+        },
         "rfc9068": {
           "anyOf": [
             { "$ref": "#/$defs/OAuthRfc9068PolicyConfig" },
@@ -237,6 +246,59 @@
       },
       "required": ["jwks"],
       "title": "OAuthPoliciesConfig",
+      "type": "object"
+    },
+    "OAuthDiscoveredIntrospectionPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            {
+              "const": true,
+              "default": true,
+              "title": "Discovered",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Client Id",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "client_secret": {
+          "anyOf": [
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Client Secret",
+              "type": "string",
+              "writeOnly": true
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "auth_method": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["client_secret_basic", "client_secret_post"],
+              "default": "client_secret_basic",
+              "title": "Auth Method"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["client_id", "client_secret"],
+      "title": "OAuthDiscoveredIntrospectionPolicyConfig",
       "type": "object"
     },
     "OAuthDiscoveredJwksPolicyConfig": {
@@ -306,6 +368,70 @@
       },
       "required": ["resource_server"],
       "title": "OAuthRfc9068PolicyConfig",
+      "type": "object"
+    },
+    "OAuthStaticIntrospectionPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            {
+              "const": false,
+              "default": false,
+              "title": "Discovered",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "endpoint": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Endpoint",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Client Id",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "client_secret": {
+          "anyOf": [
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Client Secret",
+              "type": "string",
+              "writeOnly": true
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "auth_method": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["client_secret_basic", "client_secret_post"],
+              "default": "client_secret_basic",
+              "title": "Auth Method"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["endpoint", "client_id", "client_secret"],
+      "title": "OAuthStaticIntrospectionPolicyConfig",
       "type": "object"
     },
     "ApiKeyAuthConfig": {

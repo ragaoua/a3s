@@ -14,12 +14,8 @@ Non-exhaustive list of features and enablers to implement; subject to change.
       - The app would stop displaying the API Key upon deployment
   - OAuth2:
     - Maybe support setting multiple audiences ("one-of") instead of just the one ?
-    - Implement token validation policies (and/or):
-      - Signature check
-        - Configure the alg allowlist ?
-      - RFC 9068 (stricter validation)
-      - Token introspection
-      - Custom policy (validate custom claims values...)
+    - Cache auth server metadata
+    - Cache introspection results / endpoint usage
     - Cache JWKS
     - Token validation errors aren't properly handled
   - OIDC:
@@ -56,7 +52,9 @@ Non-exhaustive list of features and enablers to implement; subject to change.
 ## App
 
 - Auth:
-  - Add UI support for configuring OAuth2 custom claim validation policies
+  - Add UI support for configuring:
+    - OAuth2 custom claim validation policies
+    - OAuth2 Token introspection configuration
 - Core features
   - After an agent has been deployed, should the platform configure (or provide
     a way to configure) a clusterIP/nodePort/loadbalancer/ingress service for external

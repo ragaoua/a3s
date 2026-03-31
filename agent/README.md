@@ -93,10 +93,8 @@ environment variable substitution is highly recommended;
 ### OAuth2
 
 If OAuth2 mode is enabled, the agent will look for a bearer token in the
-`Authorization` HTTP header upon receiving a request. It will then fetch the
-authorization server's JWKS to validate the token and grant (or deny) access.
-
-Only JWT's are supported at the moment.
+`Authorization` HTTP header upon receiving a request. It will then validate the
+token according to the configured policy set (see below).
 
 See `config/agent.example.yaml` for the current config shape.
 
@@ -106,23 +104,32 @@ This mode **requires** that the following configuration parameters be set:
 - `auth.policies`: configures the token validation policies. Policies are
   additive: all configured policies are evaluated and applied.
 
-Policies currently implemented are:
+Under `auth.policies`, configurable policies are:
 
-- token signature: this is **always** enforced and controlled via the
-  `auth.policies.jwks` configuration parameter. Setting
-  `auth.policies.jwks.discovered: true` discovers the JWKS endpoint from the
-  authorization server metadata. `auth.policies.jwks.discovered: false`
-  requires `auth.policies.jwks.url` and uses that as the JWKS endpoint
-  directly.
-- RFC 9068: `auth.policies.rfc9068.resource_server` enables RFC 9068 JWT access
-  token validation, in which case the token's `aud` claim will be validated
-  against this value.
+- token signature: use `jwks` to enable local JWT signature validation. Setting
+  `jwks.discovered: true` discovers the JWKS endpoint from the authorization
+  server metadata. `jwks.discovered: false` requires `jwks.url` and uses that
+  to fetch the JWKS.
+- RFC 9068: `rfc9068.resource_server` enables RFC 9068 JWT access token
+  validation, in which case the token's `aud` claim will be validated against
+  this value. RFC 9068 validation requires `jwks` because it validates JWT
+  structure and claims locally.
+- Token introspection: using `introspection` enables RFC 7662 token
+  introspection. `introspection.discovered: true` discovers the
+  `introspection_endpoint` from the authorization server metadata.
+  `introspection.discovered: false` uses `introspection.endpoint` directly.
+  `introspection.client_id` and `introspection.client_secret` are required.
+  `introspection.auth_method` defaults to `client_secret_basic` and also
+  supports `client_secret_post`.
 - Custom claim validation: `auth.policies.claims` adds extra claim validation
   rules. The current implementation only supports exact string matching. If
   `auth.policies.claims` contains a claim that is also validated by the RFC 9068
   policy, the custom rule overrides the built-in RFC validation for that claim.
   Do not set RFC 9068 required claims in `auth.policies.claims` unless you
   intentionally want to override that validation.
+
+At least one of `auth.policies.jwks` or `auth.policies.introspection` must be
+configured.
 
 For more information about how tokens are validated, check out
 [docs/oauth-token-validation.md](docs/oauth-token-validation.md)

@@ -1,12 +1,14 @@
 from pydantic_core import Url
 import pytest
 from authlib.jose.errors import ExpiredTokenError
+from pydantic import SecretStr
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
+    OAuthDiscoveredIntrospectionPolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
@@ -185,7 +187,11 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
         )
     )
 
-    monkeypatch.setattr(middleware, "_discover_jwks_uri", lambda: expected_jwks_url)
+    monkeypatch.setattr(
+        middleware,
+        "_discover_jwks_uri",
+        lambda _metadata=None: expected_jwks_url,
+    )
 
     def _fetch_json(url: str):
         nonlocal captured_jwks_url

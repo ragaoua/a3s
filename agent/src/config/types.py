@@ -47,8 +47,32 @@ class OAuthRfc9068PolicyConfig(StrictModel):
     resource_server: NonEmptyStr
 
 
+class OAuthDiscoveredIntrospectionPolicyConfig(StrictModel):
+    discovered: Literal[True] = True
+    client_id: NonEmptyStr
+    client_secret: SecretStr = Field(min_length=1)
+    auth_method: Literal["client_secret_basic", "client_secret_post"] = (
+        "client_secret_basic"
+    )
+
+
+class OAuthStaticIntrospectionPolicyConfig(StrictModel):
+    discovered: Literal[False] = False
+    endpoint: Url
+    client_id: NonEmptyStr
+    client_secret: SecretStr = Field(min_length=1)
+    auth_method: Literal["client_secret_basic", "client_secret_post"] = (
+        "client_secret_basic"
+    )
+
+
 class OAuthPoliciesConfig(StrictModel):
     jwks: OAuthDiscoveredJwksPolicyConfig | OAuthStaticJwksPolicyConfig
+    introspection: (
+        OAuthDiscoveredIntrospectionPolicyConfig
+        | OAuthStaticIntrospectionPolicyConfig
+        | None
+    ) = None
     rfc9068: OAuthRfc9068PolicyConfig | None = None
     claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
 
