@@ -54,8 +54,7 @@ class OAuthJwtPoliciesConfig(StrictModel):
     claims: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
 
 
-class OAuthDiscoveredIntrospectionPolicyConfig(StrictModel):
-    discovered: Literal[True] = True
+class OAuthIntrospectionPolicyConfig(StrictModel):
     client_id: NonEmptyStr
     client_secret: SecretStr = Field(min_length=1)
     auth_method: Literal["client_secret_basic", "client_secret_post"] = (
@@ -63,14 +62,13 @@ class OAuthDiscoveredIntrospectionPolicyConfig(StrictModel):
     )
 
 
-class OAuthStaticIntrospectionPolicyConfig(StrictModel):
+class OAuthDiscoveredIntrospectionPolicyConfig(OAuthIntrospectionPolicyConfig):
+    discovered: Literal[True] = True
+
+
+class OAuthStaticIntrospectionPolicyConfig(OAuthIntrospectionPolicyConfig):
     discovered: Literal[False] = False
     endpoint: Url
-    client_id: NonEmptyStr
-    client_secret: SecretStr = Field(min_length=1)
-    auth_method: Literal["client_secret_basic", "client_secret_post"] = (
-        "client_secret_basic"
-    )
 
 
 class OAuthPoliciesConfig(StrictModel):
