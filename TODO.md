@@ -15,6 +15,8 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - OAuth2:
     - Support oneOf, containsAll etc (instead of simple exact-string matching)
       strategy for the auth.policies.claims policy
+    - Add `private_key_jwt` as an `auth_method` for
+      `auth.policies.introspection`
     - Cache auth server metadata
     - Cache introspection results / endpoint usage
     - Cache JWKS
@@ -23,11 +25,12 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - mTLS:
 - agent-to-MCP auth:
   - Configure auth per MCP:
-    - No auth
-    - Oauth2:
-      - Forward agent token
-      - client credentials flow (allow different issuer ?)
-      - Token exchange (same issuer or different one that supports ?)
+    - for `mcp_servers[].auth.mode` set to `oauth_token_exchange`, allow
+      overriding `auth.issuer_url` via `mcp_servers[].auth.issuer_url`
+      (making it possible to exchange the token with a different auth server
+      than the one that issued the first token, which can allow more
+      flexibility in enterprise and multi-cloud settings)
+    - Add `private_key_jwt` as an `auth_method` for `mcp_servers[].auth`
     - API Key ?
 - Core features:
   - manage agents list

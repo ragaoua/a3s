@@ -218,10 +218,10 @@ def create_app(config: Config) -> Starlette:
         instruction=config.agent.instructions,
         tools=[
             McpToolset(
-                connection_params=StreamableHTTPConnectionParams(url=str(url)),
+                connection_params=StreamableHTTPConnectionParams(url=str(server.url)),
                 header_provider=header_provider,
             )
-            for url in config.mcp_servers
+            for server in config.mcp_servers
         ],
     )
 

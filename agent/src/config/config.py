@@ -5,11 +5,11 @@ from typing import Any, Literal
 
 import yaml
 from pydantic import (
-    BaseModel,
     ConfigDict,
     ValidationError,
+    model_validator,
 )
-from pydantic_core import InitErrorDetails, Url
+from pydantic_core import InitErrorDetails
 from yaml.parser import ParserError
 
 from src.config.constants import (
@@ -21,6 +21,9 @@ from src.config.types import (
     ApiKeyAuthConfig,
     LlmConfig,
     LoggingConfig,
+    McpServerOAuthTokenForwardAuthConfig,
+    McpServerConfig,
+    McpServerOAuthClientAuthConfig,
     OAuthConfig,
     ServerConfig,
     StrictModel,
@@ -75,14 +78,80 @@ def substitute_env_vars(config: dict[str, Any]) -> dict[str, Any]:
 
 
 class Config(StrictModel):
-    model_config = ConfigDict(title="A3S Agent Config", extra="forbid")
+    model_config = ConfigDict(
+        title="A3S Agent Config",
+        extra="forbid",
+        # `"allOf": ...` is necessary here to signal that if one MCP Server is
+        # configured with `auth` set to a `mode` that requires an oauth token,
+        # the root-level `auth.mode` should be set to oauth2. This is the JSON
+        # schema transcription of the `validate_policies` model validator
+        # method below.
+        json_schema_extra={
+            "allOf": [
+                {
+                    "if": {
+                        "required": ["mcp_servers"],
+                        "properties": {
+                            "mcp_servers": {
+                                "contains": {
+                                    "type": "object",
+                                    "required": ["auth"],
+                                    "properties": {
+                                        "auth": {
+                                            "type": "object",
+                                            "required": ["mode"],
+                                            "properties": {
+                                                "mode": {
+                                                    "enum": [
+                                                        "oauth_token_forward",
+                                                        "oauth_token_exchange",
+                                                    ]
+                                                }
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "then": {
+                        "properties": {
+                            "auth": {
+                                "type": "object",
+                                "required": ["mode"],
+                                "properties": {
+                                    "mode": {"const": "oauth2", "type": "string"}
+                                },
+                            }
+                        }
+                    },
+                }
+            ]
+        },
+    )
 
     llm: LlmConfig
     agent: AgentConfig
     server: ServerConfig = ServerConfig()
     auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"]
-    mcp_servers: list[Url] = list()
+    mcp_servers: list[McpServerConfig] = list()
     logging: LoggingConfig = LoggingConfig()
+
+    @model_validator(mode="after")
+    def validate_mcp_server_auth_requires_oauth2(self):
+        if isinstance(self.auth, OAuthConfig):
+            return self
+
+        for index, serverConfig in enumerate(self.mcp_servers):
+            if serverConfig.auth != "none" and (
+                serverConfig.auth.mode
+                in ["oauth_token_forward", "oauth_token_exchange"]
+            ):
+                raise ValueError(
+                    f"`mcp_servers[{index}].auth.mode` '{serverConfig.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
+                )
+
+        return self
 
 
 def resolve_config_file() -> Path:

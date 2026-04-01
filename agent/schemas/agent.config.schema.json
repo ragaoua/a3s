@@ -23,16 +23,7 @@
     },
     "mcp_servers": {
       "type": "array",
-      "items": {
-        "anyOf": [
-          {
-            "format": "uri",
-            "minLength": 1,
-            "type": "string"
-          },
-          { "$ref": "#/$defs/EnvVarPlaceholder" }
-        ]
-      },
+      "items": { "$ref": "#/$defs/McpServerConfig" },
       "default": [],
       "title": "Mcp Servers"
     },
@@ -45,6 +36,49 @@
     }
   },
   "required": ["llm", "agent", "auth"],
+  "allOf": [
+    {
+      "if": {
+        "required": ["mcp_servers"],
+        "properties": {
+          "mcp_servers": {
+            "contains": {
+              "type": "object",
+              "required": ["auth"],
+              "properties": {
+                "auth": {
+                  "type": "object",
+                  "required": ["mode"],
+                  "properties": {
+                    "mode": {
+                      "enum": [
+                        "oauth_token_forward",
+                        "oauth_token_exchange"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "auth": {
+            "type": "object",
+            "required": ["mode"],
+            "properties": {
+              "mode": {
+                "const": "oauth2",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "EnvVarPlaceholder": {
       "type": "string",
@@ -484,6 +518,99 @@
       },
       "required": ["api_key"],
       "title": "ApiKeyAuthConfig"
+    },
+    "McpServerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Url",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "auth": {
+          "anyOf": [
+            { "const": "none", "type": "string" },
+            { "$ref": "#/$defs/McpServerOAuthTokenForwardAuthConfig" },
+            { "$ref": "#/$defs/McpServerOAuthClientAuthConfig" }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": ["url", "auth"],
+      "title": "McpServerConfig"
+    },
+    "McpServerOAuthTokenForwardAuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "const": "oauth_token_forward",
+              "default": "oauth_token_forward",
+              "title": "Mode",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "title": "McpServerOAuthTokenForwardAuthConfig"
+    },
+    "McpServerOAuthClientAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "oauth_token_exchange",
+            "oauth_client_credentials"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "token_endpoint": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Token Endpoint",
+          "type": "string"
+        },
+        "client_id": {
+          "minLength": 1,
+          "title": "Client Id",
+          "type": "string"
+        },
+        "client_secret": {
+          "format": "password",
+          "minLength": 1,
+          "title": "Client Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "auth_method": {
+          "default": "client_secret_basic",
+          "enum": [
+            "client_secret_basic",
+            "client_secret_post"
+          ],
+          "title": "Auth Method",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "token_endpoint",
+        "client_id",
+        "client_secret"
+      ],
+      "title": "McpServerOAuthClientAuthConfig",
+      "type": "object"
     },
     "LoggingConfig": {
       "type": "object",

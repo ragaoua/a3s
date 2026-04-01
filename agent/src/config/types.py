@@ -116,6 +116,29 @@ class ApiKeyAuthConfig(StrictModel):
     api_key: SecretStr = Field(min_length=1)
 
 
+class McpServerOAuthTokenForwardAuthConfig(StrictModel):
+    mode: Literal["oauth_token_forward"] = "oauth_token_forward"
+
+
+class McpServerOAuthClientAuthConfig(StrictModel):
+    mode: Literal["oauth_token_exchange", "oauth_client_credentials"]
+    token_endpoint: Url
+    client_id: NonEmptyStr
+    client_secret: SecretStr = Field(min_length=1)
+    auth_method: Literal["client_secret_basic", "client_secret_post"] = (
+        "client_secret_basic"
+    )
+
+
+class McpServerConfig(StrictModel):
+    url: Url
+    auth: (
+        Literal["none"]
+        | McpServerOAuthTokenForwardAuthConfig
+        | McpServerOAuthClientAuthConfig
+    )
+
+
 class LoggingConfig(StrictModel):
     level: Literal["INFO", "DEBUG", "WARNING", "ERROR"] = "INFO"
     format: Literal["plain", "json"] = "plain"
