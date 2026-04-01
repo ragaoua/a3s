@@ -45,9 +45,8 @@ from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
 from src.config import Config
 from src.config.types import (
     ApiKeyAuthConfig,
+    McpServerOAuthTokenForwardAuthConfig,
     OAuthConfig,
-    OAuthDiscoveredJwksPolicyConfig,
-    OAuthStaticJwksPolicyConfig,
 )
 from src.logging import get_logger
 
@@ -61,7 +60,7 @@ def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
     return {}
 
 
-class MiddlewareCallContextBuilder(DefaultCallContextBuilder):
+class AuthHeaderCallContextBuilder(DefaultCallContextBuilder):
     def build(self, request: Request):
         context = super().build(request)
 
@@ -75,22 +74,25 @@ class MiddlewareCallContextBuilder(DefaultCallContextBuilder):
 def request_converter(
     request: RequestContext,
     part_converter,
+    *,
+    mcpServerAccessRequiresAgentAuthToken: bool,
 ) -> AgentRunRequest:
     run_request = convert_a2a_request_to_agent_run_request(
         request,
         part_converter,
     )
 
-    call_context = request.call_context
-    authorization_header = (
-        call_context.state.get("authorization_header") if call_context else None
-    )
+    if mcpServerAccessRequiresAgentAuthToken:
+        call_context = request.call_context
+        authorization_header = (
+            call_context.state.get("authorization_header") if call_context else None
+        )
 
-    if isinstance(authorization_header, str) and authorization_header:
-        run_request.state_delta = {
-            **(run_request.state_delta or {}),
-            "authorization_header": authorization_header,
-        }
+        if isinstance(authorization_header, str) and authorization_header:
+            run_request.state_delta = {
+                **(run_request.state_delta or {}),
+                "authorization_header": authorization_header,
+            }
 
     if run_request.run_config is None:
         run_request.run_config = RunConfig()
@@ -118,10 +120,20 @@ def create_a2a_app(
 
     task_store = InMemoryTaskStore()
     push_config_store = InMemoryPushNotificationConfigStore()
+
+    mcpServerAccessRequiresAgentAuthToken = any(
+        serverConfig.auth != "none"
+        and (serverConfig.auth.mode in ["oauth_token_forward", "oauth_token_exchange"])
+        for serverConfig in config.mcp_servers
+    )
     agent_executor = A2aAgentExecutor(
         runner=create_runner,
         config=A2aAgentExecutorConfig(
-            request_converter=request_converter,
+            request_converter=lambda request, part_converter: request_converter(
+                request,
+                part_converter,
+                mcpServerAccessRequiresAgentAuthToken=mcpServerAccessRequiresAgentAuthToken,
+            )
         ),
         use_legacy=False,
     )
@@ -195,10 +207,13 @@ def create_a2a_app(
             # access to
             supports_authenticated_extended_card=False,
         )
+
         a2a_server = A2AStarletteApplication(
             agent_card=agent_card,
             http_handler=request_handler,
-            context_builder=MiddlewareCallContextBuilder(),
+            context_builder=AuthHeaderCallContextBuilder()
+            if mcpServerAccessRequiresAgentAuthToken
+            else None,
         )
         a2a_server.add_routes_to_app(app)
 
@@ -219,7 +234,9 @@ def create_app(config: Config) -> Starlette:
         tools=[
             McpToolset(
                 connection_params=StreamableHTTPConnectionParams(url=str(server.url)),
-                header_provider=header_provider,
+                header_provider=header_provider
+                if isinstance(server.auth, McpServerOAuthTokenForwardAuthConfig)
+                else None,
             )
             for server in config.mcp_servers
         ],
