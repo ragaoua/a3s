@@ -124,33 +124,6 @@ async def test_dispatch_returns_invalid_request_for_malformed_bearer_header(
 
 
 @pytest.mark.asyncio
-async def test_dispatch_sets_request_state_and_calls_next_on_valid_token(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization="Bearer valid-token")
-
-    monkeypatch.setattr(
-        middleware,
-        "_fetch_jwk_set",
-        lambda *, jwtPoliciesConfig, metadata=None: object(),
-    )
-    monkeypatch.setattr(
-        middleware,
-        "_validate_access_token",
-        lambda _token, _jwk_set: None,
-    )
-
-    async def call_next(req: Request) -> Response:
-        assert req.state.authorization_header == "Bearer valid-token"
-        return JSONResponse({"ok": True}, status_code=200)
-
-    response = await middleware.dispatch(request, call_next)
-
-    assert response.status_code == 200
-
-
-@pytest.mark.asyncio
 async def test_dispatch_returns_expired_token_error_when_validation_detects_expiry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

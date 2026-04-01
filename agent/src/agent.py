@@ -2,7 +2,6 @@ import logging
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
-from a2a.server.apps.jsonrpc import DefaultCallContextBuilder
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import (
     InMemoryPushNotificationConfigStore,
@@ -39,7 +38,6 @@ from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from starlette.applications import Starlette
-from starlette.requests import Request
 
 from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
 from src.config import Config
@@ -54,48 +52,39 @@ logger = get_logger(__name__)
 
 
 def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
-    authorization_header = ctx.state.get("authorization_header")
-    if isinstance(authorization_header, str) and authorization_header:
-        return {"Authorization": authorization_header}
-    return {}
+    if ctx.run_config is None or ctx.run_config.custom_metadata is None:
+        return {}
 
+    headers = ctx.run_config.custom_metadata["temp:headers"]
+    if not headers:
+        return {}
 
-class AuthHeaderCallContextBuilder(DefaultCallContextBuilder):
-    def build(self, request: Request):
-        context = super().build(request)
-
-        authorization_header = getattr(request.state, "authorization_header", None)
-        if isinstance(authorization_header, str) and authorization_header:
-            context.state["authorization_header"] = authorization_header
-
-        return context
+    authorization_header = {k: v for k, v in headers.items() if k == "authorization"}
+    return authorization_header
 
 
 def request_converter(
     request: RequestContext,
     part_converter,
-    *,
-    mcpServerAccessRequiresAgentAuthToken: bool,
 ) -> AgentRunRequest:
     run_request = convert_a2a_request_to_agent_run_request(
         request,
         part_converter,
     )
 
-    if mcpServerAccessRequiresAgentAuthToken:
-        call_context = request.call_context
-        authorization_header = (
-            call_context.state.get("authorization_header") if call_context else None
-        )
-
-        if isinstance(authorization_header, str) and authorization_header:
-            run_request.state_delta = {
-                **(run_request.state_delta or {}),
-                "authorization_header": authorization_header,
-            }
-
     if run_request.run_config is None:
         run_request.run_config = RunConfig()
+
+    call_context = request.call_context
+    if call_context is not None:
+        headers = call_context.state.get("headers")
+
+        if headers is not None:
+            run_request.run_config.custom_metadata = {
+                **(run_request.run_config.custom_metadata or {}),
+                "temp:headers": headers,
+            }
+
     run_request.run_config.streaming_mode = StreamingMode.SSE
 
     return run_request
@@ -121,20 +110,9 @@ def create_a2a_app(
     task_store = InMemoryTaskStore()
     push_config_store = InMemoryPushNotificationConfigStore()
 
-    mcpServerAccessRequiresAgentAuthToken = any(
-        serverConfig.auth != "none"
-        and (serverConfig.auth.mode in ["oauth_token_forward", "oauth_token_exchange"])
-        for serverConfig in config.mcp_servers
-    )
     agent_executor = A2aAgentExecutor(
         runner=create_runner,
-        config=A2aAgentExecutorConfig(
-            request_converter=lambda request, part_converter: request_converter(
-                request,
-                part_converter,
-                mcpServerAccessRequiresAgentAuthToken=mcpServerAccessRequiresAgentAuthToken,
-            )
-        ),
+        config=A2aAgentExecutorConfig(request_converter=request_converter),
         use_legacy=False,
     )
     request_handler = DefaultRequestHandler(
@@ -211,9 +189,6 @@ def create_a2a_app(
         a2a_server = A2AStarletteApplication(
             agent_card=agent_card,
             http_handler=request_handler,
-            context_builder=AuthHeaderCallContextBuilder()
-            if mcpServerAccessRequiresAgentAuthToken
-            else None,
         )
         a2a_server.add_routes_to_app(app)
 

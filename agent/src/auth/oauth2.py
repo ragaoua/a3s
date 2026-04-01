@@ -328,7 +328,6 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             if jwk_set is not None:
                 self._validate_access_token(token, jwk_set)
             self._introspect_access_token(token, auth_server_metadata)
-            request.state.authorization_header = f"Bearer {token}"
         except TokenIntrospectionServiceError:
             logger.exception("Token introspection failed")
             return JSONResponse(
