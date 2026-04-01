@@ -210,7 +210,7 @@ def create_app(config: Config) -> Starlette:
     root_agent = LlmAgent(
         model=LiteLlm(
             model=f"openai/{config.llm.model}",
-            api_base=config.llm.api_url,
+            api_base=str(config.llm.api_url),
             api_key=config.llm.api_key.get_secret_value(),
         ),
         name=config.agent.name,
