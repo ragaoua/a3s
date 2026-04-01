@@ -538,7 +538,9 @@
           "anyOf": [
             { "const": "none", "type": "string" },
             { "$ref": "#/$defs/McpServerOAuthTokenForwardAuthConfig" },
-            { "$ref": "#/$defs/McpServerOAuthClientAuthConfig" }
+            { "$ref": "#/$defs/McpServerOAuthClientCredentialsAuthConfig" },
+            { "$ref": "#/$defs/McpServerOAuthDiscoveredTokenExchangeAuthConfig" },
+            { "$ref": "#/$defs/McpServerOAuthStaticTokenExchangeAuthConfig" }
           ],
           "title": "Auth"
         }
@@ -564,21 +566,13 @@
       },
       "title": "McpServerOAuthTokenForwardAuthConfig"
     },
-    "McpServerOAuthClientAuthConfig": {
+    "McpServerOAuthClientCredentialsAuthConfig": {
       "additionalProperties": false,
       "properties": {
         "mode": {
-          "enum": [
-            "oauth_token_exchange",
-            "oauth_client_credentials"
-          ],
+          "const": "oauth_client_credentials",
+          "default": "oauth_client_credentials",
           "title": "Mode",
-          "type": "string"
-        },
-        "token_endpoint": {
-          "format": "uri",
-          "minLength": 1,
-          "title": "Token Endpoint",
           "type": "string"
         },
         "client_id": {
@@ -601,15 +595,108 @@
           ],
           "title": "Auth Method",
           "type": "string"
+        },
+        "token_endpoint": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Token Endpoint",
+          "type": "string"
+        }
+      },
+      "required": ["client_id", "client_secret", "token_endpoint"],
+      "title": "McpServerOAuthClientCredentialsAuthConfig",
+      "type": "object"
+    },
+    "McpServerOAuthDiscoveredTokenExchangeAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "oauth_token_exchange",
+          "default": "oauth_token_exchange",
+          "title": "Mode",
+          "type": "string"
+        },
+        "client_id": {
+          "minLength": 1,
+          "title": "Client Id",
+          "type": "string"
+        },
+        "client_secret": {
+          "format": "password",
+          "minLength": 1,
+          "title": "Client Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "auth_method": {
+          "default": "client_secret_basic",
+          "enum": [
+            "client_secret_basic",
+            "client_secret_post"
+          ],
+          "title": "Auth Method",
+          "type": "string"
+        },
+        "discovered": {
+          "const": true,
+          "default": true,
+          "title": "Discovered",
+          "type": "boolean"
+        }
+      },
+      "required": ["client_id", "client_secret"],
+      "title": "McpServerOAuthDiscoveredTokenExchangeAuthConfig",
+      "type": "object"
+    },
+    "McpServerOAuthStaticTokenExchangeAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "oauth_token_exchange",
+          "default": "oauth_token_exchange",
+          "title": "Mode",
+          "type": "string"
+        },
+        "client_id": {
+          "minLength": 1,
+          "title": "Client Id",
+          "type": "string"
+        },
+        "client_secret": {
+          "format": "password",
+          "minLength": 1,
+          "title": "Client Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "auth_method": {
+          "default": "client_secret_basic",
+          "enum": [
+            "client_secret_basic",
+            "client_secret_post"
+          ],
+          "title": "Auth Method",
+          "type": "string"
+        },
+        "discovered": {
+          "const": false,
+          "default": false,
+          "title": "Discovered",
+          "type": "boolean"
+        },
+        "token_endpoint": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Token Endpoint",
+          "type": "string"
         }
       },
       "required": [
-        "mode",
-        "token_endpoint",
         "client_id",
-        "client_secret"
+        "client_secret",
+        "token_endpoint"
       ],
-      "title": "McpServerOAuthClientAuthConfig",
+      "title": "McpServerOAuthStaticTokenExchangeAuthConfig",
       "type": "object"
     },
     "LoggingConfig": {
