@@ -59,6 +59,7 @@ from src.config.types import (
     OAuthConfig,
 )
 from src.logging import get_logger
+from src.utils import fetch_json
 
 logger = get_logger(__name__)
 MCP_SERVER_ACCESS_TOKEN_CACHE: dict[Tuple[Url, str], str] = {}
@@ -74,23 +75,6 @@ def oauth_token_forward_header_provider(ctx: ReadonlyContext) -> dict[str, str]:
 
     authorization_header = {k: v for k, v in headers.items() if k == "authorization"}
     return authorization_header
-
-
-# TODO: there's already a similar function in oauth2.py
-def _fetch_json(
-    url: str | UrlRequest,
-    *,
-    error_message: str | None = None,
-) -> dict[str, Any]:
-    try:
-        with urlopen(url, timeout=5) as response:
-            return json.loads(response.read())
-    except (HTTPError, URLError, TimeoutError, JSONDecodeError) as err:
-        if error_message is None:
-            request_url = url.full_url if isinstance(url, UrlRequest) else url
-            error_message = f"Failed to fetch JSON from '{request_url}'"
-
-        raise ValueError(error_message) from err
 
 
 def _fetch_mcp_server_access_token(
@@ -112,7 +96,7 @@ def _fetch_mcp_server_access_token(
         body["client_id"] = server_auth_config.client_id
         body["client_secret"] = server_auth_config.client_secret.get_secret_value()
 
-    token_response = _fetch_json(
+    token_response = fetch_json(
         UrlRequest(
             str(server_auth_config.token_endpoint),
             data=urlencode(body).encode("utf-8"),

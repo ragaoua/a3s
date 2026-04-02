@@ -1,11 +1,7 @@
 import base64
-import json
-from json import JSONDecodeError
 from typing import Any, Literal, final
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest
-from urllib.request import urlopen
 
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
 from authlib.jose.errors import DecodeError, JoseError
@@ -27,6 +23,7 @@ from src.config.types import (
     OAuthStaticJwksPolicyConfig,
 )
 from src.logging import get_logger
+from src.utils import fetch_json
 
 logger = get_logger(__name__)
 
@@ -58,25 +55,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         self.realm = realm
         self.config = config
 
-    def _fetch_json(
-        self,
-        url: str | UrlRequest,
-        *,
-        error_cls: type[Exception] = ValueError,
-        error_message: str | None = None,
-    ) -> dict[str, Any]:
-        try:
-            with urlopen(url, timeout=5) as response:
-                return json.loads(response.read())
-        except (HTTPError, URLError, TimeoutError, JSONDecodeError) as err:
-            if error_message is None:
-                request_url = url.full_url if isinstance(url, UrlRequest) else url
-                error_message = f"Failed to fetch JSON from '{request_url}'"
-            raise error_cls(error_message) from err
-
     def _fetch_authorization_server_metadata(self) -> AuthorizationServerMetadata:
         metadata_url = get_well_known_url(self.issuer_url, external=True)
-        metadata_raw = self._fetch_json(metadata_url)
+        metadata_raw = fetch_json(metadata_url)
         metadata = AuthorizationServerMetadata(metadata_raw)
         metadata.validate_issuer()
 
@@ -128,7 +109,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             if isinstance(jwtPoliciesConfig.jwks, OAuthStaticJwksPolicyConfig)
             else self._discover_jwks_uri(metadata)
         )
-        jwks_raw = self._fetch_json(jwks_url)
+        jwks_raw = fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
 
     def _requires_authorization_server_metadata(self) -> bool:
@@ -194,7 +175,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 "Failed to discover token introspection endpoint"
             ) from err
 
-        introspection_response = self._fetch_json(
+        introspection_response = fetch_json(
             self._get_introspection_request(
                 token=token,
                 endpoint=endpoint,

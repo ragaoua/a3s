@@ -4,6 +4,7 @@ from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+import src.auth.oauth2 as oauth2_module
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
@@ -159,7 +160,7 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
 ) -> None:
     expected_jwks_url = "https://issuer.example/.well-known/jwks.json"
     captured_jwks_url: str | None = None
-    config = jwt = OAuthJwtPoliciesConfig(
+    config = OAuthJwtPoliciesConfig(
         jwks=OAuthDiscoveredJwksPolicyConfig(),
         rfc9068=None,
         claims={},
@@ -173,12 +174,12 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
         lambda _metadata=None: expected_jwks_url,
     )
 
-    def _fetch_json(url: str):
+    def fetch_json(url: str):
         nonlocal captured_jwks_url
         captured_jwks_url = url
         return {"keys": []}
 
-    monkeypatch.setattr(middleware, "_fetch_json", _fetch_json)
+    monkeypatch.setattr(oauth2_module, "fetch_json", fetch_json)
 
     middleware._fetch_jwk_set(jwtPoliciesConfig=config)
 
