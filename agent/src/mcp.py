@@ -2,9 +2,12 @@ import base64
 from typing import Callable
 from urllib.parse import urlencode
 from urllib.request import Request
+
+import httpx
 from google.adk.agents.llm_agent import ToolUnion
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
+from mcp.shared._httpx_utils import create_mcp_http_client
 from pydantic_core import Url
 
 from src.config.types import (
@@ -20,15 +23,32 @@ CUSTOM_METADATA_TEMP_HEADERS_KEY = "temp:headers"
 
 
 def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
-    return [
-        McpToolset(
-            connection_params=StreamableHTTPConnectionParams(
+    mcp_tool_set = []
+
+    header_provider = None
+    for serverConfig in config:
+        if isinstance(serverConfig.auth, McpServerOAuthClientCredentialsAuthConfig):
+            connection_params = StreamableHTTPConnectionParams(
                 url=str(serverConfig.url),
-            ),
-            header_provider=get_mcp_server_header_provider(serverConfig),
+                httpx_client_factory=oauth_client_credentials_http_client_factory(
+                    serverConfig.url, serverConfig.auth
+                ),
+            )
+        else:
+            connection_params = StreamableHTTPConnectionParams(
+                url=str(serverConfig.url)
+            )
+            if isinstance(serverConfig.auth, McpServerOAuthTokenForwardAuthConfig):
+                header_provider = oauth_token_forward_header_provider
+
+        mcp_tool_set.append(
+            McpToolset(
+                connection_params=connection_params,
+                header_provider=header_provider,
+            )
         )
-        for serverConfig in config
-    ]
+
+    return mcp_tool_set
 
 
 def oauth_token_forward_header_provider(ctx: ReadonlyContext) -> dict[str, str]:
@@ -83,32 +103,88 @@ def _fetch_mcp_server_access_token(
     return access_token
 
 
-def oauth_client_credentials_header_provider(
+def _refresh_mcp_server_access_token(
     server_url: Url,
     server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
-) -> Callable[[ReadonlyContext], dict[str, str]]:
+) -> str:
     cache_key = (server_auth_config.token_endpoint, server_auth_config.client_id)
+    MCP_SERVER_ACCESS_TOKEN_CACHE.pop(cache_key, None)
 
-    def provider(_ctx: ReadonlyContext) -> dict[str, str]:
-        access_token = MCP_SERVER_ACCESS_TOKEN_CACHE.get(cache_key)
-        if access_token is None:
-            access_token = _fetch_mcp_server_access_token(
-                server_url, server_auth_config
-            )
-            MCP_SERVER_ACCESS_TOKEN_CACHE[cache_key] = access_token
-
-        return {"Authorization": f"Bearer {access_token}"}
-
-    return provider
+    access_token = _fetch_mcp_server_access_token(server_url, server_auth_config)
+    MCP_SERVER_ACCESS_TOKEN_CACHE[cache_key] = access_token
+    return access_token
 
 
-def get_mcp_server_header_provider(
-    server: McpServerConfig,
-) -> Callable[[ReadonlyContext], dict[str, str]] | None:
-    if isinstance(server.auth, McpServerOAuthTokenForwardAuthConfig):
-        return oauth_token_forward_header_provider
+def _get_mcp_server_access_token(
+    server_url: Url,
+    server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+) -> str:
+    cache_key = (server_auth_config.token_endpoint, server_auth_config.client_id)
+    access_token = MCP_SERVER_ACCESS_TOKEN_CACHE.get(cache_key)
 
-    if isinstance(server.auth, McpServerOAuthClientCredentialsAuthConfig):
-        return oauth_client_credentials_header_provider(server.url, server.auth)
+    if access_token is None:
+        access_token = _fetch_mcp_server_access_token(server_url, server_auth_config)
+        MCP_SERVER_ACCESS_TOKEN_CACHE[cache_key] = access_token
 
-    return None
+    return access_token
+
+
+def _is_invalid_token_error(response: httpx.Response) -> bool:
+    if response.status_code != 401:
+        return False
+
+    return any(
+        "bearer" in header.lower() and "invalid_token" in header.lower()
+        for header in response.headers.get_list("www-authenticate")
+    )
+
+
+class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
+    def __init__(
+        self,
+        server_url: Url,
+        server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+    ):
+        self._server_url = server_url
+        self._server_auth_config = server_auth_config
+
+    async def async_auth_flow(self, request: httpx.Request):
+        request.headers["Authorization"] = "Bearer " + _get_mcp_server_access_token(
+            self._server_url, self._server_auth_config
+        )
+        response = yield request
+
+        if not _is_invalid_token_error(response):
+            return
+
+        request.headers["Authorization"] = "Bearer " + _refresh_mcp_server_access_token(
+            self._server_url, self._server_auth_config
+        )
+        yield request
+
+
+def oauth_client_credentials_http_client_factory(
+    server_url: Url,
+    server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+) -> Callable[
+    [dict[str, str] | None, httpx.Timeout | None, httpx.Auth | None],
+    httpx.AsyncClient,
+]:
+    def factory(
+        headers: dict[str, str] | None = None,
+        timeout: httpx.Timeout | None = None,
+        auth: httpx.Auth | None = None,
+    ) -> httpx.AsyncClient:
+        return create_mcp_http_client(
+            headers=headers,
+            timeout=timeout,
+            auth=(
+                auth
+                if auth is not None
+                else _McpServerOAuthClientCredentialsAuth(
+                    server_url, server_auth_config
+                )
+            ),
+        )
+
+    return factory
