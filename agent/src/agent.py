@@ -1,4 +1,13 @@
+import base64
+import json
 import logging
+from collections.abc import Callable
+from json import JSONDecodeError
+from typing import Any, Tuple
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
@@ -37,21 +46,25 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
+from pydantic_core import Url
 from starlette.applications import Starlette
 
 from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
 from src.config import Config
 from src.config.types import (
     ApiKeyAuthConfig,
+    McpServerConfig,
+    McpServerOAuthClientCredentialsAuthConfig,
     McpServerOAuthTokenForwardAuthConfig,
     OAuthConfig,
 )
 from src.logging import get_logger
 
 logger = get_logger(__name__)
+MCP_SERVER_ACCESS_TOKEN_CACHE: dict[Tuple[Url, str], str] = {}
 
 
-def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
+def oauth_token_forward_header_provider(ctx: ReadonlyContext) -> dict[str, str]:
     if ctx.run_config is None or ctx.run_config.custom_metadata is None:
         return {}
 
@@ -61,6 +74,94 @@ def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
 
     authorization_header = {k: v for k, v in headers.items() if k == "authorization"}
     return authorization_header
+
+
+# TODO: there's already a similar function in oauth2.py
+def _fetch_json(
+    url: str | UrlRequest,
+    *,
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    try:
+        with urlopen(url, timeout=5) as response:
+            return json.loads(response.read())
+    except (HTTPError, URLError, TimeoutError, JSONDecodeError) as err:
+        if error_message is None:
+            request_url = url.full_url if isinstance(url, UrlRequest) else url
+            error_message = f"Failed to fetch JSON from '{request_url}'"
+
+        raise ValueError(error_message) from err
+
+
+def _fetch_mcp_server_access_token(
+    server_url: Url,
+    server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+) -> str:
+    body = {"grant_type": "client_credentials"}
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+    }
+
+    if server_auth_config.auth_method == "client_secret_basic":
+        client_credentials = f"{server_auth_config.client_id}:{server_auth_config.client_secret.get_secret_value()}"
+        headers["Authorization"] = "Basic " + base64.b64encode(
+            client_credentials.encode("utf-8")
+        ).decode("ascii")
+    else:
+        body["client_id"] = server_auth_config.client_id
+        body["client_secret"] = server_auth_config.client_secret.get_secret_value()
+
+    token_response = _fetch_json(
+        UrlRequest(
+            str(server_auth_config.token_endpoint),
+            data=urlencode(body).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        ),
+        error_message=(
+            f"Failed to fetch OAuth2 access token for MCP server '{server_url}'"
+        ),
+    )
+    access_token = token_response.get("access_token")
+
+    if not isinstance(access_token, str) or access_token == "":
+        raise ValueError(
+            "OAuth2 client credentials response is missing a valid 'access_token'"
+        )
+
+    return access_token
+
+
+def oauth_client_credentials_header_provider(
+    server_url: Url,
+    server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+) -> Callable[[ReadonlyContext], dict[str, str]]:
+    cache_key = (server_auth_config.token_endpoint, server_auth_config.client_id)
+
+    def provider(_ctx: ReadonlyContext) -> dict[str, str]:
+        access_token = MCP_SERVER_ACCESS_TOKEN_CACHE.get(cache_key)
+        if access_token is None:
+            access_token = _fetch_mcp_server_access_token(
+                server_url, server_auth_config
+            )
+            MCP_SERVER_ACCESS_TOKEN_CACHE[cache_key] = access_token
+
+        return {"Authorization": f"Bearer {access_token}"}
+
+    return provider
+
+
+def get_mcp_server_header_provider(
+    server: McpServerConfig,
+) -> Callable[[ReadonlyContext], dict[str, str]] | None:
+    if isinstance(server.auth, McpServerOAuthTokenForwardAuthConfig):
+        return oauth_token_forward_header_provider
+
+    if isinstance(server.auth, McpServerOAuthClientCredentialsAuthConfig):
+        return oauth_client_credentials_header_provider(server.url, server.auth)
+
+    return None
 
 
 def request_converter(
@@ -209,9 +310,7 @@ def create_app(config: Config) -> Starlette:
         tools=[
             McpToolset(
                 connection_params=StreamableHTTPConnectionParams(url=str(server.url)),
-                header_provider=header_provider
-                if isinstance(server.auth, McpServerOAuthTokenForwardAuthConfig)
-                else None,
+                header_provider=get_mcp_server_header_provider(server),
             )
             for server in config.mcp_servers
         ],
