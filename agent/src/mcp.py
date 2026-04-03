@@ -1,6 +1,6 @@
 import base64
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, NamedTuple
+from typing import Any, NamedTuple
 from urllib.parse import urlencode
 from urllib.request import Request
 
@@ -9,7 +9,7 @@ import jwt
 from google.adk.agents.llm_agent import ToolUnion
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
-from mcp.shared._httpx_utils import create_mcp_http_client
+from mcp.shared._httpx_utils import McpHttpClientFactory, create_mcp_http_client
 from pydantic_core import Url
 
 from src.config.types import (
@@ -251,10 +251,7 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
 def oauth_client_credentials_http_client_factory(
     server_url: Url,
     server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
-) -> Callable[
-    [dict[str, str] | None, httpx.Timeout | None, httpx.Auth | None],
-    httpx.AsyncClient,
-]:
+) -> McpHttpClientFactory:
     def factory(
         headers: dict[str, str] | None = None,
         timeout: httpx.Timeout | None = None,
