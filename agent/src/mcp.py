@@ -29,6 +29,11 @@ class _AccessTokenInfo(NamedTuple):
     expires_at: datetime | None
 
 
+class _GetAccessTokenResult(NamedTuple):
+    access_token: str
+    fetched_from_cache: bool
+
+
 ACCESS_TOKEN_CACHE: dict[
     _AccessTokenCacheKey,
     _AccessTokenInfo,
@@ -148,23 +153,27 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
         self._server_auth_config = server_auth_config
 
     async def async_auth_flow(self, request: httpx.Request):
-        request.headers["Authorization"] = "Bearer " + await self._get_access_token()
+        access_token_result = await self._get_access_token()
+        request.headers["Authorization"] = "Bearer " + access_token_result.access_token
         response = yield request
 
-        # If the token is invalid, we'll referesh it ONCE,
-        # handling cases where the token has expired, has been
-        # revoked, was issued with a secret key that's been rotated
-        # since etc
-        if response.status_code == 401 and any(
-            "bearer" in header.lower() and "invalid_token" in header.lower()
-            for header in response.headers.get_list("www-authenticate")
+        # If a cached token is rejected, refresh it ONCE to handle
+        # cases where it expired, was revoked, or server-side key
+        # rotation invalidated it after it was cached locally.
+        if (
+            access_token_result.fetched_from_cache
+            and response.status_code == 401
+            and any(
+                "bearer" in header.lower() and "invalid_token" in header.lower()
+                for header in response.headers.get_list("www-authenticate")
+            )
         ):
             request.headers["Authorization"] = (
                 "Bearer " + await self._invalidate_cache_and_refresh_access_token()
             )
             yield request
 
-    async def _get_access_token(self) -> str:
+    async def _get_access_token(self) -> _GetAccessTokenResult:
         cache_key = _AccessTokenCacheKey(
             self._server_auth_config.token_endpoint,
             self._server_auth_config.client_id,
@@ -174,22 +183,22 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
         if token_info is None:
             token_info = await self._fetch_access_token()
             ACCESS_TOKEN_CACHE[cache_key] = token_info
-            return token_info.access_token
+            return _GetAccessTokenResult(token_info.access_token, False)
 
         if token_info.expires_at is None or token_info.expires_at > (
             datetime.now(timezone.utc) + ACCESS_TOKEN_REFRESH_WINDOW
         ):
-            return token_info.access_token
+            return _GetAccessTokenResult(token_info.access_token, True)
 
         try:
             refreshed_cache_entry = await self._fetch_access_token()
             ACCESS_TOKEN_CACHE[cache_key] = refreshed_cache_entry
-            return refreshed_cache_entry.access_token
+            return _GetAccessTokenResult(refreshed_cache_entry.access_token, False)
         except Exception:
             if token_info.expires_at is None or token_info.expires_at > datetime.now(
                 timezone.utc
             ):
-                return token_info.access_token
+                return _GetAccessTokenResult(token_info.access_token, True)
             raise
 
     async def _fetch_access_token(self) -> _AccessTokenInfo:
