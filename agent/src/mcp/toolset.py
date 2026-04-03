@@ -4,6 +4,7 @@ from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from src.config.types import (
     McpServerConfig,
     McpServerOAuthClientCredentialsAuthConfig,
+    McpServerOAuthTokenExchangeAuthConfig,
     McpServerOAuthTokenForwardAuthConfig,
 )
 
@@ -23,6 +24,10 @@ def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
                     server_config.url,
                     server_config.auth,
                 ),
+            )
+        elif isinstance(server_config.auth, McpServerOAuthTokenExchangeAuthConfig):
+            raise NotImplementedError(
+                "mcp_servers[].auth.mode='oauth_token_exchange' is not implemented yet"
             )
         else:
             connection_params = StreamableHTTPConnectionParams(
