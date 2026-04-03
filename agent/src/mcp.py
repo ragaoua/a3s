@@ -46,8 +46,8 @@ CUSTOM_METADATA_TEMP_HEADERS_KEY = "temp:headers"
 def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
     mcp_tool_set = []
 
-    header_provider = None
     for serverConfig in config:
+        header_provider = None
         if isinstance(serverConfig.auth, McpServerOAuthClientCredentialsAuthConfig):
             connection_params = StreamableHTTPConnectionParams(
                 url=str(serverConfig.url),
