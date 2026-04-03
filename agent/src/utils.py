@@ -13,7 +13,7 @@ async def fetch_json(
     request = url if isinstance(url, httpx.Request) else httpx.Request("GET", url)
 
     try:
-        async with httpx.AsyncClient(timeout=5, follow_redirects=True) as client:
+        async with httpx.AsyncClient(timeout=5) as client:
             response = await client.send(request)
             response.raise_for_status()
 
