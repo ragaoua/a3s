@@ -5,17 +5,10 @@ from urllib.parse import urlencode
 
 import httpx
 import jwt
-from google.adk.agents.llm_agent import ToolUnion
-from google.adk.agents.readonly_context import ReadonlyContext
-from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from mcp.shared._httpx_utils import McpHttpClientFactory, create_mcp_http_client
 from pydantic_core import Url
 
-from src.config.types import (
-    McpServerConfig,
-    McpServerOAuthClientCredentialsAuthConfig,
-    McpServerOAuthTokenForwardAuthConfig,
-)
+from src.config.types import McpServerOAuthClientCredentialsAuthConfig
 from src.utils import fetch_json
 
 
@@ -44,50 +37,6 @@ ACCESS_TOKEN_CACHE: dict[
 # - Should it be a percentage of the token's lifetime ?
 # - ...
 ACCESS_TOKEN_REFRESH_WINDOW = timedelta(seconds=30)
-
-CUSTOM_METADATA_TEMP_HEADERS_KEY = "temp:headers"
-
-
-def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
-    mcp_tool_set = []
-
-    for serverConfig in config:
-        header_provider = None
-        if isinstance(serverConfig.auth, McpServerOAuthClientCredentialsAuthConfig):
-            connection_params = StreamableHTTPConnectionParams(
-                url=str(serverConfig.url),
-                httpx_client_factory=oauth_client_credentials_http_client_factory(
-                    serverConfig.url,
-                    serverConfig.auth,
-                ),
-            )
-        else:
-            connection_params = StreamableHTTPConnectionParams(
-                url=str(serverConfig.url)
-            )
-            if isinstance(serverConfig.auth, McpServerOAuthTokenForwardAuthConfig):
-                header_provider = oauth_token_forward_header_provider
-
-        mcp_tool_set.append(
-            McpToolset(
-                connection_params=connection_params,
-                header_provider=header_provider,
-            )
-        )
-
-    return mcp_tool_set
-
-
-def oauth_token_forward_header_provider(ctx: ReadonlyContext) -> dict[str, str]:
-    if ctx.run_config is None or ctx.run_config.custom_metadata is None:
-        return {}
-
-    headers = ctx.run_config.custom_metadata[CUSTOM_METADATA_TEMP_HEADERS_KEY]
-    if not headers:
-        return {}
-
-    authorization_header = {k: v for k, v in headers.items() if k == "authorization"}
-    return authorization_header
 
 
 def _get_access_token_expiry_date(
@@ -134,6 +83,7 @@ def _get_exp_datetime_from_jwt(token: str) -> datetime | None:
 
     if not isinstance(exp, str):
         return None
+
     try:
         return datetime.fromtimestamp(float(exp), tz=timezone.utc)
     except (OverflowError, OSError, ValueError):
