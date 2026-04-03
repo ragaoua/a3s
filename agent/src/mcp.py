@@ -164,7 +164,7 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
             access_token_result.fetched_from_cache
             and response.status_code == 401
             and any(
-                "bearer" in header.lower() and "invalid_token" in header.lower()
+                "bearer" in header.lower()
                 for header in response.headers.get_list("www-authenticate")
             )
         ):
