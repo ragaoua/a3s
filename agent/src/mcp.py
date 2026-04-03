@@ -2,7 +2,6 @@ import base64
 from datetime import datetime, timedelta, timezone
 from typing import Any, NamedTuple
 from urllib.parse import urlencode
-from urllib.request import Request
 
 import httpx
 import jwt
@@ -34,6 +33,7 @@ ACCESS_TOKEN_CACHE: dict[
     _AccessTokenCacheKey,
     _AccessTokenInfo,
 ] = {}
+
 # TODO: Maybe work on this
 # - Should it be configurable ?
 # - Should it be a percentage of the token's lifetime ?
@@ -148,7 +148,7 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
         self._server_auth_config = server_auth_config
 
     async def async_auth_flow(self, request: httpx.Request):
-        request.headers["Authorization"] = "Bearer " + self._get_access_token()
+        request.headers["Authorization"] = "Bearer " + await self._get_access_token()
         response = yield request
 
         # If the token is invalid, we'll referesh it ONCE,
@@ -160,11 +160,11 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
             for header in response.headers.get_list("www-authenticate")
         ):
             request.headers["Authorization"] = (
-                "Bearer " + self._invalidate_cache_and_refresh_access_token()
+                "Bearer " + await self._invalidate_cache_and_refresh_access_token()
             )
             yield request
 
-    def _get_access_token(self) -> str:
+    async def _get_access_token(self) -> str:
         cache_key = _AccessTokenCacheKey(
             self._server_auth_config.token_endpoint,
             self._server_auth_config.client_id,
@@ -172,7 +172,7 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
         token_info = ACCESS_TOKEN_CACHE.get(cache_key)
 
         if token_info is None:
-            token_info = self._fetch_access_token()
+            token_info = await self._fetch_access_token()
             ACCESS_TOKEN_CACHE[cache_key] = token_info
             return token_info.access_token
 
@@ -182,7 +182,7 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
             return token_info.access_token
 
         try:
-            refreshed_cache_entry = self._fetch_access_token()
+            refreshed_cache_entry = await self._fetch_access_token()
             ACCESS_TOKEN_CACHE[cache_key] = refreshed_cache_entry
             return refreshed_cache_entry.access_token
         except Exception:
@@ -192,7 +192,7 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
                 return token_info.access_token
             raise
 
-    def _fetch_access_token(self) -> _AccessTokenInfo:
+    async def _fetch_access_token(self) -> _AccessTokenInfo:
         body = {"grant_type": "client_credentials"}
         headers = {
             "Accept": "application/json",
@@ -210,12 +210,12 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
                 self._server_auth_config.client_secret.get_secret_value()
             )
 
-        token_response = fetch_json(
-            Request(
-                str(self._server_auth_config.token_endpoint),
-                data=urlencode(body).encode("utf-8"),
-                headers=headers,
+        token_response = await fetch_json(
+            httpx.Request(
                 method="POST",
+                url=str(self._server_auth_config.token_endpoint),
+                headers=headers,
+                content=urlencode(body).encode("utf-8"),
             ),
             error_message=(
                 f"Failed to fetch OAuth2 access token for MCP server '{self._server_url}'"
@@ -236,14 +236,14 @@ class _McpServerOAuthClientCredentialsAuth(httpx.Auth):
             ),
         )
 
-    def _invalidate_cache_and_refresh_access_token(self) -> str:
+    async def _invalidate_cache_and_refresh_access_token(self) -> str:
         cache_key = _AccessTokenCacheKey(
             self._server_auth_config.token_endpoint,
             self._server_auth_config.client_id,
         )
         _ = ACCESS_TOKEN_CACHE.pop(cache_key, None)
 
-        token_info = self._fetch_access_token()
+        token_info = await self._fetch_access_token()
         ACCESS_TOKEN_CACHE[cache_key] = token_info
         return token_info.access_token
 

@@ -1,8 +1,8 @@
 import base64
 from typing import Any, Literal, final
 from urllib.parse import urlencode
-from urllib.request import Request as UrlRequest
 
+import httpx
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
 from authlib.jose.errors import DecodeError, JoseError
 from authlib.oauth2.rfc6750 import InvalidTokenError
@@ -55,9 +55,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         self.realm = realm
         self.config = config
 
-    def _fetch_authorization_server_metadata(self) -> AuthorizationServerMetadata:
+    async def _fetch_authorization_server_metadata(
+        self,
+    ) -> AuthorizationServerMetadata:
         metadata_url = get_well_known_url(self.issuer_url, external=True)
-        metadata_raw = fetch_json(metadata_url)
+        metadata_raw = await fetch_json(metadata_url)
         metadata = AuthorizationServerMetadata(metadata_raw)
         metadata.validate_issuer()
 
@@ -67,11 +69,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         return metadata
 
-    def _discover_jwks_uri(
+    async def _discover_jwks_uri(
         self,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> str:
-        metadata = metadata or self._fetch_authorization_server_metadata()
+        metadata = metadata or await self._fetch_authorization_server_metadata()
         metadata.validate_jwks_uri()
 
         jwks_uri = metadata.get("jwks_uri")
@@ -82,11 +84,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         return jwks_uri
 
-    def _discover_introspection_endpoint(
+    async def _discover_introspection_endpoint(
         self,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> str:
-        metadata = metadata or self._fetch_authorization_server_metadata()
+        metadata = metadata or await self._fetch_authorization_server_metadata()
         metadata.validate_introspection_endpoint()
 
         introspection_endpoint = metadata.get("introspection_endpoint")
@@ -98,7 +100,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         return introspection_endpoint
 
-    def _fetch_jwk_set(
+    async def _fetch_jwk_set(
         self,
         *,
         jwtPoliciesConfig: OAuthJwtPoliciesConfig,
@@ -107,9 +109,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwks_url = (
             str(jwtPoliciesConfig.jwks.url)
             if isinstance(jwtPoliciesConfig.jwks, OAuthStaticJwksPolicyConfig)
-            else self._discover_jwks_uri(metadata)
+            else await self._discover_jwks_uri(metadata)
         )
-        jwks_raw = fetch_json(jwks_url)
+        jwks_raw = await fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
 
     def _requires_authorization_server_metadata(self) -> bool:
@@ -131,7 +133,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         auth_method: Literal["client_secret_basic", "client_secret_post"],
         client_id: str,
         client_secret: SecretStr,
-    ) -> UrlRequest:
+    ) -> httpx.Request:
         body = {"token": token, "token_type_hint": "access_token"}
         headers = {
             "Accept": "application/json",
@@ -147,14 +149,14 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             body["client_id"] = client_id
             body["client_secret"] = client_secret.get_secret_value()
 
-        return UrlRequest(
-            endpoint,
-            data=urlencode(body).encode("utf-8"),
-            headers=headers,
+        return httpx.Request(
             method="POST",
+            url=endpoint,
+            headers=headers,
+            content=urlencode(body).encode("utf-8"),
         )
 
-    def _introspect_access_token(
+    async def _introspect_access_token(
         self,
         token: str,
         metadata: AuthorizationServerMetadata | None = None,
@@ -168,14 +170,14 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 if isinstance(
                     self.config.introspection, OAuthStaticIntrospectionPolicyConfig
                 )
-                else self._discover_introspection_endpoint(metadata)
+                else await self._discover_introspection_endpoint(metadata)
             )
         except Exception as err:
             raise TokenIntrospectionServiceError(
                 "Failed to discover token introspection endpoint"
             ) from err
 
-        introspection_response = fetch_json(
+        introspection_response = await fetch_json(
             self._get_introspection_request(
                 token=token,
                 endpoint=endpoint,
@@ -285,7 +287,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         auth_server_metadata: AuthorizationServerMetadata | None = None
         if self._requires_authorization_server_metadata():
             try:
-                auth_server_metadata = self._fetch_authorization_server_metadata()
+                auth_server_metadata = await self._fetch_authorization_server_metadata()
             except Exception:
                 logger.exception("Authorization server metadata fetch failed")
                 return JSONResponse(
@@ -296,7 +298,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwk_set: KeySet | None = None
         if self.config.jwt is not None:
             try:
-                jwk_set = self._fetch_jwk_set(
+                jwk_set = await self._fetch_jwk_set(
                     jwtPoliciesConfig=self.config.jwt, metadata=auth_server_metadata
                 )
             except Exception:
@@ -308,7 +310,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         try:
             if jwk_set is not None:
                 self._validate_access_token(token, jwk_set)
-            self._introspect_access_token(token, auth_server_metadata)
+            await self._introspect_access_token(token, auth_server_metadata)
         except TokenIntrospectionServiceError:
             logger.exception("Token introspection failed")
             return JSONResponse(
