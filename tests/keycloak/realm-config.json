@@ -8,6 +8,7 @@
       "publicClient": false,
       "secret": "a3s-test-secret",
       "attributes": {
+        "standard.token.exchange.enabled": "true",
         "access.token.header.type.rfc9068": "true"
       },
       "serviceAccountsEnabled": true,
