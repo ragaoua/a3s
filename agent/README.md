@@ -138,14 +138,36 @@ For more information about how tokens are validated, check out
 ## MCP configuration
 
 Define the MCP servers an agent has access to with `mcp_servers` as a YAML list
-of URLs.
+of objects. Each entry must include a `url` and an `auth` property:
 
-When using API key for auth, or when auth is disabled, MCP servers will only
-be accessible to the agent if they don't require authorization. Otherwise, the
-agent will fail upon receiving a 401 from the MCP servers when trying to
-access.
+```yaml
+mcp_servers:
+  - url: http://mcp1.example.com/mcp
+    auth: none
 
-In OAuth2 mode, the `Authorization` header used by the client is transferred to
-the MCP servers. This allows agents to access MCP servers that require
-authorized access, but it requires the agent and MCP servers to share the
-same authorization server.
+  - url: http://mcp2.example.com/mcp
+    auth:
+      mode: oauth_client_credentials
+      token_endpoint: http://mcp2.example.com/mcp/token
+      client_id: myclient
+      client_secret: ${A3S_MCP2_CLIENT_SECRET}
+
+  - url: http://mcp3.example.com/mcp
+    auth:
+      mode: oauth_token_forward
+```
+
+Supported MCP auth modes are:
+
+- `auth: none`: no authorization is added to MCP requests. The MCP server must
+  accept unauthenticated access.
+- `auth.mode: oauth_client_credentials`: the agent obtains a token for that MCP
+  server using the configured `token_endpoint`, `client_id`, and
+  `client_secret`. `auth_method` defaults to `client_secret_basic` and also
+  supports `client_secret_post`.
+- `auth.mode: oauth_token_forward`: the agent forwards the inbound
+  `Authorization` header to that MCP server. This requires root-level
+  `auth.mode: oauth2`.
+- `auth.mode: oauth_token_exchange`: the config shape is defined, and it also
+  requires root-level `auth.mode: oauth2`, but this mode is not implemented yet
+  and currently fails closed at runtime.
