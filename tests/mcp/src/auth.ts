@@ -43,10 +43,10 @@ async function getJwksClient(): Promise<ReturnType<typeof jwksRsa>> {
       const jwksUri = await getJwksUri();
       return jwksRsa({
         jwksUri,
-        cache: true,
-        cacheMaxAge: 10 * 60 * 1000,
-        rateLimit: true,
-        jwksRequestsPerMinute: 10,
+        cache: false,
+        // cacheMaxAge: 10 * 60 * 1000,
+        // rateLimit: true,
+        // jwksRequestsPerMinute: 10,
         timeout: 5000,
       });
     })().catch((error: unknown) => {
