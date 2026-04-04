@@ -77,11 +77,11 @@ class OAuthPoliciesConfig(StrictModel):
 
 
 class OAuthConfig(StrictModel):
-    mode: Literal["oauth2"] = "oauth2"
+    mode: Literal["oauth2"]
     issuer_url: Url
     policies: OAuthPoliciesConfig
 
 
 class ApiKeyAuthConfig(StrictModel):
-    mode: Literal["api_key"] = "api_key"
+    mode: Literal["api_key"]
     api_key: SecretStr = Field(min_length=1)

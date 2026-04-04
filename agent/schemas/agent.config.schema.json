@@ -205,7 +205,6 @@
           "anyOf": [
             {
               "const": "oauth2",
-              "default": "oauth2",
               "title": "Mode",
               "type": "string"
             },
@@ -227,7 +226,7 @@
           "$ref": "#/$defs/OAuthPoliciesConfig"
         }
       },
-      "required": ["issuer_url", "policies"],
+      "required": ["mode", "issuer_url", "policies"],
       "title": "OAuthConfig"
     },
     "OAuthPoliciesConfig": {
@@ -307,58 +306,6 @@
       "required": ["jwks"],
       "title": "OAuthJwtPolicyConfig"
     },
-    "OAuthDiscoveredIntrospectionPolicyConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "discovered": {
-          "anyOf": [
-            {
-              "const": true,
-              "default": true,
-              "title": "Discovered",
-              "type": "boolean"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "client_id": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Client Id",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "client_secret": {
-          "anyOf": [
-            {
-              "format": "password",
-              "minLength": 1,
-              "title": "Client Secret",
-              "type": "string",
-              "writeOnly": true
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "auth_method": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": ["client_secret_basic", "client_secret_post"],
-              "default": "client_secret_basic",
-              "title": "Auth Method"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["client_id", "client_secret"],
-      "title": "OAuthDiscoveredIntrospectionPolicyConfig"
-    },
     "OAuthDiscoveredJwksPolicyConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -424,6 +371,58 @@
       },
       "required": ["resource_server"],
       "title": "OAuthRfc9068PolicyConfig"
+    },
+    "OAuthDiscoveredIntrospectionPolicyConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            {
+              "const": true,
+              "default": true,
+              "title": "Discovered",
+              "type": "boolean"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "client_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Client Id",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "client_secret": {
+          "anyOf": [
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Client Secret",
+              "type": "string",
+              "writeOnly": true
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "auth_method": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": ["client_secret_basic", "client_secret_post"],
+              "default": "client_secret_basic",
+              "title": "Auth Method"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["client_id", "client_secret"],
+      "title": "OAuthDiscoveredIntrospectionPolicyConfig"
     },
     "OAuthStaticIntrospectionPolicyConfig": {
       "type": "object",
@@ -496,7 +495,6 @@
           "anyOf": [
             {
               "const": "api_key",
-              "default": "api_key",
               "title": "Mode",
               "type": "string"
             },
@@ -516,7 +514,7 @@
           ]
         }
       },
-      "required": ["api_key"],
+      "required": ["mode", "api_key"],
       "title": "ApiKeyAuthConfig"
     },
     "McpServerConfig": {
@@ -571,7 +569,6 @@
       "properties": {
         "mode": {
           "const": "oauth_client_credentials",
-          "default": "oauth_client_credentials",
           "title": "Mode",
           "type": "string"
         },
@@ -603,7 +600,7 @@
           "type": "string"
         }
       },
-      "required": ["client_id", "client_secret", "token_endpoint"],
+      "required": ["client_id", "client_secret", "mode", "token_endpoint"],
       "title": "McpServerOAuthClientCredentialsAuthConfig",
       "type": "object"
     },
@@ -612,7 +609,6 @@
       "properties": {
         "mode": {
           "const": "oauth_token_exchange",
-          "default": "oauth_token_exchange",
           "title": "Mode",
           "type": "string"
         },
@@ -644,7 +640,7 @@
           "type": "boolean"
         }
       },
-      "required": ["client_id", "client_secret"],
+      "required": ["client_id", "client_secret", "mode"],
       "title": "McpServerOAuthDiscoveredTokenExchangeAuthConfig",
       "type": "object"
     },
@@ -653,7 +649,6 @@
       "properties": {
         "mode": {
           "const": "oauth_token_exchange",
-          "default": "oauth_token_exchange",
           "title": "Mode",
           "type": "string"
         },
@@ -694,6 +689,7 @@
       "required": [
         "client_id",
         "client_secret",
+        "mode",
         "token_endpoint"
       ],
       "title": "McpServerOAuthStaticTokenExchangeAuthConfig",

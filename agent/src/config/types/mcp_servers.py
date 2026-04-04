@@ -19,12 +19,12 @@ class McpServerOAuthClientAuthConfig(StrictModel):
 
 
 class McpServerOAuthClientCredentialsAuthConfig(McpServerOAuthClientAuthConfig):
-    mode: Literal["oauth_client_credentials"] = "oauth_client_credentials"
+    mode: Literal["oauth_client_credentials"]
     token_endpoint: Url
 
 
 class McpServerOAuthTokenExchangeAuthConfig(McpServerOAuthClientAuthConfig):
-    mode: Literal["oauth_token_exchange"] = "oauth_token_exchange"
+    mode: Literal["oauth_token_exchange"]
 
 
 class McpServerOAuthDiscoveredTokenExchangeAuthConfig(

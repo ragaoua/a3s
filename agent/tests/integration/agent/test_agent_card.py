@@ -27,8 +27,9 @@ from tests.utils import get_base_test_config
     ("auth"),
     [
         "none",
-        ApiKeyAuthConfig(api_key=SecretStr("abcdef")),  # API Key auth
+        ApiKeyAuthConfig(mode="api_key", api_key=SecretStr("abcdef")),  # API Key auth
         OAuthConfig(
+            mode="oauth2",
             issuer_url=Url("https://issuer.example"),
             policies=OAuthPoliciesConfig(
                 jwt=OAuthJwtPolicyConfig(
