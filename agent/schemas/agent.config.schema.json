@@ -556,7 +556,6 @@
           "anyOf": [
             {
               "const": "oauth_token_forward",
-              "default": "oauth_token_forward",
               "title": "Mode",
               "type": "string"
             },
@@ -564,6 +563,7 @@
           ]
         }
       },
+      "required": ["mode"],
       "title": "McpServerOAuthTokenForwardAuthConfig"
     },
     "McpServerOAuthClientCredentialsAuthConfig": {

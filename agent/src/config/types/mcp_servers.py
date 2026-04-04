@@ -7,7 +7,7 @@ from src.config.types.common import NonEmptyStr, StrictModel
 
 
 class McpServerOAuthTokenForwardAuthConfig(StrictModel):
-    mode: Literal["oauth_token_forward"] = "oauth_token_forward"
+    mode: Literal["oauth_token_forward"]
 
 
 class McpServerOAuthClientAuthConfig(StrictModel):
