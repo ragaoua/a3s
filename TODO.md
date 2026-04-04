@@ -25,12 +25,12 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     - Token validation errors aren't properly handled
   - OIDC:
   - mTLS:
-  - Not perticularly happy with how the authorization header is provided to MCP
+  - Not particularly happy with how the authorization header is provided to MCP
     Server (`agent.request_converter` and `agent.header_provider`). Right now,
     run_config.custom_metadata is used as a bridge between the agent requests
-    and the mcp call requests. We're defining a "temp:headers" key because
-    "temp:" is how ADK knows not to persist that custom data, but this seems
-    hacky and brittle. Relevant code:
+    and the mcp call requests. We're defining a "temp:authorization_header" key
+    because "temp:" is how ADK knows not to persist that custom data, but this
+    seems hacky and brittle. Relevant code:
     - google/adk/sessions/state.py:23-25
     - google/adk/runners.py:976-995
     - google/adk/sessions/base_session_service.py:109-145

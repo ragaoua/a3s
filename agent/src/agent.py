@@ -45,7 +45,7 @@ from src.config.types import (
 )
 from src.logging import get_logger
 from src.mcp import (
-    CUSTOM_METADATA_TEMP_HEADERS_KEY,
+    CUSTOM_METADATA_AUTH_HEADER_KEY,
     get_mcp_tool_set,
 )
 
@@ -67,12 +67,15 @@ def request_converter(
     call_context = request.call_context
     if call_context is not None:
         headers = call_context.state.get("headers")
-
         if headers is not None:
-            run_request.run_config.custom_metadata = {
-                **(run_request.run_config.custom_metadata or {}),
-                CUSTOM_METADATA_TEMP_HEADERS_KEY: headers,
-            }
+            authorization_header = headers.get("authorization") or headers.get(
+                "Authorization"
+            )
+            if authorization_header is not None:
+                run_request.run_config.custom_metadata = {
+                    **(run_request.run_config.custom_metadata or {}),
+                    CUSTOM_METADATA_AUTH_HEADER_KEY: authorization_header,
+                }
 
     run_request.run_config.streaming_mode = StreamingMode.SSE
 
