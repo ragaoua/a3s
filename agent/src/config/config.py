@@ -10,25 +10,20 @@ from pydantic import (
     model_validator,
 )
 from pydantic_core import InitErrorDetails
-from yaml.parser import ParserError
 
-from src.config.constants import (
-    CONFIG_FILE_ENV_VAR_NAME,
-    DEFAULT_CONFIG_FILE,
-)
 from src.config.types import (
     AgentConfig,
     ApiKeyAuthConfig,
     LlmConfig,
     LoggingConfig,
-    McpServerOAuthTokenForwardAuthConfig,
     McpServerConfig,
-    McpServerOAuthClientAuthConfig,
     OAuthConfig,
     ServerConfig,
-    StrictModel,
 )
+from src.config.types.common import StrictModel
 
+CONFIG_FILE_ENV_VAR_NAME = "A3S_CONFIG_FILE"
+DEFAULT_CONFIG_FILE = Path("config/agent.yaml")
 # matches ${var}
 ENV_VAR_PATTERN = re.compile(r"^\$\{([^}]+)\}$")
 

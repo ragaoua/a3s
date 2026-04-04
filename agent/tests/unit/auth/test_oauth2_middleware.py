@@ -8,11 +8,11 @@ import src.auth.oauth2 as oauth2_module
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
-    OAuthDiscoveredJwksPolicyConfig,
-    OAuthJwtPoliciesConfig,
+    OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
 )
+from src.config.types.auth import OAuthDiscoveredJwksPolicyConfig
 
 
 def _build_request(*, path: str, authorization: str | None = None) -> Request:
@@ -49,7 +49,7 @@ def _build_middleware(*, config: OAuthPoliciesConfig | None = None):
         realm="test-realm",
         config=config
         or OAuthPoliciesConfig(
-            jwt=OAuthJwtPoliciesConfig(
+            jwt=OAuthJwtPolicyConfig(
                 jwks=OAuthStaticJwksPolicyConfig(
                     url=Url("https://issuer.example/jwks")
                 ),
@@ -131,7 +131,7 @@ async def test_dispatch_returns_expired_token_error_when_validation_detects_expi
     middleware = _build_middleware()
     request = _build_request(path="/rpc", authorization="Bearer expired-token")
 
-    async def fetch_jwk_set(*, jwtPoliciesConfig, metadata=None):
+    async def fetch_jwk_set(*, jwtPolicyConfig, metadata=None):
         return object()
 
     monkeypatch.setattr(middleware, "_fetch_jwk_set", fetch_jwk_set)
@@ -159,7 +159,7 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
 ) -> None:
     expected_jwks_url = "https://issuer.example/.well-known/jwks.json"
     captured_jwks_url: str | None = None
-    config = OAuthJwtPoliciesConfig(
+    config = OAuthJwtPolicyConfig(
         jwks=OAuthDiscoveredJwksPolicyConfig(),
         rfc9068=None,
         claims={},
@@ -178,8 +178,7 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
         return {"keys": []}
 
     monkeypatch.setattr(oauth2_module, "fetch_json", fetch_json)
-
-    await middleware._fetch_jwk_set(jwtPoliciesConfig=config)
+    await middleware._fetch_jwk_set(jwtPolicyConfig=config)
 
     assert captured_jwks_url == expected_jwks_url
 
@@ -191,7 +190,7 @@ async def test_dispatch_returns_503_when_jwks_fetch_fails(
     middleware = _build_middleware()
     request = _build_request(path="/rpc", authorization="Bearer valid-token")
 
-    async def raise_fetch_jwk_set(*, jwtPoliciesConfig, metadata=None):
+    async def raise_fetch_jwk_set(*, jwtPolicyConfig, metadata=None):
         raise ValueError("boom")
 
     monkeypatch.setattr(middleware, "_fetch_jwk_set", raise_fetch_jwk_set)

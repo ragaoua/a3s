@@ -236,7 +236,7 @@
       "properties": {
         "jwt": {
           "anyOf": [
-            { "$ref": "#/$defs/OAuthJwtPoliciesConfig" },
+            { "$ref": "#/$defs/OAuthJwtPolicyConfig" },
             { "type": "null" }
           ],
           "default": null
@@ -269,7 +269,7 @@
       ],
       "title": "OAuthPoliciesConfig"
     },
-    "OAuthJwtPoliciesConfig": {
+    "OAuthJwtPolicyConfig": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -305,7 +305,7 @@
         }
       },
       "required": ["jwks"],
-      "title": "OAuthJwtPoliciesConfig"
+      "title": "OAuthJwtPolicyConfig"
     },
     "OAuthDiscoveredIntrospectionPolicyConfig": {
       "type": "object",

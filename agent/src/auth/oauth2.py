@@ -17,7 +17,7 @@ from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.config.types import (
-    OAuthJwtPoliciesConfig,
+    OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticIntrospectionPolicyConfig,
     OAuthStaticJwksPolicyConfig,
@@ -103,12 +103,12 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
     async def _fetch_jwk_set(
         self,
         *,
-        jwtPoliciesConfig: OAuthJwtPoliciesConfig,
+        jwtPolicyConfig: OAuthJwtPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> KeySet:
         jwks_url = (
-            str(jwtPoliciesConfig.jwks.url)
-            if isinstance(jwtPoliciesConfig.jwks, OAuthStaticJwksPolicyConfig)
+            str(jwtPolicyConfig.jwks.url)
+            if isinstance(jwtPolicyConfig.jwks, OAuthStaticJwksPolicyConfig)
             else await self._discover_jwks_uri(metadata)
         )
         jwks_raw = await fetch_json(jwks_url)
@@ -299,7 +299,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         if self.config.jwt is not None:
             try:
                 jwk_set = await self._fetch_jwk_set(
-                    jwtPoliciesConfig=self.config.jwt, metadata=auth_server_metadata
+                    jwtPolicyConfig=self.config.jwt, metadata=auth_server_metadata
                 )
             except Exception:
                 logger.exception("JWKS fetch failed")
