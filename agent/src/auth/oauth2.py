@@ -16,6 +16,10 @@ from starlette.types import ASGIApp
 from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
+from src.auth.context import (
+    reset_current_authorization_header,
+    set_current_authorization_header,
+)
 from src.config.types import (
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
@@ -328,4 +332,8 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 error_description="The access token is invalid",
             )
 
-        return await call_next(request)
+        auth_header_reset_token = set_current_authorization_header(f"Bearer {token}")
+        try:
+            return await call_next(request)
+        finally:
+            reset_current_authorization_header(auth_header_reset_token)
