@@ -8,8 +8,8 @@ from src.config.types import (
     McpServerOAuthTokenForwardAuthConfig,
 )
 
-from .headers import oauth_token_forward_header_provider
-from .oauth_client_credentials import oauth_client_credentials_http_client_factory
+from .internal.headers import oauth_token_forward_header_provider
+from .internal.oauth_client_credentials import OAuthClientCredentialsAuth
 
 
 def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
@@ -20,7 +20,7 @@ def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
         if isinstance(server_config.auth, McpServerOAuthClientCredentialsAuthConfig):
             connection_params = StreamableHTTPConnectionParams(
                 url=str(server_config.url),
-                httpx_client_factory=oauth_client_credentials_http_client_factory(
+                httpx_client_factory=OAuthClientCredentialsAuth.build_factory(
                     server_config.url,
                     server_config.auth,
                 ),
