@@ -17,8 +17,7 @@ from typing_extensions import override
 
 from src.auth.constants import EXCLUDED_PATHS
 from src.auth.context import (
-    reset_current_authorization_header,
-    set_current_authorization_header,
+    bind_current_authorization_header,
 )
 from src.config.types import (
     OAuthJwtPolicyConfig,
@@ -332,8 +331,5 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 error_description="The access token is invalid",
             )
 
-        auth_header_reset_token = set_current_authorization_header(f"Bearer {token}")
-        try:
+        with bind_current_authorization_header(f"Bearer {token}"):
             return await call_next(request)
-        finally:
-            reset_current_authorization_header(auth_header_reset_token)

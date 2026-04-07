@@ -1,4 +1,6 @@
-from contextvars import ContextVar, Token
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 
 _CURRENT_AUTHORIZATION_HEADER: ContextVar[str | None] = ContextVar(
@@ -11,11 +13,12 @@ def get_current_authorization_header() -> str | None:
     return _CURRENT_AUTHORIZATION_HEADER.get()
 
 
-def set_current_authorization_header(
+@contextmanager
+def bind_current_authorization_header(
     authorization_header: str,
-) -> Token[str | None]:
-    return _CURRENT_AUTHORIZATION_HEADER.set(authorization_header)
-
-
-def reset_current_authorization_header(token: Token[str | None]) -> None:
-    _CURRENT_AUTHORIZATION_HEADER.reset(token)
+) -> Iterator[None]:
+    token = _CURRENT_AUTHORIZATION_HEADER.set(authorization_header)
+    try:
+        yield
+    finally:
+        _CURRENT_AUTHORIZATION_HEADER.reset(token)
