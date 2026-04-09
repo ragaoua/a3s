@@ -17,6 +17,7 @@ from tests.utils import get_base_test_config
 async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
     config = get_base_test_config(
         auth=ApiKeyAuthConfig(
+            mode="api_key",
             api_key=SecretStr("123"),
         ),
     )
@@ -57,6 +58,7 @@ async def test_agent_sends_401_when_wrong_api_key_is_provided() -> None:
 async def test_agent_sends_401_when_no_api_key_is_provided() -> None:
     config = get_base_test_config(
         auth=ApiKeyAuthConfig(
+            mode="api_key",
             api_key=SecretStr("123"),
         ),
     )
@@ -96,6 +98,7 @@ async def test_agent_sends_401_when_no_api_key_is_provided() -> None:
 async def test_agent_is_reachable_when_api_key_auth_is_enabled() -> None:
     config = get_base_test_config(
         auth=ApiKeyAuthConfig(
+            mode="api_key",
             api_key=SecretStr("123"),
         ),
     )

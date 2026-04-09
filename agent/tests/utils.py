@@ -7,6 +7,7 @@ from src.config.types import (
     AgentConfig,
     ApiKeyAuthConfig,
     LlmConfig,
+    McpServerConfig,
     OAuthConfig,
     ServerConfig,
 )
@@ -29,7 +30,7 @@ def get_base_test_config(
         listen_port=12345,
         listen_address=IPv4Address("127.0.0.1"),
     ),
-    mcp_servers: list[Url] = list(),
+    mcp_servers: list[McpServerConfig] = list(),
 ) -> Config:
     return Config(
         llm=llm,

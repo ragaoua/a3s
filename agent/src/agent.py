@@ -2,7 +2,6 @@ import logging
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
-from a2a.server.apps.jsonrpc import DefaultCallContextBuilder
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import (
     InMemoryPushNotificationConfigStore,
@@ -27,7 +26,6 @@ from google.adk.a2a.converters.request_converter import (
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.executor.config import A2aAgentExecutorConfig
 from google.adk.agents import LlmAgent
-from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.auth.credential_service.in_memory_credential_service import (
@@ -37,39 +35,18 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
-from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from starlette.applications import Starlette
-from starlette.requests import Request
 
 from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
 from src.config import Config
 from src.config.types import (
     ApiKeyAuthConfig,
     OAuthConfig,
-    OAuthDiscoveredJwksPolicyConfig,
-    OAuthStaticJwksPolicyConfig,
 )
 from src.logging import get_logger
+from src.mcp import get_mcp_tool_set
 
 logger = get_logger(__name__)
-
-
-def header_provider(ctx: ReadonlyContext) -> dict[str, str]:
-    authorization_header = ctx.state.get("authorization_header")
-    if isinstance(authorization_header, str) and authorization_header:
-        return {"Authorization": authorization_header}
-    return {}
-
-
-class MiddlewareCallContextBuilder(DefaultCallContextBuilder):
-    def build(self, request: Request):
-        context = super().build(request)
-
-        authorization_header = getattr(request.state, "authorization_header", None)
-        if isinstance(authorization_header, str) and authorization_header:
-            context.state["authorization_header"] = authorization_header
-
-        return context
 
 
 def request_converter(
@@ -81,19 +58,9 @@ def request_converter(
         part_converter,
     )
 
-    call_context = request.call_context
-    authorization_header = (
-        call_context.state.get("authorization_header") if call_context else None
-    )
-
-    if isinstance(authorization_header, str) and authorization_header:
-        run_request.state_delta = {
-            **(run_request.state_delta or {}),
-            "authorization_header": authorization_header,
-        }
-
     if run_request.run_config is None:
         run_request.run_config = RunConfig()
+
     run_request.run_config.streaming_mode = StreamingMode.SSE
 
     return run_request
@@ -118,11 +85,10 @@ def create_a2a_app(
 
     task_store = InMemoryTaskStore()
     push_config_store = InMemoryPushNotificationConfigStore()
+
     agent_executor = A2aAgentExecutor(
         runner=create_runner,
-        config=A2aAgentExecutorConfig(
-            request_converter=request_converter,
-        ),
+        config=A2aAgentExecutorConfig(request_converter=request_converter),
         use_legacy=False,
     )
     request_handler = DefaultRequestHandler(
@@ -195,10 +161,10 @@ def create_a2a_app(
             # access to
             supports_authenticated_extended_card=False,
         )
+
         a2a_server = A2AStarletteApplication(
             agent_card=agent_card,
             http_handler=request_handler,
-            context_builder=MiddlewareCallContextBuilder(),
         )
         a2a_server.add_routes_to_app(app)
 
@@ -216,13 +182,7 @@ def create_app(config: Config) -> Starlette:
         name=config.agent.name,
         description=config.agent.description,
         instruction=config.agent.instructions,
-        tools=[
-            McpToolset(
-                connection_params=StreamableHTTPConnectionParams(url=str(url)),
-                header_provider=header_provider,
-            )
-            for url in config.mcp_servers
-        ],
+        tools=get_mcp_tool_set(config.mcp_servers),
     )
 
     app = create_a2a_app(root_agent, config)

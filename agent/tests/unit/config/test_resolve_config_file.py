@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from src.config.config import resolve_config_file
-from src.config.constants import CONFIG_FILE_ENV_VAR_NAME, DEFAULT_CONFIG_FILE
+from src.config.config import CONFIG_FILE_ENV_VAR_NAME, DEFAULT_CONFIG_FILE
 
 
 @pytest.mark.parametrize("raw_path", [None, "", "   "])

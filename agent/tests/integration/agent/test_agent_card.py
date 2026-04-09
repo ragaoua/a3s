@@ -11,10 +11,10 @@ from src.auth import ApiKeyAuthMiddleware
 from src.config.types import (
     ApiKeyAuthConfig,
     OAuthConfig,
-    OAuthJwtPoliciesConfig,
+    OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
-    OAuthDiscoveredJwksPolicyConfig,
 )
+from src.config.types.auth import OAuthDiscoveredJwksPolicyConfig
 from tests.integration.utils import (
     start_agent_server,
     wait_for_agent_card,
@@ -27,11 +27,12 @@ from tests.utils import get_base_test_config
     ("auth"),
     [
         "none",
-        ApiKeyAuthConfig(api_key=SecretStr("abcdef")),  # API Key auth
+        ApiKeyAuthConfig(mode="api_key", api_key=SecretStr("abcdef")),  # API Key auth
         OAuthConfig(
+            mode="oauth2",
             issuer_url=Url("https://issuer.example"),
             policies=OAuthPoliciesConfig(
-                jwt=OAuthJwtPoliciesConfig(
+                jwt=OAuthJwtPolicyConfig(
                     jwks=OAuthDiscoveredJwksPolicyConfig(discovered=True)
                 )
             ),
