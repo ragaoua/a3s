@@ -1,5 +1,8 @@
+from typing import Any
+
 import pytest
-from authlib.jose.errors import ExpiredTokenError
+from authlib.jose import JsonWebKey, KeySet, jwt
+from authlib.jose.errors import ExpiredTokenError, InvalidClaimError, InvalidTokenError
 from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -13,6 +16,24 @@ from src.config.types import (
     OAuthStaticJwksPolicyConfig,
 )
 from src.config.types.auth import OAuthDiscoveredJwksPolicyConfig
+
+
+ISSUER_URL = "https://issuer.example"
+_JWK_DICT = {
+    "kty": "oct",
+    "k": "c2VjcmV0c2VjcmV0c2VjcmV0c2VjcmV0",
+    "kid": "test-key-id",
+}
+
+
+def _build_jwk_set() -> KeySet:
+    return JsonWebKey.import_key_set({"keys": [_JWK_DICT]})
+
+
+def _encode_access_token(*, claims: dict[str, Any]) -> str:
+    key = JsonWebKey.import_key(_JWK_DICT)
+    token = jwt.encode({"alg": "HS256", "kid": "test-key-id"}, claims, key)
+    return token.decode("utf-8")
 
 
 def _build_request(*, path: str, authorization: str | None = None) -> Request:
@@ -45,14 +66,12 @@ def _build_middleware(*, config: OAuthPoliciesConfig | None = None):
 
     return OAuth2BearerAuthMiddleware(
         app=app,
-        issuer_url="https://issuer.example",
+        issuer_url=ISSUER_URL,
         realm="test-realm",
         config=config
         or OAuthPoliciesConfig(
             jwt=OAuthJwtPolicyConfig(
-                jwks=OAuthStaticJwksPolicyConfig(
-                    url=Url("https://issuer.example/jwks")
-                ),
+                jwks=OAuthStaticJwksPolicyConfig(url=Url(f"{ISSUER_URL}/jwks")),
                 rfc9068=None,
                 claims={},
             )
@@ -151,6 +170,42 @@ async def test_dispatch_returns_expired_token_error_when_validation_detects_expi
         'Bearer realm="test-realm", error="invalid_token", '
         'error_description="The access token expired"'
     )
+
+
+def test_validate_access_token_accepts_tokens_without_optional_date_claims() -> None:
+    middleware = _build_middleware()
+    token = _encode_access_token(claims={"iss": ISSUER_URL})
+
+    middleware._validate_access_token(token, _build_jwk_set())
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        {"iss": ISSUER_URL, "exp": 1},
+        {"iss": ISSUER_URL, "iat": 9999999999},
+        {"iss": ISSUER_URL, "nbf": 9999999999},
+    ],
+)
+def test_validate_access_token_rejects_invalid_registered_date_claim_values(
+    claims: dict[str, Any],
+) -> None:
+    middleware = _build_middleware()
+    token = _encode_access_token(claims=claims)
+
+    with pytest.raises((ExpiredTokenError, InvalidTokenError)):
+        middleware._validate_access_token(token, _build_jwk_set())
+
+
+@pytest.mark.parametrize("claim_name", ["exp", "iat", "nbf"])
+def test_validate_access_token_rejects_malformed_registered_date_claims(
+    claim_name: str,
+) -> None:
+    middleware = _build_middleware()
+    token = _encode_access_token(claims={"iss": ISSUER_URL, claim_name: "invalid"})
+
+    with pytest.raises(InvalidClaimError, match=f"Invalid claim '{claim_name}'"):
+        middleware._validate_access_token(token, _build_jwk_set())
 
 
 @pytest.mark.asyncio

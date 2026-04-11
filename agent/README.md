@@ -109,7 +109,9 @@ Under `auth.policies`, configurable policies are:
 - token signature: use `jwt.jwks` to enable local JWT signature validation.
   Setting `jwt.jwks.discovered: true` discovers the JWKS endpoint from the
   authorization server metadata. `jwt.jwks.discovered: false` requires
-  `jwt.jwks.url` and uses that to fetch the JWKS.
+  `jwt.jwks.url` and uses that to fetch the JWKS. The token `iss` claim is
+  always validated against `auth.issuer_url`, and registered JWT date claims
+  such as `exp`, `nbf`, and `iat` are validated when present.
 - RFC 9068: `jwt.rfc9068.resource_server` enables RFC 9068 JWT access token
   validation, in which case the token's `aud` claim will be validated against
   this value. RFC 9068 validation requires `jwt.jwks` because it validates JWT

@@ -15,7 +15,6 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - OAuth2:
     - Support oneOf, containsAll etc (instead of simple exact-string matching)
       strategy for the auth.policies.claims policy
-    - Automatically validate date claims (exp, iat etc) when they are present
     - Add `private_key_jwt` as an `auth_method` for
       `auth.policies.introspection`
     - Cache auth server metadata

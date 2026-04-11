@@ -220,10 +220,12 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         }
 
     def _validate_access_token(self, token: str, jwk_set: KeySet):
+        # Base JWT validation always uses JWTClaims so registered NumericDate
+        # claims like exp/nbf/iat are validated when the token includes them.
+        claims_cls: type[JWTClaims] = JWTClaims
         claims_options: dict[str, Any] = {
             "iss": {"essential": True, "value": self.issuer_url},
         }
-        claims_cls: type[JWTClaims] | None = None
         jwt_config = self.config.jwt
 
         if jwt_config is not None and jwt_config.rfc9068 is not None:

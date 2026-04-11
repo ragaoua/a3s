@@ -6,6 +6,8 @@ Token signature validation:
 - Token signature verification is done against JWKS configured under
   `auth.policies.jwt.jwks`. The `iss` claim is validated against
   `auth.issuer_url`.
+- Registered JWT date claims such as `exp`, `nbf`, and `iat` are optional, but
+  when present they are validated according to standard JWT semantics.
 - With `auth.policies.jwt.jwks.discovered: true`, the JWKS endpoint is
   discovered from the authorization server metadata. With
   `auth.policies.jwt.jwks.discovered: false`, the agent uses
