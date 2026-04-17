@@ -118,39 +118,6 @@
             bind:value={s.oauth2IssuerUrl}
             required
           />
-
-          <FormField
-            label="OAuth2 JWKS URL"
-            id="oauth2-jwks-url"
-            name="oauth2JwksUrl"
-            type="url"
-            bind:value={s.oauth2JwksUrl}
-            placeholder="Optional. Leave empty to discover JWKS from issuer metadata"
-          />
-
-          <label
-            class="flex items-start gap-3 rounded-lg border border-neutral-700 bg-black/45 px-3 py-3 text-sm text-neutral-200"
-          >
-            <input
-              id="oauth2-rfc9068-enabled"
-              name="oauth2Rfc9068Enabled"
-              type="checkbox"
-              bind:checked={s.oauth2Rfc9068Enabled}
-              class="mt-0.5 accent-neutral-300"
-            />
-            <span>Enable RFC 9068 access token validation</span>
-          </label>
-
-          {#if s.oauth2Rfc9068Enabled}
-            <FormField
-              label="RFC 9068 resource server"
-              id="oauth2-resource-server"
-              name="oauth2ResourceServer"
-              bind:value={s.oauth2ResourceServer}
-              placeholder="Resource server identifier to validate against"
-              required
-            />
-          {/if}
         {:else}
           <div class="flex gap-3">
             <span class="text-neutral-400">Authentication will be disabled.</span>
