@@ -246,7 +246,10 @@ abstract class AgentService {
 								mode: 'api_key',
 								api_key: `\${${AGENT_API_KEY_ENV_VAR}}`
 							},
-			mcp_servers: agentConfig.mcpServers
+			mcp_servers: agentConfig.mcpServers.map((mcpServerUrl) => ({
+				url: mcpServerUrl,
+				auth: 'none'
+			}))
 		};
 
 		return {

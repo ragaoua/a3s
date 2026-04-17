@@ -45,7 +45,12 @@ export const agentRuntimeConfigSchema = z.object({
 			})
 		})
 	]),
-	mcp_servers: z.array(z.url())
+	mcp_servers: z.array(
+		z.object({
+			url: z.url(),
+			auth: z.literal('none')
+		})
+	)
 });
 
 export type AgentRuntimeConfig = z.infer<typeof agentRuntimeConfigSchema>;
