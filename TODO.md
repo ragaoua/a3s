@@ -22,29 +22,13 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     - Cache JWKS
     - Token validation errors aren't properly handled
   - OIDC:
-  - mTLS:
-  - Not particularly happy with how the authorization header is provided to MCP
-    Server (`agent.request_converter` and `agent.header_provider`). Right now,
-    run_config.custom_metadata is used as a bridge between the agent requests
-    and the mcp call requests. We're defining a "temp:authorization_header" key
-    because "temp:" is how ADK knows not to persist that custom data, but this
-    seems hacky and brittle. Relevant code:
-    - google/adk/sessions/state.py:23-25
-    - google/adk/runners.py:976-995
-    - google/adk/sessions/base_session_service.py:109-145
-    - google/adk/agents/readonly_context.py:54-56
-    - google/adk/sessions/database_session_service.py:526-530
-    - google/adk/sessions/sqlite_session_service.py:364-368
-    - google/adk/sessions/\_session_util.py:43-49
-    - google/adk/sessions/sqlite_session_service.py:389-436
-    - google/adk/sessions/database_session_service.py:539-638
+    - Support oidc well-known discovery endpoints ?
+  - mTLS: ?
 
 - agent-to-MCP auth:
   - Configure auth per MCP:
     - Add `private_key_jwt` as an `auth_method` for `mcp_servers[].auth`
-    - No auth
-    - Oauth2:
-      - Token exchange (same issuer or different one that supports ?)
+    - Oauth2 token exchange
     - API Key ?
 - Core features:
   - manage agents list
