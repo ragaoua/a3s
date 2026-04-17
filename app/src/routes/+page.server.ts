@@ -13,16 +13,13 @@ export const actions: Actions = {
 		const formData = await request.formData();
 		const formDataDict = {
 			model: trimOrUndefined(formData, 'model'),
+			apiUrl: trimOrUndefined(formData, 'apiUrl'),
+			apiKey: trimOrUndefined(formData, 'apiKey'),
 			name: trimOrUndefined(formData, 'name'),
 			description: trimOrUndefined(formData, 'description'),
 			instructions: trimOrUndefined(formData, 'instructions'),
 			authMode: trimOrUndefined(formData, 'authMode'),
-			apiKey: trimOrUndefined(formData, 'apiKey'),
 			oauth2IssuerUrl: trimOrUndefined(formData, 'oauth2IssuerUrl'),
-			oauth2JwksUrl: trimOrUndefined(formData, 'oauth2JwksUrl'),
-			oauth2Rfc9068Enabled: formData.has('oauth2Rfc9068Enabled'),
-			oauth2ResourceServer: trimOrUndefined(formData, 'oauth2ResourceServer'),
-			apiUrl: trimOrUndefined(formData, 'apiUrl'),
 			mcpServers: formData
 				.getAll('mcpServers')
 				.map((value) => String(value).trim())

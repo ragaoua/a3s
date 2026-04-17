@@ -9,9 +9,6 @@ export class DeployAgentFormState {
 
 	authMode: 'apiKey' | 'oauth2' | 'none' = $state('apiKey');
 	oauth2IssuerUrl = $state('');
-	oauth2JwksUrl = $state('');
-	oauth2Rfc9068Enabled = $state(false);
-	oauth2ResourceServer = $state('');
 
 	mcpServers: string[] = $state(['']);
 

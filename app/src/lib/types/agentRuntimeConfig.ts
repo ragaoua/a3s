@@ -10,10 +10,6 @@ const oauthJwksPolicySchema = z.discriminatedUnion('discovered', [
 	})
 ]);
 
-const oauthRfc9068PolicySchema = z.object({
-	resource_server: z.string().min(1)
-});
-
 export const agentRuntimeConfigSchema = z.object({
 	llm: z.object({
 		api_url: z.url(),
@@ -39,9 +35,9 @@ export const agentRuntimeConfigSchema = z.object({
 			mode: z.literal('oauth2'),
 			issuer_url: z.url(),
 			policies: z.object({
-				jwks: oauthJwksPolicySchema,
-				rfc9068: oauthRfc9068PolicySchema.nullish(),
-				claims: z.record(z.string().min(1), z.string().min(1))
+				jwt: z.object({
+					jwks: oauthJwksPolicySchema
+				})
 			})
 		})
 	]),
