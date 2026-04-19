@@ -165,7 +165,7 @@
               "minLength": 1,
               "title": "Skills Dir",
               "type": "string",
-              "default": "skills"
+              "default": "config/skills"
             },
             { "$ref": "#/$defs/EnvVarPlaceholder" }
           ]
