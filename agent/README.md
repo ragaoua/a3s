@@ -67,7 +67,7 @@ Configure these fields:
 
 - `llm.api_url` (**required**)
 - `llm.api_key` (**required**): use of environment variable substitution is highly
-  recommended;
+  recommended
 - `llm.model` (**required**)
 
 ## Authorization
@@ -77,7 +77,7 @@ The agent supports 3 authorization modes configured through the **required**
 
 - `auth: none`: disables auth. Not recommended in prod environments
 - `auth.mode: api_key`: enables auth through API Key
-- `auth.mode: oauth2`: enables oauth2 authorization.
+- `auth.mode: oauth2`: enables oauth2 authorization
 
 **Note**: the agent card endpoint (`/.well-known/agent-card.json`) is publicly
 accessible, even when auth is enabled.
@@ -88,7 +88,7 @@ If API Key auth is configured, the agent will look for an `API-Key` HTTP header
 for every request, and check its value against the configured API key.
 
 This mode **requires** that `auth.api_key` be set to any arbitrary string. Use of
-environment variable substitution is highly recommended;
+environment variable substitution is highly recommended.
 
 ### OAuth2
 
@@ -116,13 +116,6 @@ Under `auth.policies`, configurable policies are:
   validation, in which case the token's `aud` claim will be validated against
   this value. RFC 9068 validation requires `jwt.jwks` because it validates JWT
   structure and claims locally.
-- Token introspection: using `introspection` enables RFC 7662 token
-  introspection. `introspection.discovered: true` discovers the
-  `introspection_endpoint` from the authorization server metadata.
-  `introspection.discovered: false` uses `introspection.endpoint` directly.
-  `introspection.client_id` and `introspection.client_secret` are required.
-  `introspection.auth_method` defaults to `client_secret_basic` and also
-  supports `client_secret_post`.
 - Custom claim validation: `auth.policies.jwt.claims` adds extra claim
   validation rules. The current implementation only supports exact string
   matching. If `auth.policies.jwt.claims` contains a claim that is also
@@ -130,6 +123,13 @@ Under `auth.policies`, configurable policies are:
   validation for that claim. Do not set RFC 9068 required claims in
   `auth.policies.jwt.claims` unless you intentionally want to override that
   validation.
+- Token introspection: using `introspection` enables RFC 7662 token
+  introspection. `introspection.discovered: true` discovers the
+  `introspection_endpoint` from the authorization server metadata.
+  `introspection.discovered: false` uses `introspection.endpoint` directly.
+  `introspection.client_id` and `introspection.client_secret` are required.
+  `introspection.auth_method` defaults to `client_secret_basic` and also
+  supports `client_secret_post`.
 
 At least one of `auth.policies.jwt` or `auth.policies.introspection` must be
 configured. Both can be set simultaneously.
