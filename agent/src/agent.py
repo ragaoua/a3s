@@ -35,6 +35,8 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from google.adk.skills import list_skills_in_dir, load_skill_from_dir
+from google.adk.tools import skill_toolset
 from starlette.applications import Starlette
 
 from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
@@ -173,6 +175,13 @@ def create_a2a_app(
 
 
 def create_app(config: Config) -> Starlette:
+    mcp_toolset = get_mcp_tool_set(config.mcp_servers)
+    skills = [
+        load_skill_from_dir(f"{config.agent.skills_dir}/{skill_name}")
+        for skill_name in list_skills_in_dir(config.agent.skills_dir)
+    ]
+    skills_toolset = [skill_toolset.SkillToolset(skills=skills)] if skills else []
+
     root_agent = LlmAgent(
         model=LiteLlm(
             model=f"openai/{config.llm.model}",
@@ -182,7 +191,7 @@ def create_app(config: Config) -> Starlette:
         name=config.agent.name,
         description=config.agent.description,
         instruction=config.agent.instructions,
-        tools=get_mcp_tool_set(config.mcp_servers),
+        tools=mcp_toolset + skills_toolset,
     )
 
     app = create_a2a_app(root_agent, config)

@@ -24,17 +24,15 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - OIDC:
     - Support oidc well-known discovery endpoints ?
   - mTLS: ?
-
+- docs:
+  - Update doc regarding skills use
 - agent-to-MCP auth:
   - Configure auth per MCP:
     - Add `private_key_jwt` as an `auth_method` for `mcp_servers[].auth`
     - Oauth2 token exchange
     - API Key ?
 - Core features:
-  - manage agents list
-    - edit
-    - delete
-  - skills / subagents
+  - subagents
   - Handle MCP elicitations
   - AG-UI support ?
   - Add builtin code execution tool (with opt-in/out configuration)
@@ -64,6 +62,9 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     access to the agent ?
   - Run a deployment for agents, not a simple pod
   - Clean up per-agent ConfigMaps and Secrets when agent pods are deleted
+  - Manage agents list
+    - edit
+    - delete
 - Technical enablers:
   - Test:
     - Unit tests

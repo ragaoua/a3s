@@ -158,6 +158,17 @@
             },
             { "$ref": "#/$defs/EnvVarPlaceholder" }
           ]
+        },
+        "skills_dir": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "title": "Skills Dir",
+              "type": "string",
+              "default": "skills"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
         }
       },
       "required": ["name", "description", "instructions"],
