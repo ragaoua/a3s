@@ -11,6 +11,7 @@ agent:
   instructions: |
     You are a coding agent. Use the tools provided to access the user's requests
     regarding coding tasks.
+  # skills_dir: config/skills
 
 server:
   listen_address: 127.0.0.1

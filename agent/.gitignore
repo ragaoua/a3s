@@ -136,6 +136,7 @@ ENV/
 env.bak/
 venv.bak/
 /config/agent.yaml
+/config/skills
 
 # Spyder project settings
 .spyderproject
