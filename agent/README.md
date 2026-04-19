@@ -22,6 +22,7 @@ docker run \
     --rm \
     -p 8000:8000 \
     -v "$(pwd)/agent/config/agent.yaml:/app/config/agent.yaml:ro" \
+    -v "$(pwd)/agent/config/skills:/app/config/skills:ro" \
     -e A3S_LLM_API_KEY="your-llm-api-key" \
     a3s-agent
 ```
@@ -59,6 +60,20 @@ Basic configuration settings are:
   - "INFO"
   - "DEBUG"
 - `logging.format`: `json` or `plain`. Defaults to `plain`
+
+## Skills
+
+The engine loads all skills found under the directory pointed by
+`agent.skills_dir`. skills under this directory are expected to comply with the
+[Agent Skills specification](https://agentskills.io/specification).
+
+For the time being, agents do not have access to a code execution environment,
+so scripts provided to an agent as part of a skill (under the skill's
+`scripts` directory) cannot be used by the agent.
+
+`agent.skills_dir` is optional. It defaults to `config/skills`. If the path is
+missing, not a directory, or empty, the agent starts without loading any
+skills.
 
 ## LLM Support
 
