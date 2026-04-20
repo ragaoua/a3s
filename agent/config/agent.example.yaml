@@ -11,6 +11,9 @@ agent:
   instructions: |
     You are a coding agent. Use the tools provided to access the user's requests
     regarding coding tasks.
+  # subagents:
+  #   planner: https://planner.example.com
+  #   worker: https://worker.example.com/a2a
   # skills_dir: config/skills
 
 server:

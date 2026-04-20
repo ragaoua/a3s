@@ -86,6 +86,11 @@ so scripts provided to an agent as part of a skill (under the skill's
 missing, not a directory, or empty, the agent starts without loading any
 skills.
 
+## Subagents
+
+Configure subagents with the `agent.subagents` parameter as a mapping where the
+key is the subagent name and the value is its A2A agent URL.
+
 ## LLM Support
 
 The engine supports any OpenAI-compatible API for connecting to an LLM.

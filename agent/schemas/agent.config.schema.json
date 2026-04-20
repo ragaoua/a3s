@@ -159,6 +159,23 @@
             { "$ref": "#/$defs/EnvVarPlaceholder" }
           ]
         },
+        "subagents": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "format": "uri",
+                "minLength": 1,
+                "type": "string"
+              },
+              { "$ref": "#/$defs/EnvVarPlaceholder" }
+            ]
+          },
+          "title": "Subagents"
+        },
         "skills_dir": {
           "anyOf": [
             {

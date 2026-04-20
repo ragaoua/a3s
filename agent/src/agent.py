@@ -1,4 +1,5 @@
 import logging
+from urllib.parse import urljoin
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
@@ -18,6 +19,7 @@ from a2a.types import (
     OAuthFlows,
     SecurityScheme,
 )
+from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 from authlib.oauth2.rfc8414 import get_well_known_url
 from google.adk.a2a.converters.request_converter import (
     AgentRunRequest,
@@ -26,6 +28,7 @@ from google.adk.a2a.converters.request_converter import (
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.executor.config import A2aAgentExecutorConfig
 from google.adk.agents import LlmAgent
+from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.auth.credential_service.in_memory_credential_service import (
@@ -168,6 +171,14 @@ def create_app(config: Config) -> Starlette:
     ]
     skills_toolset = [skill_toolset.SkillToolset(skills=skills)] if skills else []
 
+    subagents = [
+        RemoteA2aAgent(
+            name=agent_name,
+            agent_card=f"{str(agent_url).rstrip('/')}/{AGENT_CARD_WELL_KNOWN_PATH.lstrip('/')}",
+        )
+        for agent_name, agent_url in config.agent.subagents.items()
+    ]
+
     root_agent = LlmAgent(
         model=LiteLlm(
             model=f"openai/{config.llm.model}",
@@ -177,6 +188,7 @@ def create_app(config: Config) -> Starlette:
         name=config.agent.name,
         description=config.agent.description,
         instruction=config.agent.instructions,
+        sub_agents=subagents,
         tools=mcp_toolset + skills_toolset,
     )
 
