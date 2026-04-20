@@ -47,6 +47,7 @@ from src.config.types import (
 )
 from src.logging import get_logger
 from src.mcp import get_mcp_tool_set
+from src.telemetry import TracingMiddleware
 
 logger = get_logger(__name__)
 
@@ -191,15 +192,18 @@ def create_app(config: Config) -> Starlette:
     )
 
     app = create_a2a_app(root_agent, config)
+    auth_mode = "none"
 
     if isinstance(config.auth, ApiKeyAuthConfig):
         logger.info("Auth mode: API Key")
+        auth_mode = "api_key"
         app.add_middleware(
             ApiKeyAuthMiddleware,
             api_key=config.auth.api_key.get_secret_value(),
         )
     elif isinstance(config.auth, OAuthConfig):
         logger.info("Auth mode: OAuth2")
+        auth_mode = "oauth2"
 
         app.add_middleware(
             OAuth2BearerAuthMiddleware,
@@ -209,5 +213,11 @@ def create_app(config: Config) -> Starlette:
         )
     else:
         logger.info("Auth disabled.")
+
+    app.add_middleware(
+        TracingMiddleware,
+        agent_name=config.agent.name,
+        auth_mode=auth_mode,
+    )
 
     return app

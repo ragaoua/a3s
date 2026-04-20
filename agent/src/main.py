@@ -8,6 +8,7 @@ import uvicorn
 from src.agent import create_app
 from src.config import load_config
 from src.logging import setup_logging
+from src.telemetry import setup_telemetry
 
 
 # We're not using LoggingManager because it
@@ -40,6 +41,7 @@ def main() -> None:
         raise SystemExit(1)
 
     setup_logging(config.logging)
+    setup_telemetry(config)
     app = create_app(config)
 
     server = uvicorn.Server(
