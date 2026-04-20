@@ -45,6 +45,17 @@ match `${ENV_VAR}`. So `agent.name: ${AGENT_NAME}` works (if `AGENT_NAME` is
 set), but not `agent.name: prefix_${AGENT_NAME}`. The latter will be left
 unchanged.
 
+## Telemetry
+
+Set `A3S_OTEL_ENABLED=true` to enable basic OpenTelemetry tracing. Traces are
+emitted to `stderr` with the console exporter.
+
+With tracing enabled, the runtime emits:
+
+- request spans for incoming HTTP traffic
+- outbound HTTP spans for auth, MCP, and other `httpx` calls
+- ADK spans such as `invocation`, `invoke_agent`, `call_llm`, and `execute_tool`
+
 ## Basic Configuration
 
 Basic configuration settings are:
