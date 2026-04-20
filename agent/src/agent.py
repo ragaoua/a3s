@@ -136,10 +136,6 @@ def create_a2a_app(
             security = None
             security_schemes = None
 
-        agent_description = agent.description
-        if isinstance(agent.instruction, str):
-            agent_description += f"\n{agent.instruction}"
-
         agent_card = AgentCard(
             name=agent.name,
             description=agent.description,
@@ -150,7 +146,7 @@ def create_a2a_app(
                 AgentSkill(
                     id=agent.name,
                     name="model",
-                    description=agent_description,
+                    description=agent.description,
                     tags=["llm"],
                 )
             ],
