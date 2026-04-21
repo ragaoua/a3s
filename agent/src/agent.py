@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urljoin
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
@@ -85,6 +84,7 @@ def create_a2a_app(
         runner=create_runner,
         config=A2aAgentExecutorConfig(request_converter=request_converter),
         use_legacy=False,
+        force_new_version=True,
     )
     request_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
