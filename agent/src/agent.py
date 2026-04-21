@@ -1,5 +1,7 @@
 import logging
 
+from a2a.client.client import ClientConfig
+from a2a.client.client_factory import ClientFactory
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -171,10 +173,15 @@ def create_app(config: Config) -> Starlette:
     ]
     skills_toolset = [skill_toolset.SkillToolset(skills=skills)] if skills else []
 
+    a2a_client_factory = ClientFactory(
+        config=ClientConfig(streaming=True),
+    )
     subagents = [
         RemoteA2aAgent(
             name=agent_name,
             agent_card=f"{str(agent_url).rstrip('/')}/{AGENT_CARD_WELL_KNOWN_PATH.lstrip('/')}",
+            use_legacy=False,
+            a2a_client_factory=a2a_client_factory,
         )
         for agent_name, agent_url in config.agent.subagents.items()
     ]
