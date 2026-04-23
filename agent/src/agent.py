@@ -56,16 +56,8 @@ def request_converter(
     request: RequestContext,
     part_converter,
 ) -> AgentRunRequest:
-    run_request = convert_a2a_request_to_agent_run_request(
-        request,
-        part_converter,
-    )
-
-    if run_request.run_config is None:
-        run_request.run_config = RunConfig()
-
+    run_request = convert_a2a_request_to_agent_run_request(request, part_converter)
     run_request.run_config.streaming_mode = StreamingMode.SSE
-
     return run_request
 
 
@@ -86,9 +78,6 @@ def create_a2a_app(
             credential_service=InMemoryCredentialService(),
         )
 
-    task_store = InMemoryTaskStore()
-    push_config_store = InMemoryPushNotificationConfigStore()
-
     agent_executor = A2aAgentExecutor(
         runner=create_runner,
         config=A2aAgentExecutorConfig(request_converter=request_converter),
@@ -96,8 +85,8 @@ def create_a2a_app(
     )
     request_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
-        task_store=task_store,
-        push_config_store=push_config_store,
+        task_store=InMemoryTaskStore(),
+        push_config_store=InMemoryPushNotificationConfigStore(),
     )
 
     rpc_url = f"http://{config.server.listen_address}:{config.server.listen_port}"
