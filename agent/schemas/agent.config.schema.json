@@ -125,6 +125,35 @@
       "required": ["api_url", "api_key", "model"],
       "title": "LlmConfig"
     },
+    "SubagentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Url",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "type": {
+          "anyOf": [
+            {
+              "enum": ["delegate", "peer"],
+              "title": "Type",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["url", "type"],
+      "title": "SubagentConfig"
+    },
     "AgentConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -165,14 +194,7 @@
             "minLength": 1
           },
           "additionalProperties": {
-            "anyOf": [
-              {
-                "format": "uri",
-                "minLength": 1,
-                "type": "string"
-              },
-              { "$ref": "#/$defs/EnvVarPlaceholder" }
-            ]
+            "$ref": "#/$defs/SubagentConfig"
           },
           "title": "Subagents"
         },

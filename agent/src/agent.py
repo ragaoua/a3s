@@ -28,7 +28,7 @@ from google.adk.a2a.converters.request_converter import (
 )
 from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.executor.config import A2aAgentExecutorConfig
-from google.adk.agents import LlmAgent
+from google.adk.agents import BaseAgent, LlmAgent
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
@@ -40,7 +40,8 @@ from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from google.adk.skills import list_skills_in_dir, load_skill_from_dir
-from google.adk.tools import skill_toolset
+from google.adk.tools import agent_tool, skill_toolset
+from google.adk.tools.base_tool import BaseTool
 from starlette.applications import Starlette
 
 from src.auth import ApiKeyAuthMiddleware, OAuth2BearerAuthMiddleware
@@ -176,15 +177,20 @@ def create_app(config: Config) -> Starlette:
     a2a_client_factory = ClientFactory(
         config=ClientConfig(streaming=True),
     )
-    subagents = [
-        RemoteA2aAgent(
+
+    delegate_subagents: list[BaseAgent] = []
+    peer_subagents: list[agent_tool.AgentTool] = []
+    for agent_name, agent_config in config.agent.subagents.items():
+        remote_agent = RemoteA2aAgent(
             name=agent_name,
-            agent_card=f"{str(agent_url).rstrip('/')}/{AGENT_CARD_WELL_KNOWN_PATH.lstrip('/')}",
+            agent_card=f"{str(agent_config.url).rstrip('/')}/{AGENT_CARD_WELL_KNOWN_PATH.lstrip('/')}",
             use_legacy=False,
             a2a_client_factory=a2a_client_factory,
         )
-        for agent_name, agent_url in config.agent.subagents.items()
-    ]
+        if agent_config.type == "delegate":
+            delegate_subagents.append(remote_agent)
+        else:
+            peer_subagents.append(agent_tool.AgentTool(remote_agent))
 
     root_agent = LlmAgent(
         model=LiteLlm(
@@ -195,8 +201,8 @@ def create_app(config: Config) -> Starlette:
         name=config.agent.name,
         description=config.agent.description,
         instruction=config.agent.instructions,
-        sub_agents=subagents,
-        tools=mcp_toolset + skills_toolset,
+        sub_agents=delegate_subagents,
+        tools=mcp_toolset + skills_toolset + peer_subagents,
     )
 
     app = create_a2a_app(root_agent, config)

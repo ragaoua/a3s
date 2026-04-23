@@ -12,8 +12,12 @@ agent:
     You are a coding agent. Use the tools provided to access the user's requests
     regarding coding tasks.
   # subagents:
-  #   planner: https://planner.example.com
-  #   worker: https://worker.example.com/a2a
+  #   planner:
+  #     url: https://planner.example.com
+  #     type: delegate
+  #   worker:
+  #     url: https://worker.example.com/a2a
+  #     type: peer
   # skills_dir: config/skills
 
 server:

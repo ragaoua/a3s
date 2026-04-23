@@ -89,7 +89,16 @@ skills.
 ## Subagents
 
 Configure subagents with the `agent.subagents` parameter as a mapping where the
-key is the subagent name and the value is its A2A agent URL.
+key is the subagent's name and the value is an object with `url` (the
+subagent's URL) and `type`. Supported types are:
+
+- `delegate`: delegate agents are subagents that the main agent can transfer a
+  client request to at any time. In that case, the exact request is handed-off
+  to the subagent and its response it transferred as-is to the client. The main
+  agent can only hand a request off to one delegate at a time.
+- `peer`: a peer agent is a subagent that the main agent can communicate with
+  (assign a task, ask questions...) as part of the process of answering a
+  client request.
 
 ## LLM Support
 
