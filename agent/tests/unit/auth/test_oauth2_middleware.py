@@ -7,9 +7,9 @@ from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-import src.auth.oauth2 as oauth2_module
-from src.auth.constants import EXCLUDED_PATHS
-from src.auth.oauth2 import OAuth2BearerAuthMiddleware
+import src.auth.inbound.oauth2 as oauth2_module
+from src.auth.inbound.constants import EXCLUDED_PATHS
+from src.auth.inbound.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,

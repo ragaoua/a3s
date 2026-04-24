@@ -89,8 +89,35 @@ skills.
 ## Subagents
 
 Configure subagents with the `agent.subagents` parameter as a mapping where the
-key is the subagent's name and the value is an object with `url` (the
-subagent's URL) and `type`. Supported types are:
+key is the subagent's name and the value is an object with `url`, `type`, and
+`auth`:
+
+```yaml
+agent:
+  subagents:
+    planner:
+      url: https://planner.example.com
+      type: delegate
+      auth: none
+
+    worker1:
+      url: https://worker.example.com/a2a
+      type: peer
+      auth:
+        mode: api_key
+        api_key: ${A3S_WORKER1_API_KEY}
+
+    worker2:
+      url: https://worker.example.com/a2a
+      type: peer
+      auth:
+        mode: oauth_client_credentials
+        token_endpoint: https://auth-server.example.com/oauth/token
+        client_id: myclient
+        client_secret: ${A3S_WORKER2_CLIENT_SECRET}
+```
+
+Supported subagent types are:
 
 - `delegate`: delegate agents are subagents that the main agent can transfer a
   client request to at any time. In that case, the exact request is handed-off
@@ -99,6 +126,22 @@ subagent's URL) and `type`. Supported types are:
 - `peer`: a peer agent is a subagent that the main agent can communicate with
   (assign a task, ask questions...) as part of the process of answering a
   client request.
+
+Supported subagent auth modes are:
+
+- `auth: none`: no authorization is added to requests sent to that subagent.
+- `auth.mode: api_key`: the agent sends the configured API key in the `API-Key`
+  header.
+- `auth.mode: oauth_client_credentials`: the agent obtains an access token for
+  that subagent using the configured `token_endpoint`, `client_id`, and
+  `client_secret`. `auth_method` defaults to `client_secret_basic` and also
+  supports `client_secret_post`.
+- `auth.mode: oauth_token_forward`: the agent forwards the inbound
+  `Authorization` header to that subagent. This requires root-level
+  `auth.mode: oauth2`.
+- `auth.mode: oauth_token_exchange`: the config shape is defined, and it also
+  requires root-level `auth.mode: oauth2`, but this mode is not implemented yet
+  and currently fails closed at runtime.
 
 ## LLM Support
 
@@ -201,8 +244,7 @@ mcp_servers:
 
 Supported MCP auth modes are:
 
-- `auth: none`: no authorization is added to MCP requests. The MCP server must
-  accept unauthenticated access.
+- `auth: none`: no authorization is added to MCP requests.
 - `auth.mode: oauth_client_credentials`: the agent obtains a token for that MCP
   server using the configured `token_endpoint`, `client_id`, and
   `client_secret`. `auth_method` defaults to `client_secret_basic` and also
