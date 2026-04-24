@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import jwt
 import pytest
 
-from src.mcp.internal.token_helpers import (
+from src.auth.outbound.internal.token_helpers import (
     get_access_token_expiry_date,
     get_exp_datetime_from_jwt,
 )

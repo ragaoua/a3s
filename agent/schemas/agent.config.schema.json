@@ -36,49 +36,6 @@
     }
   },
   "required": ["llm", "agent", "auth"],
-  "allOf": [
-    {
-      "if": {
-        "required": ["mcp_servers"],
-        "properties": {
-          "mcp_servers": {
-            "contains": {
-              "type": "object",
-              "required": ["auth"],
-              "properties": {
-                "auth": {
-                  "type": "object",
-                  "required": ["mode"],
-                  "properties": {
-                    "mode": {
-                      "enum": [
-                        "oauth_token_forward",
-                        "oauth_token_exchange"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "then": {
-        "properties": {
-          "auth": {
-            "type": "object",
-            "required": ["mode"],
-            "properties": {
-              "mode": {
-                "const": "oauth2",
-                "type": "string"
-              }
-            }
-          }
-        }
-      }
-    }
-  ],
   "$defs": {
     "EnvVarPlaceholder": {
       "type": "string",
@@ -125,6 +82,46 @@
       "required": ["api_url", "api_key", "model"],
       "title": "LlmConfig"
     },
+    "SubagentConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Url",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "type": {
+          "anyOf": [
+            {
+              "enum": ["delegate", "peer"],
+              "title": "Type",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "auth": {
+          "anyOf": [
+            { "const": "none", "type": "string" },
+            { "$ref": "#/$defs/OAuthTokenForwardAuthConfig" },
+            { "$ref": "#/$defs/OAuthClientCredentialsAuthConfig" },
+            { "$ref": "#/$defs/OAuthDiscoveredTokenExchangeAuthConfig" },
+            { "$ref": "#/$defs/OAuthStaticTokenExchangeAuthConfig" },
+            { "$ref": "#/$defs/OutboundApiKeyAuthConfig" }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": ["url", "type", "auth"],
+      "title": "SubagentConfig"
+    },
     "AgentConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -158,6 +155,16 @@
             },
             { "$ref": "#/$defs/EnvVarPlaceholder" }
           ]
+        },
+        "subagents": {
+          "type": "object",
+          "propertyNames": {
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/SubagentConfig"
+          },
+          "title": "Subagents"
         },
         "skills_dir": {
           "anyOf": [
@@ -528,6 +535,36 @@
       "required": ["mode", "api_key"],
       "title": "ApiKeyAuthConfig"
     },
+    "OutboundApiKeyAuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            {
+              "const": "api_key",
+              "title": "Mode",
+              "type": "string"
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        },
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Api Key",
+              "type": "string",
+              "writeOnly": true
+            },
+            { "$ref": "#/$defs/EnvVarPlaceholder" }
+          ]
+        }
+      },
+      "required": ["mode", "api_key"],
+      "title": "OutboundApiKeyAuthConfig"
+    },
     "McpServerConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -546,10 +583,10 @@
         "auth": {
           "anyOf": [
             { "const": "none", "type": "string" },
-            { "$ref": "#/$defs/McpServerOAuthTokenForwardAuthConfig" },
-            { "$ref": "#/$defs/McpServerOAuthClientCredentialsAuthConfig" },
-            { "$ref": "#/$defs/McpServerOAuthDiscoveredTokenExchangeAuthConfig" },
-            { "$ref": "#/$defs/McpServerOAuthStaticTokenExchangeAuthConfig" }
+            { "$ref": "#/$defs/OAuthTokenForwardAuthConfig" },
+            { "$ref": "#/$defs/OAuthClientCredentialsAuthConfig" },
+            { "$ref": "#/$defs/OAuthDiscoveredTokenExchangeAuthConfig" },
+            { "$ref": "#/$defs/OAuthStaticTokenExchangeAuthConfig" }
           ],
           "title": "Auth"
         }
@@ -557,7 +594,7 @@
       "required": ["url", "auth"],
       "title": "McpServerConfig"
     },
-    "McpServerOAuthTokenForwardAuthConfig": {
+    "OAuthTokenForwardAuthConfig": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -573,9 +610,9 @@
         }
       },
       "required": ["mode"],
-      "title": "McpServerOAuthTokenForwardAuthConfig"
+      "title": "OAuthTokenForwardAuthConfig"
     },
-    "McpServerOAuthClientCredentialsAuthConfig": {
+    "OAuthClientCredentialsAuthConfig": {
       "additionalProperties": false,
       "properties": {
         "mode": {
@@ -612,10 +649,10 @@
         }
       },
       "required": ["client_id", "client_secret", "mode", "token_endpoint"],
-      "title": "McpServerOAuthClientCredentialsAuthConfig",
+      "title": "OAuthClientCredentialsAuthConfig",
       "type": "object"
     },
-    "McpServerOAuthDiscoveredTokenExchangeAuthConfig": {
+    "OAuthDiscoveredTokenExchangeAuthConfig": {
       "additionalProperties": false,
       "properties": {
         "mode": {
@@ -652,10 +689,10 @@
         }
       },
       "required": ["client_id", "client_secret", "mode"],
-      "title": "McpServerOAuthDiscoveredTokenExchangeAuthConfig",
+      "title": "OAuthDiscoveredTokenExchangeAuthConfig",
       "type": "object"
     },
-    "McpServerOAuthStaticTokenExchangeAuthConfig": {
+    "OAuthStaticTokenExchangeAuthConfig": {
       "additionalProperties": false,
       "properties": {
         "mode": {
@@ -703,7 +740,7 @@
         "mode",
         "token_endpoint"
       ],
-      "title": "McpServerOAuthStaticTokenExchangeAuthConfig",
+      "title": "OAuthStaticTokenExchangeAuthConfig",
       "type": "object"
     },
     "LoggingConfig": {

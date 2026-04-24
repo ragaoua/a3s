@@ -1,5 +1,5 @@
 from .llm import LlmConfig
-from .agent import AgentConfig
+from .agent import AgentConfig, SubagentConfig
 from .auth import (
     ApiKeyAuthConfig,
     OAuthConfig,
@@ -9,17 +9,20 @@ from .auth import (
     OAuthStaticIntrospectionPolicyConfig,
 )
 from .server import ServerConfig
-from .mcp_servers import (
-    McpServerConfig,
-    McpServerOAuthClientCredentialsAuthConfig,
-    McpServerOAuthTokenExchangeAuthConfig,
-    McpServerOAuthTokenForwardAuthConfig,
+from .mcp_servers import McpServerConfig
+from .outbound_auth import (
+    OAuthTokenForwardAuthConfig,
+    OAuthClientCredentialsAuthConfig,
+    OAuthTokenExchangeAuthConfig,
+    OAuthDiscoveredTokenExchangeAuthConfig,
+    OutboundApiKeyAuthConfig,
 )
 from .logging import LoggingConfig
 
 __all__ = [
     "LlmConfig",
     "AgentConfig",
+    "SubagentConfig",
     "ApiKeyAuthConfig",
     "OAuthConfig",
     "OAuthPoliciesConfig",
@@ -28,8 +31,10 @@ __all__ = [
     "OAuthStaticIntrospectionPolicyConfig",
     "ServerConfig",
     "McpServerConfig",
-    "McpServerOAuthClientCredentialsAuthConfig",
-    "McpServerOAuthTokenExchangeAuthConfig",
-    "McpServerOAuthTokenForwardAuthConfig",
+    "OAuthTokenForwardAuthConfig",
+    "OAuthClientCredentialsAuthConfig",
+    "OAuthTokenExchangeAuthConfig",
+    "OAuthDiscoveredTokenExchangeAuthConfig",
+    "OutboundApiKeyAuthConfig",
     "LoggingConfig",
 ]

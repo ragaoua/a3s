@@ -15,7 +15,7 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 from typing_extensions import override
 
-from src.auth.constants import EXCLUDED_PATHS
+from src.auth.inbound.constants import EXCLUDED_PATHS
 from src.auth.context import (
     bind_current_authorization_header,
 )

@@ -7,7 +7,7 @@ from authlib.oauth2.rfc8414 import get_well_known_url
 from pydantic import SecretStr
 from pydantic_core import Url
 
-from src.auth import ApiKeyAuthMiddleware
+from src.auth.inbound import ApiKeyAuthMiddleware
 from src.config.types import (
     ApiKeyAuthConfig,
     OAuthConfig,

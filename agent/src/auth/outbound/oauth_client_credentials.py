@@ -9,11 +9,10 @@ import httpx
 from mcp.shared._httpx_utils import create_mcp_http_client
 from pydantic_core import Url
 
-from src.config.types import McpServerOAuthClientCredentialsAuthConfig
-from src.mcp.internal.types import AccessTokenCacheKey, AccessTokenInfo
+from src.config.types import OAuthClientCredentialsAuthConfig
+from src.auth.outbound.internal.types import AccessTokenCacheKey, AccessTokenInfo
 from src.utils import fetch_json
-
-from .token_helpers import get_access_token_expiry_date
+from src.auth.outbound.internal.token_helpers import get_access_token_expiry_date
 
 
 class OAuthClientCredentialsAuth(httpx.Auth):
@@ -33,12 +32,10 @@ class OAuthClientCredentialsAuth(httpx.Auth):
     def __init__(
         self,
         server_url: Url,
-        server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+        server_auth_config: OAuthClientCredentialsAuthConfig,
     ):
         self._server_url: Url = server_url
-        self._server_auth_config: McpServerOAuthClientCredentialsAuthConfig = (
-            server_auth_config
-        )
+        self._server_auth_config: OAuthClientCredentialsAuthConfig = server_auth_config
         self._cache_key: AccessTokenCacheKey = AccessTokenCacheKey(
             server_auth_config.token_endpoint,
             server_auth_config.client_id,
@@ -47,7 +44,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
     @staticmethod
     def build_factory(
         server_url: Url,
-        server_auth_config: McpServerOAuthClientCredentialsAuthConfig,
+        server_auth_config: OAuthClientCredentialsAuthConfig,
     ):
         def factory(
             headers: dict[str, str] | None = None,
@@ -180,7 +177,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 content=urlencode(body).encode("utf-8"),
             ),
             error_message=(
-                f"Failed to fetch OAuth2 access token for MCP server '{self._server_url}'"
+                f"Failed to fetch OAuth2 access token for server '{self._server_url}'"
             ),
         )
         access_token = token_response.get("access_token")

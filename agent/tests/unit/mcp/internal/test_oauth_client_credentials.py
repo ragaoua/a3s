@@ -9,10 +9,10 @@ from pydantic import SecretStr
 import pytest
 from pydantic_core import Url
 
-import src.mcp.internal.oauth_client_credentials as oauth_client_credentials_module
-from src.config.types import McpServerOAuthClientCredentialsAuthConfig
-from src.mcp.internal.oauth_client_credentials import OAuthClientCredentialsAuth
-from src.mcp.internal.types import AccessTokenInfo
+import src.auth.outbound.oauth_client_credentials as oauth_client_credentials_module
+from src.config.types import OAuthClientCredentialsAuthConfig
+from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
+from src.auth.outbound.internal.types import AccessTokenInfo
 
 
 @pytest.fixture(autouse=True)
@@ -31,7 +31,7 @@ def _build_auth(
 ) -> OAuthClientCredentialsAuth:
     return OAuthClientCredentialsAuth(
         server_url=Url("https://mcp.example"),
-        server_auth_config=McpServerOAuthClientCredentialsAuthConfig(
+        server_auth_config=OAuthClientCredentialsAuthConfig(
             mode="oauth_client_credentials",
             token_endpoint=Url("https://issuer.example/oauth/token"),
             client_id="client-id",

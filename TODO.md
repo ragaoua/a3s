@@ -31,6 +31,8 @@ Non-exhaustive list of features and enablers to implement; subject to change.
     - Add `private_key_jwt` as an `auth_method` for `mcp_servers[].auth`
     - Oauth2 token exchange
     - API Key ?
+- agent-to-agent auth:
+  - Allow for configuring the header name which still should default to "API-Key"
 - Core features:
   - subagents
   - Handle MCP elicitations

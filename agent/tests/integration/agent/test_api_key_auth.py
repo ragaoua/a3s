@@ -3,7 +3,7 @@ from pydantic import SecretStr
 import pytest
 from a2a.client import A2AClient, A2AClientHTTPError
 
-from src.auth import ApiKeyAuthMiddleware
+from src.auth.inbound import ApiKeyAuthMiddleware
 from src.config.types import ApiKeyAuthConfig
 from tests.integration.utils import (
     run_single_turn_test,

@@ -76,53 +76,6 @@ class Config(StrictModel):
     model_config = ConfigDict(
         title="A3S Agent Config",
         extra="forbid",
-        # `"allOf": ...` is necessary here to signal that if one MCP Server is
-        # configured with `auth` set to a `mode` that requires an oauth token,
-        # the root-level `auth.mode` should be set to oauth2. This is the JSON
-        # schema transcription of the `validate_policies` model validator
-        # method below.
-        json_schema_extra={
-            "allOf": [
-                {
-                    "if": {
-                        "required": ["mcp_servers"],
-                        "properties": {
-                            "mcp_servers": {
-                                "contains": {
-                                    "type": "object",
-                                    "required": ["auth"],
-                                    "properties": {
-                                        "auth": {
-                                            "type": "object",
-                                            "required": ["mode"],
-                                            "properties": {
-                                                "mode": {
-                                                    "enum": [
-                                                        "oauth_token_forward",
-                                                        "oauth_token_exchange",
-                                                    ]
-                                                }
-                                            },
-                                        }
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "then": {
-                        "properties": {
-                            "auth": {
-                                "type": "object",
-                                "required": ["mode"],
-                                "properties": {
-                                    "mode": {"const": "oauth2", "type": "string"}
-                                },
-                            }
-                        }
-                    },
-                }
-            ]
-        },
     )
 
     llm: LlmConfig
@@ -133,17 +86,28 @@ class Config(StrictModel):
     logging: LoggingConfig = LoggingConfig()
 
     @model_validator(mode="after")
-    def validate_mcp_server_auth_requires_oauth2(self):
+    def validate_outbound_auth_requires_oauth2(self):
         if isinstance(self.auth, OAuthConfig):
             return self
 
-        for index, serverConfig in enumerate(self.mcp_servers):
-            if serverConfig.auth != "none" and (
-                serverConfig.auth.mode
-                in ["oauth_token_forward", "oauth_token_exchange"]
+        oauth_token_modes = {"oauth_token_forward", "oauth_token_exchange"}
+
+        for index, server_config in enumerate(self.mcp_servers):
+            if (
+                server_config.auth != "none"
+                and server_config.auth.mode in oauth_token_modes
             ):
                 raise ValueError(
-                    f"`mcp_servers[{index}].auth.mode` '{serverConfig.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
+                    f"`mcp_servers[{index}].auth.mode` '{server_config.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
+                )
+
+        for name, subagent_config in self.agent.subagents.items():
+            if (
+                subagent_config.auth != "none"
+                and subagent_config.auth.mode in oauth_token_modes
+            ):
+                raise ValueError(
+                    f"`agent.subagents['{name}'].auth.mode` '{subagent_config.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
                 )
 
         return self

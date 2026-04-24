@@ -4,10 +4,10 @@ from pydantic_core import Url
 import src.mcp.core as mcp_core
 from src.config.types import (
     McpServerConfig,
-    McpServerOAuthClientCredentialsAuthConfig,
-    McpServerOAuthTokenForwardAuthConfig,
+    OAuthClientCredentialsAuthConfig,
+    OAuthDiscoveredTokenExchangeAuthConfig,
+    OAuthTokenForwardAuthConfig,
 )
-from src.config.types.mcp_servers import McpServerOAuthDiscoveredTokenExchangeAuthConfig
 
 
 def _patch_mcp_builders(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict]]:
@@ -74,7 +74,7 @@ def test_get_mcp_tool_set_uses_header_provider_for_token_forward_auth(
     config = [
         McpServerConfig(
             url=Url("https://mcp.example/server"),
-            auth=McpServerOAuthTokenForwardAuthConfig(mode="oauth_token_forward"),
+            auth=OAuthTokenForwardAuthConfig(mode="oauth_token_forward"),
         )
     ]
 
@@ -99,13 +99,11 @@ def test_get_mcp_tool_set_uses_client_credentials_httpx_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = _patch_mcp_builders(monkeypatch)
-    build_factory_calls: list[
-        tuple[Url, McpServerOAuthClientCredentialsAuthConfig]
-    ] = []
+    build_factory_calls: list[tuple[Url, OAuthClientCredentialsAuthConfig]] = []
     factory = object()
     server_config = McpServerConfig(
         url=Url("https://mcp.example/server"),
-        auth=McpServerOAuthClientCredentialsAuthConfig(
+        auth=OAuthClientCredentialsAuthConfig(
             mode="oauth_client_credentials",
             token_endpoint=Url("https://issuer.example/oauth/token"),
             client_id="client-id",
@@ -149,7 +147,7 @@ def test_get_mcp_tool_set_raises_for_token_exchange_auth() -> None:
     config = [
         McpServerConfig(
             url=Url("https://mcp.example/server"),
-            auth=McpServerOAuthDiscoveredTokenExchangeAuthConfig(
+            auth=OAuthDiscoveredTokenExchangeAuthConfig(
                 mode="oauth_token_exchange",
                 client_id="client-id",
                 client_secret="client-secret",

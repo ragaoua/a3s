@@ -5,7 +5,7 @@ import pytest
 from authlib.jose import JsonWebKey, KeySet, jwt
 from authlib.jose.errors import InvalidClaimError, MissingClaimError
 
-from src.auth.oauth2 import OAuth2BearerAuthMiddleware
+from src.auth.inbound.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
