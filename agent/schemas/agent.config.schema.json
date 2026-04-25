@@ -1,625 +1,234 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A3S Agent Config",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "llm": { "$ref": "#/$defs/LlmConfig" },
-    "agent": { "$ref": "#/$defs/AgentConfig" },
-    "server": {
-      "$ref": "#/$defs/ServerConfig",
-      "default": {
-        "listen_address": "127.0.0.1",
-        "listen_port": 8000
-      }
-    },
-    "auth": {
-      "anyOf": [
-        { "$ref": "#/$defs/OAuthConfig" },
-        { "$ref": "#/$defs/ApiKeyAuthConfig" },
-        { "const": "none", "type": "string" }
-      ],
-      "title": "Auth"
-    },
-    "mcp_servers": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/McpServerConfig" },
-      "default": [],
-      "title": "Mcp Servers"
-    },
-    "logging": {
-      "$ref": "#/$defs/LoggingConfig",
-      "default": {
-        "level": "INFO",
-        "format": "plain"
-      }
-    }
-  },
-  "required": ["llm", "agent", "auth"],
   "$defs": {
     "EnvVarPlaceholder": {
       "type": "string",
       "pattern": "^\\$\\{[^}]+\\}$"
     },
+    "AgentConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            }
+          ]
+        },
+        "description": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "minLength": 1,
+              "title": "Description",
+              "type": "string"
+            }
+          ]
+        },
+        "instructions": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "minLength": 1,
+              "title": "Instructions",
+              "type": "string"
+            }
+          ]
+        },
+        "subagents": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SubagentConfig"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Subagents",
+          "type": "object"
+        },
+        "skills_dir": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": "config/skills",
+              "minLength": 1,
+              "title": "Skills Dir",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "instructions"
+      ],
+      "title": "AgentConfig",
+      "type": "object"
+    },
+    "ApiKeyAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": "api_key",
+              "title": "Mode",
+              "type": "string"
+            }
+          ]
+        },
+        "api_key": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Api Key",
+              "type": "string",
+              "writeOnly": true
+            }
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "api_key"
+      ],
+      "title": "ApiKeyAuthConfig",
+      "type": "object"
+    },
     "LlmConfig": {
-      "type": "object",
       "additionalProperties": false,
       "properties": {
         "api_url": {
           "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
               "format": "uri",
               "minLength": 1,
               "title": "Api Url",
               "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
+            }
           ]
         },
         "api_key": {
           "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
               "format": "password",
               "minLength": 1,
               "title": "Api Key",
               "type": "string",
               "writeOnly": true
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
+            }
           ]
         },
         "model": {
           "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
               "minLength": 1,
               "title": "Model",
               "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["api_url", "api_key", "model"],
-      "title": "LlmConfig"
-    },
-    "SubagentConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "url": {
-          "anyOf": [
-            {
-              "format": "uri",
-              "minLength": 1,
-              "title": "Url",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "type": {
-          "anyOf": [
-            {
-              "enum": ["delegate", "peer"],
-              "title": "Type",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "auth": {
-          "anyOf": [
-            { "const": "none", "type": "string" },
-            { "$ref": "#/$defs/OAuthTokenForwardAuthConfig" },
-            { "$ref": "#/$defs/OAuthClientCredentialsAuthConfig" },
-            { "$ref": "#/$defs/OAuthDiscoveredTokenExchangeAuthConfig" },
-            { "$ref": "#/$defs/OAuthStaticTokenExchangeAuthConfig" },
-            { "$ref": "#/$defs/OutboundApiKeyAuthConfig" }
-          ],
-          "title": "Auth"
-        }
-      },
-      "required": ["url", "type", "auth"],
-      "title": "SubagentConfig"
-    },
-    "AgentConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "name": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Name",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "description": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Description",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "instructions": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Instructions",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "subagents": {
-          "type": "object",
-          "propertyNames": {
-            "minLength": 1
-          },
-          "additionalProperties": {
-            "$ref": "#/$defs/SubagentConfig"
-          },
-          "title": "Subagents"
-        },
-        "skills_dir": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Skills Dir",
-              "type": "string",
-              "default": "config/skills"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["name", "description", "instructions"],
-      "title": "AgentConfig"
-    },
-    "ServerConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "listen_address": {
-          "anyOf": [
-            {
-              "format": "ipv4",
-              "type": "string"
-            },
-            {
-              "const": "localhost",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ],
-          "default": "127.0.0.1",
-          "title": "Listen Address"
-        },
-        "listen_port": {
-          "anyOf": [
-            {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65535,
-              "default": 8000,
-              "title": "Listen Port"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "title": "ServerConfig"
-    },
-    "OAuthConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "mode": {
-          "anyOf": [
-            {
-              "const": "oauth2",
-              "title": "Mode",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "issuer_url": {
-          "anyOf": [
-            {
-              "format": "uri",
-              "minLength": 1,
-              "title": "Issuer Url",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "policies": {
-          "$ref": "#/$defs/OAuthPoliciesConfig"
-        }
-      },
-      "required": ["mode", "issuer_url", "policies"],
-      "title": "OAuthConfig"
-    },
-    "OAuthPoliciesConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "jwt": {
-          "anyOf": [
-            { "$ref": "#/$defs/OAuthJwtPolicyConfig" },
-            { "type": "null" }
-          ],
-          "default": null
-        },
-        "introspection": {
-          "anyOf": [
-            { "$ref": "#/$defs/OAuthDiscoveredIntrospectionPolicyConfig" },
-            { "$ref": "#/$defs/OAuthStaticIntrospectionPolicyConfig" },
-            { "type": "null" }
-          ],
-          "default": null,
-          "title": "Introspection"
-        }
-      },
-      "anyOf": [
-        {
-          "required": ["jwt"],
-          "properties": {
-            "jwt": { "not": { "type": "null" } }
-          }
-        },
-        {
-          "required": ["introspection"],
-          "properties": {
-            "introspection": {
-              "not": { "type": "null" }
             }
-          }
+          ]
         }
+      },
+      "required": [
+        "api_url",
+        "api_key",
+        "model"
       ],
-      "title": "OAuthPoliciesConfig"
+      "title": "LlmConfig",
+      "type": "object"
     },
-    "OAuthJwtPolicyConfig": {
-      "type": "object",
+    "LoggingConfig": {
       "additionalProperties": false,
       "properties": {
-        "jwks": {
+        "level": {
           "anyOf": [
-            { "$ref": "#/$defs/OAuthDiscoveredJwksPolicyConfig" },
-            { "$ref": "#/$defs/OAuthStaticJwksPolicyConfig" }
-          ],
-          "title": "Jwks"
-        },
-        "rfc9068": {
-          "anyOf": [
-            { "$ref": "#/$defs/OAuthRfc9068PolicyConfig" },
-            { "type": "null" }
-          ],
-          "default": null
-        },
-        "claims": {
-          "type": "object",
-          "propertyNames": {
-            "minLength": 1
-          },
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "minLength": 1,
-                "type": "string"
-              },
-              { "$ref": "#/$defs/EnvVarPlaceholder" }
-            ]
-          },
-          "title": "Claims"
-        }
-      },
-      "required": ["jwks"],
-      "title": "OAuthJwtPolicyConfig"
-    },
-    "OAuthDiscoveredJwksPolicyConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "discovered": {
-          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
-              "const": true,
-              "default": true,
-              "title": "Discovered",
-              "type": "boolean"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "title": "OAuthDiscoveredJwksPolicyConfig"
-    },
-    "OAuthStaticJwksPolicyConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "discovered": {
-          "anyOf": [
-            {
-              "const": false,
-              "default": false,
-              "title": "Discovered",
-              "type": "boolean"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "url": {
-          "anyOf": [
-            {
-              "format": "uri",
-              "minLength": 1,
-              "title": "Url",
+              "default": "INFO",
+              "enum": [
+                "INFO",
+                "DEBUG",
+                "WARNING",
+                "ERROR"
+              ],
+              "title": "Level",
               "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
+            }
+          ]
+        },
+        "format": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": "plain",
+              "enum": [
+                "plain",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
           ]
         }
       },
-      "required": ["url"],
-      "title": "OAuthStaticJwksPolicyConfig"
-    },
-    "OAuthRfc9068PolicyConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "resource_server": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Resource Server",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["resource_server"],
-      "title": "OAuthRfc9068PolicyConfig"
-    },
-    "OAuthDiscoveredIntrospectionPolicyConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "discovered": {
-          "anyOf": [
-            {
-              "const": true,
-              "default": true,
-              "title": "Discovered",
-              "type": "boolean"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "client_id": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Client Id",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "client_secret": {
-          "anyOf": [
-            {
-              "format": "password",
-              "minLength": 1,
-              "title": "Client Secret",
-              "type": "string",
-              "writeOnly": true
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "auth_method": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": ["client_secret_basic", "client_secret_post"],
-              "default": "client_secret_basic",
-              "title": "Auth Method"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["client_id", "client_secret"],
-      "title": "OAuthDiscoveredIntrospectionPolicyConfig"
-    },
-    "OAuthStaticIntrospectionPolicyConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "discovered": {
-          "anyOf": [
-            {
-              "const": false,
-              "default": false,
-              "title": "Discovered",
-              "type": "boolean"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "endpoint": {
-          "anyOf": [
-            {
-              "format": "uri",
-              "minLength": 1,
-              "title": "Endpoint",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "client_id": {
-          "anyOf": [
-            {
-              "minLength": 1,
-              "title": "Client Id",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "client_secret": {
-          "anyOf": [
-            {
-              "format": "password",
-              "minLength": 1,
-              "title": "Client Secret",
-              "type": "string",
-              "writeOnly": true
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "auth_method": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": ["client_secret_basic", "client_secret_post"],
-              "default": "client_secret_basic",
-              "title": "Auth Method"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["client_id", "client_secret", "endpoint"],
-      "title": "OAuthStaticIntrospectionPolicyConfig"
-    },
-    "ApiKeyAuthConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "mode": {
-          "anyOf": [
-            {
-              "const": "api_key",
-              "title": "Mode",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "api_key": {
-          "anyOf": [
-            {
-              "format": "password",
-              "minLength": 1,
-              "title": "Api Key",
-              "type": "string",
-              "writeOnly": true
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["mode", "api_key"],
-      "title": "ApiKeyAuthConfig"
-    },
-    "OutboundApiKeyAuthConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "mode": {
-          "anyOf": [
-            {
-              "const": "api_key",
-              "title": "Mode",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "api_key": {
-          "anyOf": [
-            {
-              "format": "password",
-              "minLength": 1,
-              "title": "Api Key",
-              "type": "string",
-              "writeOnly": true
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["mode", "api_key"],
-      "title": "OutboundApiKeyAuthConfig"
+      "title": "LoggingConfig",
+      "type": "object"
     },
     "McpServerConfig": {
-      "type": "object",
       "additionalProperties": false,
       "properties": {
         "url": {
           "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
               "format": "uri",
               "minLength": 1,
               "title": "Url",
               "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
+            }
           ]
         },
         "auth": {
           "anyOf": [
-            { "const": "none", "type": "string" },
-            { "$ref": "#/$defs/OAuthTokenForwardAuthConfig" },
-            { "$ref": "#/$defs/OAuthClientCredentialsAuthConfig" },
-            { "$ref": "#/$defs/OAuthDiscoveredTokenExchangeAuthConfig" },
-            { "$ref": "#/$defs/OAuthStaticTokenExchangeAuthConfig" }
+            {
+              "const": "none",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/OAuthTokenForwardAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthClientCredentialsAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthDiscoveredTokenExchangeAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthStaticTokenExchangeAuthConfig"
+            }
           ],
           "title": "Auth"
         }
       },
-      "required": ["url", "auth"],
-      "title": "McpServerConfig"
-    },
-    "OAuthTokenForwardAuthConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "mode": {
-          "anyOf": [
-            {
-              "const": "oauth_token_forward",
-              "title": "Mode",
-              "type": "string"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        }
-      },
-      "required": ["mode"],
-      "title": "OAuthTokenForwardAuthConfig"
+      "required": [
+        "url",
+        "auth"
+      ],
+      "title": "McpServerConfig",
+      "type": "object"
     },
     "OAuthClientCredentialsAuthConfig": {
       "additionalProperties": false,
       "properties": {
-        "mode": {
-          "const": "oauth_client_credentials",
-          "title": "Mode",
-          "type": "string"
-        },
         "client_id": {
           "minLength": 1,
           "title": "Client Id",
@@ -639,6 +248,11 @@
             "client_secret_post"
           ],
           "title": "Auth Method",
+          "type": "string"
+        },
+        "mode": {
+          "const": "oauth_client_credentials",
+          "title": "Mode",
           "type": "string"
         },
         "token_endpoint": {
@@ -648,18 +262,130 @@
           "type": "string"
         }
       },
-      "required": ["client_id", "client_secret", "mode", "token_endpoint"],
+      "required": [
+        "client_id",
+        "client_secret",
+        "mode",
+        "token_endpoint"
+      ],
       "title": "OAuthClientCredentialsAuthConfig",
+      "type": "object"
+    },
+    "OAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": "oauth2",
+              "title": "Mode",
+              "type": "string"
+            }
+          ]
+        },
+        "issuer_url": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Issuer Url",
+              "type": "string"
+            }
+          ]
+        },
+        "policies": {
+          "$ref": "#/$defs/OAuthPoliciesConfig"
+        }
+      },
+      "required": [
+        "mode",
+        "issuer_url",
+        "policies"
+      ],
+      "title": "OAuthConfig",
+      "type": "object"
+    },
+    "OAuthDiscoveredIntrospectionPolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "client_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "minLength": 1,
+              "title": "Client Id",
+              "type": "string"
+            }
+          ]
+        },
+        "client_secret": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Client Secret",
+              "type": "string",
+              "writeOnly": true
+            }
+          ]
+        },
+        "auth_method": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": "client_secret_basic",
+              "enum": [
+                "client_secret_basic",
+                "client_secret_post"
+              ],
+              "title": "Auth Method",
+              "type": "string"
+            }
+          ]
+        },
+        "discovered": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": true,
+              "default": true,
+              "title": "Discovered",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "required": [
+        "client_id",
+        "client_secret"
+      ],
+      "title": "OAuthDiscoveredIntrospectionPolicyConfig",
+      "type": "object"
+    },
+    "OAuthDiscoveredJwksPolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": true,
+              "default": true,
+              "title": "Discovered",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "title": "OAuthDiscoveredJwksPolicyConfig",
       "type": "object"
     },
     "OAuthDiscoveredTokenExchangeAuthConfig": {
       "additionalProperties": false,
       "properties": {
-        "mode": {
-          "const": "oauth_token_exchange",
-          "title": "Mode",
-          "type": "string"
-        },
         "client_id": {
           "minLength": 1,
           "title": "Client Id",
@@ -679,6 +405,11 @@
             "client_secret_post"
           ],
           "title": "Auth Method",
+          "type": "string"
+        },
+        "mode": {
+          "const": "oauth_token_exchange",
+          "title": "Mode",
           "type": "string"
         },
         "discovered": {
@@ -688,18 +419,246 @@
           "type": "boolean"
         }
       },
-      "required": ["client_id", "client_secret", "mode"],
+      "required": [
+        "client_id",
+        "client_secret",
+        "mode"
+      ],
       "title": "OAuthDiscoveredTokenExchangeAuthConfig",
+      "type": "object"
+    },
+    "OAuthJwtPolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "jwks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthDiscoveredJwksPolicyConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthStaticJwksPolicyConfig"
+            }
+          ],
+          "title": "Jwks"
+        },
+        "rfc9068": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthRfc9068PolicyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "claims": {
+          "additionalProperties": {
+            "anyOf": [
+              { "$ref": "#/$defs/EnvVarPlaceholder" },
+              {
+                  "minLength": 1,
+                  "type": "string"
+              }
+            ]
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Claims",
+          "type": "object"
+        }
+      },
+      "required": [
+        "jwks"
+      ],
+      "title": "OAuthJwtPolicyConfig",
+      "type": "object"
+    },
+    "OAuthPoliciesConfig": {
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "properties": {
+            "jwt": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "jwt"
+          ]
+        },
+        {
+          "properties": {
+            "introspection": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "introspection"
+          ]
+        }
+      ],
+      "properties": {
+        "jwt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthJwtPolicyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "introspection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OAuthDiscoveredIntrospectionPolicyConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthStaticIntrospectionPolicyConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Introspection"
+        }
+      },
+      "title": "OAuthPoliciesConfig",
+      "type": "object"
+    },
+    "OAuthRfc9068PolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "resource_server": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "minLength": 1,
+              "title": "Resource Server",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "resource_server"
+      ],
+      "title": "OAuthRfc9068PolicyConfig",
+      "type": "object"
+    },
+    "OAuthStaticIntrospectionPolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "client_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "minLength": 1,
+              "title": "Client Id",
+              "type": "string"
+            }
+          ]
+        },
+        "client_secret": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Client Secret",
+              "type": "string",
+              "writeOnly": true
+            }
+          ]
+        },
+        "auth_method": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": "client_secret_basic",
+              "enum": [
+                "client_secret_basic",
+                "client_secret_post"
+              ],
+              "title": "Auth Method",
+              "type": "string"
+            }
+          ]
+        },
+        "discovered": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": false,
+              "default": false,
+              "title": "Discovered",
+              "type": "boolean"
+            }
+          ]
+        },
+        "endpoint": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Endpoint",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "client_id",
+        "client_secret",
+        "endpoint"
+      ],
+      "title": "OAuthStaticIntrospectionPolicyConfig",
+      "type": "object"
+    },
+    "OAuthStaticJwksPolicyConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "discovered": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": false,
+              "default": false,
+              "title": "Discovered",
+              "type": "boolean"
+            }
+          ]
+        },
+        "url": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Url",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "OAuthStaticJwksPolicyConfig",
       "type": "object"
     },
     "OAuthStaticTokenExchangeAuthConfig": {
       "additionalProperties": false,
       "properties": {
-        "mode": {
-          "const": "oauth_token_exchange",
-          "title": "Mode",
-          "type": "string"
-        },
         "client_id": {
           "minLength": 1,
           "title": "Client Id",
@@ -719,6 +678,11 @@
             "client_secret_post"
           ],
           "title": "Auth Method",
+          "type": "string"
+        },
+        "mode": {
+          "const": "oauth_token_exchange",
+          "title": "Mode",
           "type": "string"
         },
         "discovered": {
@@ -743,34 +707,205 @@
       "title": "OAuthStaticTokenExchangeAuthConfig",
       "type": "object"
     },
-    "LoggingConfig": {
-      "type": "object",
+    "OAuthTokenForwardAuthConfig": {
       "additionalProperties": false,
       "properties": {
-        "level": {
+        "mode": {
           "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
-              "type": "string",
-              "enum": ["INFO", "DEBUG", "WARNING", "ERROR"],
-              "default": "INFO",
-              "title": "Level"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
-          ]
-        },
-        "format": {
-          "anyOf": [
-            {
-              "type": "string",
-              "enum": ["plain", "json"],
-              "default": "plain",
-              "title": "Format"
-            },
-            { "$ref": "#/$defs/EnvVarPlaceholder" }
+              "const": "oauth_token_forward",
+              "title": "Mode",
+              "type": "string"
+            }
           ]
         }
       },
-      "title": "LoggingConfig"
+      "required": [
+        "mode"
+      ],
+      "title": "OAuthTokenForwardAuthConfig",
+      "type": "object"
+    },
+    "OutboundApiKeyAuthConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "const": "api_key",
+              "title": "Mode",
+              "type": "string"
+            }
+          ]
+        },
+        "api_key": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "password",
+              "minLength": 1,
+              "title": "Api Key",
+              "type": "string",
+              "writeOnly": true
+            }
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "api_key"
+      ],
+      "title": "OutboundApiKeyAuthConfig",
+      "type": "object"
+    },
+    "ServerConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "listen_address": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "ipv4",
+              "type": "string"
+            },
+            {
+              "const": "localhost",
+              "type": "string"
+            }
+          ],
+          "default": "127.0.0.1",
+          "title": "Listen Address"
+        },
+        "listen_port": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": 8000,
+              "maximum": 65535,
+              "minimum": 1,
+              "title": "Listen Port",
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "title": "ServerConfig",
+      "type": "object"
+    },
+    "SubagentConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "uri",
+              "minLength": 1,
+              "title": "Url",
+              "type": "string"
+            }
+          ]
+        },
+        "type": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "enum": [
+                "delegate",
+                "peer"
+              ],
+              "title": "Type",
+              "type": "string"
+            }
+          ]
+        },
+        "auth": {
+          "anyOf": [
+            {
+              "const": "none",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/OAuthTokenForwardAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthClientCredentialsAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthDiscoveredTokenExchangeAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OAuthStaticTokenExchangeAuthConfig"
+            },
+            {
+              "$ref": "#/$defs/OutboundApiKeyAuthConfig"
+            }
+          ],
+          "title": "Auth"
+        }
+      },
+      "required": [
+        "url",
+        "type",
+        "auth"
+      ],
+      "title": "SubagentConfig",
+      "type": "object"
     }
-  }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "llm": {
+      "$ref": "#/$defs/LlmConfig"
+    },
+    "agent": {
+      "$ref": "#/$defs/AgentConfig"
+    },
+    "server": {
+      "$ref": "#/$defs/ServerConfig",
+      "default": {
+        "listen_address": "127.0.0.1",
+        "listen_port": 8000
+      }
+    },
+    "auth": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OAuthConfig"
+        },
+        {
+          "$ref": "#/$defs/ApiKeyAuthConfig"
+        },
+        {
+          "const": "none",
+          "type": "string"
+        }
+      ],
+      "title": "Auth"
+    },
+    "mcp_servers": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/McpServerConfig"
+      },
+      "title": "Mcp Servers",
+      "type": "array"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "default": {
+        "level": "INFO",
+        "format": "plain"
+      }
+    }
+  },
+  "required": [
+    "llm",
+    "agent",
+    "auth"
+  ],
+  "title": "A3S Agent Config",
+  "type": "object"
 }
