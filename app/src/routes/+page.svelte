@@ -33,97 +33,97 @@
 				</div>
 			{/if}
 
-      <FieldSet title="Agent">
-        <FormField
-          label="Agent name"
-          id="agent-name"
-          name="name"
-          bind:value={s.agentName}
-          placeholder="e.g. Support Assistant"
-          required
-        />
+			<FieldSet title="Agent">
+				<FormField
+					label="Agent name"
+					id="agent-name"
+					name="name"
+					bind:value={s.agentName}
+					placeholder="e.g. Support Assistant"
+					required
+				/>
 
-        <FormField
-          label="Description"
-          id="description"
-          name="description"
-          bind:value={s.description}
-          placeholder="Short summary of what this agent does."
-          required
-        />
+				<FormField
+					label="Description"
+					id="description"
+					name="description"
+					bind:value={s.description}
+					placeholder="Short summary of what this agent does."
+					required
+				/>
 
-        <FormField
-          label="Instructions"
-          id="instructions"
-          name="instructions"
-          bind:value={s.instructions}
-          placeholder="Describe behavior, goals, and constraints."
-          isTextarea
-          required
-        />
-      </FieldSet>
+				<FormField
+					label="Instructions"
+					id="instructions"
+					name="instructions"
+					bind:value={s.instructions}
+					placeholder="Describe behavior, goals, and constraints."
+					isTextarea
+					required
+				/>
+			</FieldSet>
 
-      <FieldSet title="Model">
-        <FormField
-          label="Model"
-          id="model"
-          name="model"
-          bind:value={s.model}
-          placeholder="e.g. gpt-5.3-codex, claude-opus-4.6, ..."
-          required
-        />
+			<FieldSet title="Model">
+				<FormField
+					label="Model"
+					id="model"
+					name="model"
+					bind:value={s.model}
+					placeholder="e.g. gpt-5.3-codex, claude-opus-4.6, ..."
+					required
+				/>
 
-        <FormField
-          label="API URL"
-          id="api-url"
-          name="apiUrl"
-          type="url"
-          bind:value={s.apiUrl}
-          placeholder="e.g. https://api.anthropic.com/v1/, https://local.myorg.llm/v1, ..."
-          required
-        />
+				<FormField
+					label="API URL"
+					id="api-url"
+					name="apiUrl"
+					type="url"
+					bind:value={s.apiUrl}
+					placeholder="e.g. https://api.anthropic.com/v1/, https://local.myorg.llm/v1, ..."
+					required
+				/>
 
-        <FormField
-          label="API key"
-          id="api-key"
-          name="apiKey"
-          type="password"
-          bind:value={s.apiKey}
-          placeholder="Enter API key"
-          required
-        />
-      </FieldSet>
+				<FormField
+					label="API key"
+					id="api-key"
+					name="apiKey"
+					type="password"
+					bind:value={s.apiKey}
+					placeholder="Enter API key"
+					required
+				/>
+			</FieldSet>
 
-      <FieldSet title="Authentication">
-        <RadioGroup
-          name="authMode"
-          bind:group={s.authMode}
-          choices={[
-            { value: 'apiKey', label: 'API key' },
-            { value: 'oauth2', label: 'OAuth2' },
-            { value: 'none', label: 'Disabled' }
-          ]}
-        />
+			<FieldSet title="Authentication">
+				<RadioGroup
+					name="authMode"
+					bind:group={s.authMode}
+					choices={[
+						{ value: 'apiKey', label: 'API key' },
+						{ value: 'oauth2', label: 'OAuth2' },
+						{ value: 'none', label: 'Disabled' }
+					]}
+				/>
 
-        {#if s.authMode === 'apiKey'}
-          <div class="flex gap-3">
-            <span class="text-neutral-400">An API Key will be generated.</span>
-          </div>
-        {:else if s.authMode === 'oauth2'}
-          <FormField
-            label="OAuth2 issuer URL"
-            id="oauth2-issuer-url"
-            name="oauth2IssuerUrl"
-            type="url"
-            bind:value={s.oauth2IssuerUrl}
-            required
-          />
-        {:else}
-          <div class="flex gap-3">
-            <span class="text-neutral-400">Authentication will be disabled.</span>
-          </div>
-        {/if}
-      </FieldSet>
+				{#if s.authMode === 'apiKey'}
+					<div class="flex gap-3">
+						<span class="text-neutral-400">An API Key will be generated.</span>
+					</div>
+				{:else if s.authMode === 'oauth2'}
+					<FormField
+						label="OAuth2 issuer URL"
+						id="oauth2-issuer-url"
+						name="oauth2IssuerUrl"
+						type="url"
+						bind:value={s.oauth2IssuerUrl}
+						required
+					/>
+				{:else}
+					<div class="flex gap-3">
+						<span class="text-neutral-400">Authentication will be disabled.</span>
+					</div>
+				{/if}
+			</FieldSet>
 
 			<FieldSet title="MCP Servers">
 				{#each { length: s.mcpServers.length }, index}
