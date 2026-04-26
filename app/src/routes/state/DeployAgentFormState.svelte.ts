@@ -13,25 +13,35 @@ export class DeployAgentFormState {
 	mcpServers: string[] = $state([]);
 	isPanelOpen = $state(false);
 	mcpServerDraft = $state('');
+	editingMcpServerIndex: number | null = $state(null);
 
-	openPanel() {
-		this.mcpServerDraft = '';
+	openPanel(index?: number) {
+		this.editingMcpServerIndex = typeof index === 'number' ? index : null;
+		this.mcpServerDraft = typeof index === 'number' ? (this.mcpServers[index] ?? '') : '';
 		this.isPanelOpen = true;
 	}
 
 	closePanel() {
 		this.isPanelOpen = false;
 		this.mcpServerDraft = '';
+		this.editingMcpServerIndex = null;
 	}
 
-	addMcpServer() {
+	saveMcpServer() {
 		const mcpServer = this.mcpServerDraft.trim();
 
 		if (mcpServer.length === 0) {
 			return;
 		}
 
-		this.mcpServers = [...this.mcpServers, mcpServer];
+		if (this.editingMcpServerIndex === null) {
+			this.mcpServers = [...this.mcpServers, mcpServer];
+		} else {
+			this.mcpServers = this.mcpServers.map((currentMcpServer, index) =>
+				index === this.editingMcpServerIndex ? mcpServer : currentMcpServer
+			);
+		}
+
 		this.closePanel();
 	}
 

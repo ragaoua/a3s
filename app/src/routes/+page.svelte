@@ -142,6 +142,7 @@
 						>
 							<button
 								type="button"
+								onclick={() => s.openPanel(index)}
 								class="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/80 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 sm:w-24 sm:flex-none"
 							>
 								Edit
@@ -191,14 +192,14 @@
 	></button>
 
 	<aside
-		aria-label="Add MCP server"
+		aria-label={s.editingMcpServerIndex === null ? 'Add MCP server' : 'Edit MCP server'}
 		class={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-900 p-6 shadow-2xl transition-transform duration-300 ease-in-out ${s.isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}
 	>
 		<form
 			class="flex h-full flex-col gap-4"
 			onsubmit={(event) => {
 				event.preventDefault();
-				s.addMcpServer();
+				s.saveMcpServer();
 			}}
 		>
 			<FormField
@@ -211,12 +212,21 @@
 				required
 			/>
 
-			<button
-				type="submit"
-				class="mt-auto rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
-			>
-				Add MCP server
-			</button>
+			<div class="mt-auto flex gap-3">
+				<button
+					type="button"
+					onclick={() => s.closePanel()}
+					class="flex-1 rounded-lg border border-neutral-700 bg-black/45 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
+				>
+					Cancel
+				</button>
+				<button
+					type="submit"
+					class="flex-1 rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
+				>
+					{s.editingMcpServerIndex === null ? 'Add MCP server' : 'Update MCP server'}
+				</button>
+			</div>
 		</form>
 	</aside>
 </div>
