@@ -4,6 +4,8 @@
 	import RadioGroup from './components/RadioGroup.svelte';
 	import SlideOverPanel from './components/SlideOverPanel.svelte';
 	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
+	import McpServerPanelForm from './components/McpServerPanelForm.svelte';
+	import { MCP_SERVER_AUTH_MODE_LABELS } from './types/mcpServer.js';
 
 	const s = new DeployAgentFormState();
 	const { form } = $props();
@@ -133,9 +135,11 @@
 					>
 						<div class="min-w-0 space-y-2">
 							<p class="text-sm font-medium break-all text-neutral-100">
-								{mcpServer}
+								{mcpServer.url}
 							</p>
-							<p class="text-sm text-neutral-300">No auth configured</p>
+							<p class="text-sm text-neutral-300">
+								{MCP_SERVER_AUTH_MODE_LABELS[mcpServer.authMode]}
+							</p>
 						</div>
 
 						<div
@@ -157,7 +161,7 @@
 							</button>
 						</div>
 
-						<input type="hidden" name="mcpServers" value={mcpServer} />
+						<input type="hidden" name="mcpServers" value={mcpServer.url} />
 					</div>
 				{/each}
 
@@ -181,21 +185,13 @@
 </main>
 
 <SlideOverPanel
-	open={s.isPanelOpen}
+	open={s.panelState.kind !== 'closed'}
 	title={s.panelTitle}
 	actionLabel={s.panelActionLabel}
 	onClose={() => s.closePanel()}
-	onAction={() => s.saveMcpServer()}
+	onAction={() => s.saveAndClosePanel()}
 >
 	{#if s.panelState.kind === 'mcpServer'}
-		<FormField
-			label="MCP server URL"
-			id="mcp-server-draft"
-			name="mcpServerDraft"
-			type="url"
-			bind:value={s.mcpServerDraft}
-			placeholder="https://example-mcp-server.com"
-			required
-		/>
+		<McpServerPanelForm bind:mcpServerDraft={s.mcpServerDraft} />
 	{/if}
 </SlideOverPanel>

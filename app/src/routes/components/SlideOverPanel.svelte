@@ -30,7 +30,7 @@
 >
 	<button
 		type="button"
-		aria-label='Clone panel'
+		aria-label="Clone panel"
 		onclick={onClose}
 		class={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
 	></button>
