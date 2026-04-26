@@ -94,7 +94,7 @@
 				/>
 			</FieldSet>
 
-			<FieldSet title="Authentication">
+			<FieldSet title="Authorization mode">
 				<RadioGroup
 					name="authMode"
 					bind:group={s.authMode}
