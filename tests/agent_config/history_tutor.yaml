@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=../../agent/schemas/agent.config.schema.json
+
+llm:
+  api_url: "${A3S_LLM_API_URL}"
+  api_key: "${A3S_LLM_API_KEY}"
+  model: "${A3S_LLM}"
+
+agent:
+  name: history_tutor
+  description: A knowledgeable history tutor
+  instructions: |
+    You are a helpful assistant. You are knowledgeable regarding historical
+    events.
+
+server:
+  listen_address: 127.0.0.1
+  listen_port: 8002
+
+auth:
+  mode: api_key
+  api_key: azerty

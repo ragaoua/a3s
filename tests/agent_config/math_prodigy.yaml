@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../agent/schemas/agent.config.schema.json
+
+llm:
+  api_url: "${A3S_LLM_API_URL}"
+  api_key: "${A3S_LLM_API_KEY}"
+  model: "${A3S_LLM}"
+
+agent:
+  name: math_prodigy
+  description: A helpful math-specialized agent
+  instructions: |
+    You are a helpful assistant. You answer requests related to math
+
+server:
+  listen_address: 127.0.0.1
+  listen_port: 8001
+
+auth: none
