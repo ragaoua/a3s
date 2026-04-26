@@ -1,3 +1,11 @@
+type PanelState<TKind extends 'mcpServer'> =
+	| { kind: 'closed' }
+	| { kind: TKind; mode: 'add' }
+	| { kind: TKind; mode: 'edit'; index: number };
+
+type MCPServerPanelState = PanelState<'mcpServer'>;
+type OpenMcpServerPanelState = Exclude<MCPServerPanelState, { kind: 'closed' }>;
+
 export class DeployAgentFormState {
 	agentName: string = $state('');
 	description: string = $state('');
@@ -11,34 +19,55 @@ export class DeployAgentFormState {
 	oauth2IssuerUrl = $state('');
 
 	mcpServers: string[] = $state([]);
-	isPanelOpen = $state(false);
 	mcpServerDraft = $state('');
-	editingMcpServerIndex: number | null = $state(null);
 
-	openPanel(index?: number) {
-		this.editingMcpServerIndex = typeof index === 'number' ? index : null;
-		this.mcpServerDraft = typeof index === 'number' ? (this.mcpServers[index] ?? '') : '';
-		this.isPanelOpen = true;
+	panelState: MCPServerPanelState = $state({ kind: 'closed' });
+
+	panelTitle = $derived.by(() => {
+		if (this.panelState.kind === 'closed') {
+			return '';
+		}
+
+		return this.panelState.mode === 'add' ? 'Add MCP server' : 'Edit MCP server';
+	});
+
+	panelActionLabel = $derived.by(() => {
+		if (this.panelState.kind === 'closed') {
+			return '';
+		}
+
+		return this.panelState.mode === 'add' ? 'Add MCP server' : 'Update MCP server';
+	});
+
+	isPanelOpen = $derived.by(() => {
+		return this.panelState.kind !== 'closed';
+	});
+
+	openPanel(panelState: OpenMcpServerPanelState) {
+		this.panelState = panelState;
+		this.mcpServerDraft =
+			panelState.mode === 'edit' ? (this.mcpServers[panelState.index] ?? '') : '';
 	}
 
 	closePanel() {
-		this.isPanelOpen = false;
+		this.panelState = { kind: 'closed' };
 		this.mcpServerDraft = '';
-		this.editingMcpServerIndex = null;
 	}
 
 	saveMcpServer() {
 		const mcpServer = this.mcpServerDraft.trim();
+		const panelState = this.panelState;
 
-		if (mcpServer.length === 0) {
+		if (mcpServer.length === 0 || panelState.kind !== 'mcpServer') {
 			return;
 		}
 
-		if (this.editingMcpServerIndex === null) {
+		if (panelState.mode === 'add') {
 			this.mcpServers = [...this.mcpServers, mcpServer];
 		} else {
+			const editingIndex = panelState.index;
 			this.mcpServers = this.mcpServers.map((currentMcpServer, index) =>
-				index === this.editingMcpServerIndex ? mcpServer : currentMcpServer
+				index === editingIndex ? mcpServer : currentMcpServer
 			);
 		}
 

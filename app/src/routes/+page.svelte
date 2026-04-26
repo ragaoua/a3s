@@ -2,6 +2,7 @@
 	import FieldSet from './components/FieldSet.svelte';
 	import FormField from './components/FormField.svelte';
 	import RadioGroup from './components/RadioGroup.svelte';
+	import SlideOverPanel from './components/SlideOverPanel.svelte';
 	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
 
 	const s = new DeployAgentFormState();
@@ -142,7 +143,7 @@
 						>
 							<button
 								type="button"
-								onclick={() => s.openPanel(index)}
+								onclick={() => s.openPanel({ kind: 'mcpServer', mode: 'edit', index })}
 								class="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/80 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 sm:w-24 sm:flex-none"
 							>
 								Edit
@@ -162,7 +163,7 @@
 
 				<button
 					type="button"
-					onclick={() => s.openPanel()}
+					onclick={() => s.openPanel({ kind: 'mcpServer', mode: 'add' })}
 					class="rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
 				>
 					Add MCP server
@@ -179,54 +180,22 @@
 	</div>
 </main>
 
-<div
-	inert={!s.isPanelOpen}
-	aria-hidden={!s.isPanelOpen}
-	class={`fixed inset-0 z-40 ${s.isPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+<SlideOverPanel
+	open={s.isPanelOpen}
+	title={s.panelTitle}
+	actionLabel={s.panelActionLabel}
+	onClose={() => s.closePanel()}
+	onAction={() => s.saveMcpServer()}
 >
-	<button
-		type="button"
-		aria-label="Close MCP server panel"
-		onclick={() => s.closePanel()}
-		class={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${s.isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
-	></button>
-
-	<aside
-		aria-label={s.editingMcpServerIndex === null ? 'Add MCP server' : 'Edit MCP server'}
-		class={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-900 p-6 shadow-2xl transition-transform duration-300 ease-in-out ${s.isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}
-	>
-		<form
-			class="flex h-full flex-col gap-4"
-			onsubmit={(event) => {
-				event.preventDefault();
-				s.saveMcpServer();
-			}}
-		>
-			<FormField
-				label="MCP server URL"
-				id="mcp-server-draft"
-				name="mcpServerDraft"
-				type="url"
-				bind:value={s.mcpServerDraft}
-				placeholder="https://example-mcp-server.com"
-				required
-			/>
-
-			<div class="mt-auto flex gap-3">
-				<button
-					type="button"
-					onclick={() => s.closePanel()}
-					class="flex-1 rounded-lg border border-neutral-700 bg-black/45 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-				>
-					Cancel
-				</button>
-				<button
-					type="submit"
-					class="flex-1 rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
-				>
-					{s.editingMcpServerIndex === null ? 'Add MCP server' : 'Update MCP server'}
-				</button>
-			</div>
-		</form>
-	</aside>
-</div>
+	{#if s.panelState.kind === 'mcpServer'}
+		<FormField
+			label="MCP server URL"
+			id="mcp-server-draft"
+			name="mcpServerDraft"
+			type="url"
+			bind:value={s.mcpServerDraft}
+			placeholder="https://example-mcp-server.com"
+			required
+		/>
+	{/if}
+</SlideOverPanel>
