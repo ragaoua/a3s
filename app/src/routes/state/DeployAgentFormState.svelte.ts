@@ -10,18 +10,32 @@ export class DeployAgentFormState {
 	authMode: 'apiKey' | 'oauth2' | 'none' = $state('apiKey');
 	oauth2IssuerUrl = $state('');
 
-	mcpServers: string[] = $state(['']);
+	mcpServers: string[] = $state([]);
+	isPanelOpen = $state(false);
+	mcpServerDraft = $state('');
 
-	addMcpServer() {
-		this.mcpServers = [...this.mcpServers, ''];
+	openPanel() {
+		this.mcpServerDraft = '';
+		this.isPanelOpen = true;
 	}
 
-	removeMcpServer(index: number) {
-		if (this.mcpServers.length === 1) {
-			this.mcpServers = [''];
+	closePanel() {
+		this.isPanelOpen = false;
+		this.mcpServerDraft = '';
+	}
+
+	addMcpServer() {
+		const mcpServer = this.mcpServerDraft.trim();
+
+		if (mcpServer.length === 0) {
 			return;
 		}
 
+		this.mcpServers = [...this.mcpServers, mcpServer];
+		this.closePanel();
+	}
+
+	removeMcpServer(index: number) {
 		this.mcpServers = this.mcpServers.filter((_, currentIndex) => currentIndex !== index);
 	}
 }

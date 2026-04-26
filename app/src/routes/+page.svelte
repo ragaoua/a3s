@@ -126,28 +126,42 @@
 			</FieldSet>
 
 			<FieldSet title="MCP Servers">
-				{#each { length: s.mcpServers.length }, index}
-					<div class="flex items-center gap-2">
-            <FormField
-              id={`mcp-server-${index}`}
-              name="mcpServers"
-              type="url"
-              bind:value={s.mcpServers[index]}
-              placeholder="https://example-mcp-server.com"
-            />
-            <button
-              type="button"
-              onclick={() => s.removeMcpServer(index)}
-              class="rounded-lg border border-neutral-700 bg-black/45 px-3 py-2 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800"
-            >
-              Remove
-            </button>
-          </div>
+				{#each s.mcpServers as mcpServer, index (index)}
+					<div
+						class="flex flex-col gap-3 rounded-xl border border-neutral-700 bg-black/45 p-3 sm:flex-row sm:items-stretch sm:justify-between"
+					>
+						<div class="min-w-0 space-y-2">
+							<p class="text-sm font-medium break-all text-neutral-100">
+								{mcpServer}
+							</p>
+							<p class="text-sm text-neutral-300">No auth configured</p>
+						</div>
+
+						<div
+							class="flex items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-between"
+						>
+							<button
+								type="button"
+								class="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/80 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 sm:w-24 sm:flex-none"
+							>
+								Edit
+							</button>
+							<button
+								type="button"
+								onclick={() => s.removeMcpServer(index)}
+								class="flex-1 rounded-lg border border-red-900/80 bg-red-950/40 px-3 py-1.5 text-sm font-medium text-red-200 transition hover:bg-red-900/40 sm:w-24 sm:flex-none"
+							>
+								Remove
+							</button>
+						</div>
+
+						<input type="hidden" name="mcpServers" value={mcpServer} />
+					</div>
 				{/each}
 
 				<button
 					type="button"
-					onclick={() => s.addMcpServer()}
+					onclick={() => s.openPanel()}
 					class="rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
 				>
 					Add MCP server
@@ -163,3 +177,46 @@
 		</form>
 	</div>
 </main>
+
+<div
+	inert={!s.isPanelOpen}
+	aria-hidden={!s.isPanelOpen}
+	class={`fixed inset-0 z-40 ${s.isPanelOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
+>
+	<button
+		type="button"
+		aria-label="Close MCP server panel"
+		onclick={() => s.closePanel()}
+		class={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${s.isPanelOpen ? 'opacity-100' : 'opacity-0'}`}
+	></button>
+
+	<aside
+		aria-label="Add MCP server"
+		class={`absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-neutral-800 bg-neutral-900 p-6 shadow-2xl transition-transform duration-300 ease-in-out ${s.isPanelOpen ? 'translate-x-0' : 'translate-x-full'}`}
+	>
+		<form
+			class="flex h-full flex-col gap-4"
+			onsubmit={(event) => {
+				event.preventDefault();
+				s.addMcpServer();
+			}}
+		>
+			<FormField
+				label="MCP server URL"
+				id="mcp-server-draft"
+				name="mcpServerDraft"
+				type="url"
+				bind:value={s.mcpServerDraft}
+				placeholder="https://example-mcp-server.com"
+				required
+			/>
+
+			<button
+				type="submit"
+				class="mt-auto rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
+			>
+				Add MCP server
+			</button>
+		</form>
+	</aside>
+</div>
