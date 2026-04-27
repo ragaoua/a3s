@@ -1,5 +1,7 @@
 import { newMcpServer, type McpServer } from '../types/mcpServer';
 
+export type AgentAuthMode = 'apiKey' | 'oauth2' | 'none';
+
 type PanelKinds = 'mcpServer';
 
 type ClosedPanelState = { kind: 'closed' };
@@ -18,7 +20,7 @@ export class DeployAgentFormState {
 	apiUrl: string = $state('');
 	apiKey: string = $state('');
 
-	authMode: 'apiKey' | 'oauth2' | 'none' = $state('apiKey');
+	authMode: AgentAuthMode = $state('apiKey');
 	oauth2IssuerUrl = $state('');
 
 	mcpServers: McpServer[] = $state([]);

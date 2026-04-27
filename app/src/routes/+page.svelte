@@ -9,6 +9,12 @@
 
 	const s = new DeployAgentFormState();
 	const { form } = $props();
+
+	const agentAuthMismatch = $derived(
+		s.authMode !== 'oauth2' &&
+			s.panelState.kind === 'mcpServer' &&
+			['oauth2TokenForward', 'oauth2TokenExchange'].includes(s.mcpServerDraft.authMode)
+	);
 </script>
 
 <main class="min-h-screen bg-transparent px-4 py-12 text-neutral-100">
@@ -188,10 +194,11 @@
 	open={s.panelState.kind !== 'closed'}
 	title={s.panelTitle}
 	actionLabel={s.panelActionLabel}
+	actionDisabled={agentAuthMismatch}
 	onClose={() => s.closePanel()}
 	onAction={() => s.saveAndClosePanel()}
 >
 	{#if s.panelState.kind === 'mcpServer'}
-		<McpServerPanelForm bind:mcpServerDraft={s.mcpServerDraft} />
+		<McpServerPanelForm bind:mcpServerDraft={s.mcpServerDraft} {agentAuthMismatch} />
 	{/if}
 </SlideOverPanel>

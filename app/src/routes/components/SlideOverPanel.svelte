@@ -6,6 +6,7 @@
 		open,
 		title,
 		actionLabel,
+		actionDisabled = false,
 		onClose,
 		onAction
 	}: {
@@ -13,13 +14,16 @@
 		open: boolean;
 		title: string;
 		actionLabel: string;
+		actionDisabled?: boolean;
 		onClose: () => void;
 		onAction: () => void;
 	} = $props();
 
 	function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
-		onAction();
+		if (!actionDisabled) {
+			onAction();
+		}
 	}
 </script>
 
@@ -30,7 +34,7 @@
 >
 	<button
 		type="button"
-		aria-label="Clone panel"
+		aria-label="Close panel"
 		onclick={onClose}
 		class={`absolute inset-0 bg-black/60 transition-opacity duration-300 ${open ? 'opacity-100' : 'opacity-0'}`}
 	></button>
@@ -55,7 +59,8 @@
 				</button>
 				<button
 					type="submit"
-					class="flex-1 rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
+					disabled={actionDisabled}
+					class="flex-1 rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-neutral-200"
 				>
 					{actionLabel}
 				</button>
