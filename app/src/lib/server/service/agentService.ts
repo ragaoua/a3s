@@ -33,7 +33,9 @@ interface AgentDeploymentConfig {
 	secretData: Record<string, string>;
 }
 
+const LLM_API_KEY_ENV_VAR = 'A3S_LLM_API_KEY';
 const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
+const MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_MCP_SERVER_CLIENT_SECRET';
 
 abstract class AgentService {
 	protected abstract getKubeConfig(): KubeConfig;
@@ -199,14 +201,19 @@ abstract class AgentService {
 	}
 
 	private buildAgentDeploymentConfig(agentConfig: AgentConfigForm): AgentDeploymentConfig {
-		const agentApiKey =
-			agentConfig.authMode === 'apiKey' ? randomBytes(32).toString('hex') : undefined;
-		const llmApiKeyEnvVar = 'A3S_LLM_API_KEY';
+		const secretData: Record<string, string> = {
+			[LLM_API_KEY_ENV_VAR]: agentConfig.apiKey
+		};
+
+		if (agentConfig.authMode === 'apiKey') {
+			const agentApiKey = randomBytes(32).toString('hex');
+			secretData[AGENT_API_KEY_ENV_VAR] = agentApiKey;
+		}
 
 		const config: AgentRuntimeConfig = {
 			llm: {
 				api_url: agentConfig.apiUrl,
-				api_key: `\${${llmApiKeyEnvVar}}`,
+				api_key: `\${${LLM_API_KEY_ENV_VAR}}`,
 				model: agentConfig.model
 			},
 			agent: {
@@ -235,10 +242,57 @@ abstract class AgentService {
 								mode: 'api_key',
 								api_key: `\${${AGENT_API_KEY_ENV_VAR}}`
 							},
-			mcp_servers: agentConfig.mcpServers.map((mcpServer) => ({
-				url: mcpServer.url,
-				auth: 'none'
-			})),
+			mcp_servers: agentConfig.mcpServers.map((mcpServer, index) => {
+				switch (mcpServer.authMode) {
+					case 'none':
+						return {
+							url: mcpServer.url,
+							auth: 'none'
+						};
+					case 'oauth_token_forward':
+						return {
+							url: mcpServer.url,
+							auth: {
+								mode: 'oauth_token_forward'
+							}
+						};
+					case 'oauth_client_credentials': {
+						const clientSecretEnvVar = `${MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX}${index}`;
+						secretData[clientSecretEnvVar] = mcpServer.clientSecret;
+						return {
+							url: mcpServer.url,
+							auth: {
+								mode: 'oauth_client_credentials',
+								client_id: mcpServer.clientId,
+								client_secret: `\${${clientSecretEnvVar}}`,
+								auth_method: mcpServer.authMethod,
+								token_endpoint: mcpServer.tokenEndpoint
+							}
+						};
+					}
+					case 'oauth_token_exchange': {
+						const clientSecretEnvVar = `${MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX}${index}`;
+						secretData[clientSecretEnvVar] = mcpServer.clientSecret;
+						return {
+							url: mcpServer.url,
+							auth: {
+								mode: 'oauth_token_exchange',
+								client_id: mcpServer.clientId,
+								client_secret: mcpServer.clientSecret,
+								auth_method: mcpServer.authMethod,
+								...(mcpServer.tokenEndpoint !== undefined
+									? {
+											discovered: false,
+											token_endpoint: mcpServer.tokenEndpoint
+										}
+									: {
+											discovered: true
+										})
+							}
+						};
+					}
+				}
+			}),
 			logging: {
 				level: 'INFO',
 				format: 'plain'
@@ -247,10 +301,7 @@ abstract class AgentService {
 
 		return {
 			runtimeConfig: agentRuntimeConfigSchema.parse(config),
-			secretData: {
-				[llmApiKeyEnvVar]: agentConfig.apiKey,
-				...(agentApiKey ? { [AGENT_API_KEY_ENV_VAR]: agentApiKey } : {})
-			}
+			secretData
 		};
 	}
 

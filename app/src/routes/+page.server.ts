@@ -20,10 +20,13 @@ export const actions: Actions = {
 			instructions: trimOrUndefined(formData, 'instructions'),
 			authMode: trimOrUndefined(formData, 'authMode'),
 			oauth2IssuerUrl: trimOrUndefined(formData, 'oauth2IssuerUrl'),
-			mcpServers: formData
-				.getAll('mcpServers')
-				.map((value) => String(value).trim())
-				.filter((value) => value.length > 0)
+			mcpServers: formData.getAll('mcpServers').map((value) => {
+				try {
+					return JSON.parse(String(value));
+				} catch {
+					return value;
+				}
+			})
 		};
 
 		const formDataValidationResult = agentConfigFormSchema.safeParse(formDataDict);

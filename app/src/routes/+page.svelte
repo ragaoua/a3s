@@ -13,7 +13,7 @@
 	const agentAuthMismatch = $derived(
 		s.authMode !== 'oauth2' &&
 			s.panelState.kind === 'mcpServer' &&
-			['oauth2TokenForward', 'oauth2TokenExchange'].includes(s.mcpServerDraft.authMode)
+			['oauth_token_forward', 'oauth_token_exchange'].includes(s.mcpServerDraft.authMode)
 	);
 </script>
 
@@ -167,7 +167,7 @@
 							</button>
 						</div>
 
-						<input type="hidden" name="mcpServers" value={mcpServer.url} />
+						<input type="hidden" name="mcpServers" value={JSON.stringify(mcpServer)} />
 					</div>
 				{/each}
 

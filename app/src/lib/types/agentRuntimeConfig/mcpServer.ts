@@ -1,6 +1,18 @@
 import z from 'zod';
+import {
+	oauthClientCredentialsAuthSchema,
+	oauthDiscoveredTokenExchangeAuthSchema,
+	oauthStaticTokenExchangeAuthSchema,
+	oauthTokenForwardAuthSchema
+} from './outboundAuth';
 
 export const mcpServerSchema = z.object({
 	url: z.url(),
-	auth: z.literal('none')
+	auth: z.union([
+		z.literal('none'),
+		oauthTokenForwardAuthSchema,
+		oauthClientCredentialsAuthSchema,
+		oauthDiscoveredTokenExchangeAuthSchema,
+		oauthStaticTokenExchangeAuthSchema
+	])
 });

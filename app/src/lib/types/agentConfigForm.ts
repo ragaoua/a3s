@@ -1,11 +1,12 @@
 import z from 'zod';
+import { OAUTH2_AUTH_METHOD_OPTIONS } from './agentRuntimeConfig/outboundAuth';
 
 const mcpServerFormBaseSchema = z.object({ url: z.url() });
 
 const mcpServerOAuthClientAuthSchema = mcpServerFormBaseSchema.extend({
 	clientId: z.string().min(1),
 	clientSecret: z.string().min(1),
-	authMethod: z.enum(['post', 'basic'])
+	authMethod: z.enum(OAUTH2_AUTH_METHOD_OPTIONS)
 });
 
 const mcpServerFormSchema = z.discriminatedUnion('authMode', [
@@ -13,15 +14,15 @@ const mcpServerFormSchema = z.discriminatedUnion('authMode', [
 		authMode: z.literal('none')
 	}),
 	mcpServerFormBaseSchema.extend({
-		authMode: z.literal('oauth2TokenForward')
+		authMode: z.literal('oauth_token_forward')
 	}),
 	mcpServerOAuthClientAuthSchema.extend({
-		authMode: z.literal('oauth2ClientCredentials'),
+		authMode: z.literal('oauth_client_credentials'),
 		tokenEndpoint: z.url()
 	}),
 	mcpServerOAuthClientAuthSchema.extend({
-		authMode: z.literal('oauth2TokenExchange'),
-		tokenEndpoint: z.url().optional()
+		authMode: z.literal('oauth_token_exchange'),
+		tokenEndpoint: z.preprocess((v) => (v === '' ? undefined : v), z.url().optional())
 	})
 ]);
 
@@ -52,7 +53,7 @@ export const agentConfigFormSchema = z
 		if (data.authMode === 'oauth2') return;
 
 		data.mcpServers.forEach((server, index) => {
-			if (server.authMode === 'oauth2TokenForward' || server.authMode === 'oauth2TokenExchange') {
+			if (server.authMode === 'oauth_token_forward' || server.authMode === 'oauth_token_exchange') {
 				ctx.addIssue({
 					code: 'custom',
 					path: ['mcpServers', index, 'authMode'],

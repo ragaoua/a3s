@@ -1,9 +1,9 @@
 <script lang="ts">
+	import { OAUTH2_AUTH_METHOD_OPTIONS } from '$lib/types/agentRuntimeConfig/outboundAuth';
 	import {
 		MCP_SERVER_AUTH_MODE_LABELS,
 		MCP_SERVER_AUTH_MODE_OPTIONS,
 		MCP_SERVER_OAUTH2_AUTH_METHOD_LABELS,
-		MCP_SERVER_OAUTH2_AUTH_METHOD_OPTIONS,
 		type McpServer
 	} from '../types/mcpServer';
 	import FormField from './FormField.svelte';
@@ -17,7 +17,7 @@
 		agentAuthMismatch: boolean;
 	} = $props();
 
-	const tokenEndpointRequired = $derived(mcpServerDraft.authMode === 'oauth2ClientCredentials');
+	const tokenEndpointRequired = $derived(mcpServerDraft.authMode === 'oauth_client_credentials');
 </script>
 
 <FormField
@@ -44,11 +44,11 @@
 	</select>
 </div>
 
-{#if mcpServerDraft.authMode === 'oauth2TokenForward'}
+{#if mcpServerDraft.authMode === 'oauth_token_forward'}
 	<HeadsUpCard>
 		The inbound auth token your agent validates will be forwarded as-is to this MCP server.
 	</HeadsUpCard>
-{:else if mcpServerDraft.authMode === 'oauth2TokenExchange'}
+{:else if mcpServerDraft.authMode === 'oauth_token_exchange'}
 	<HeadsUpCard>
 		The inbound auth token your agent validates will be exchanged for a new token.
 	</HeadsUpCard>
@@ -67,7 +67,7 @@
 	</div>
 {/if}
 
-{#if mcpServerDraft.authMode === 'oauth2ClientCredentials' || mcpServerDraft.authMode === 'oauth2TokenExchange'}
+{#if mcpServerDraft.authMode === 'oauth_client_credentials' || mcpServerDraft.authMode === 'oauth_token_exchange'}
 	<FormField
 		label="Client ID"
 		id="mcp-server-client-id"
@@ -97,7 +97,7 @@
 		required={tokenEndpointRequired}
 	/>
 
-	{#if mcpServerDraft.authMode === 'oauth2TokenExchange'}
+	{#if mcpServerDraft.authMode === 'oauth_token_exchange'}
 		<p class="text-xs text-neutral-400">
 			If left blank, the token endpoint will be discovered from the agent's OAuth2 issuer.
 		</p>
@@ -111,7 +111,7 @@
 			bind:value={mcpServerDraft.authMethod}
 			class="w-full rounded-lg border border-neutral-700 bg-black/50 px-3 py-2 text-sm text-neutral-100 transition outline-none focus:border-neutral-300"
 		>
-			{#each MCP_SERVER_OAUTH2_AUTH_METHOD_OPTIONS as authMethod (authMethod)}
+			{#each OAUTH2_AUTH_METHOD_OPTIONS as authMethod (authMethod)}
 				<option value={authMethod}>{MCP_SERVER_OAUTH2_AUTH_METHOD_LABELS[authMethod]}</option>
 			{/each}
 		</select>
