@@ -26,6 +26,13 @@ export const actions: Actions = {
 				} catch {
 					return value;
 				}
+			}),
+			skills: formData.getAll('skills').map((value) => {
+				try {
+					return JSON.parse(String(value));
+				} catch {
+					return value;
+				}
 			})
 		};
 

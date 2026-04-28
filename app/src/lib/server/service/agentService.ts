@@ -63,8 +63,14 @@ abstract class AgentService {
 		const resourceSuffix = randomBytes(8).toString('hex');
 		const configMapName = `a3s-${kubernetesAgentName}-config-${resourceSuffix}`;
 		const secretName = `a3s-${kubernetesAgentName}-secret-${resourceSuffix}`;
+		const skillConfigMaps = agentConfig.skills.map((skill) => ({
+			skillName: skill.name,
+			configMapName: `a3s-${kubernetesAgentName}-skill-${skill.name}-${resourceSuffix}`,
+			body: buildSkillMarkdown(skill)
+		}));
 		let configMapCreated = false;
 		let secretCreated = false;
+		const createdSkillConfigMaps: string[] = [];
 
 		try {
 			await core.createNamespacedConfigMap({
@@ -101,6 +107,28 @@ abstract class AgentService {
 				}
 			});
 			secretCreated = true;
+
+			for (const skill of skillConfigMaps) {
+				await core.createNamespacedConfigMap({
+					namespace,
+					body: {
+						apiVersion: 'v1',
+						kind: 'ConfigMap',
+						metadata: {
+							name: skill.configMapName,
+							labels: {
+								run: 'agent',
+								'a3s.dev/agent': kubernetesAgentName,
+								'a3s.dev/skill': skill.skillName
+							}
+						},
+						data: {
+							'SKILL.md': skill.body
+						}
+					}
+				});
+				createdSkillConfigMaps.push(skill.configMapName);
+			}
 
 			const pod = await core.createNamespacedPod({
 				namespace,
@@ -154,9 +182,21 @@ abstract class AgentService {
 						volumes: [
 							{
 								name: 'agent-config',
-								configMap: {
-									name: configMapName,
-									items: [{ key: 'agent.yaml', path: 'agent.yaml' }]
+								projected: {
+									sources: [
+										{
+											configMap: {
+												name: configMapName,
+												items: [{ key: 'agent.yaml', path: 'agent.yaml' }]
+											}
+										},
+										...skillConfigMaps.map((skill) => ({
+											configMap: {
+												name: skill.configMapName,
+												items: [{ key: 'SKILL.md', path: `skills/${skill.skillName}/SKILL.md` }]
+											}
+										}))
+									]
 								}
 							}
 						]
@@ -168,6 +208,17 @@ abstract class AgentService {
 				`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
 			);
 		} catch (error) {
+			for (const skillConfigMapName of createdSkillConfigMaps) {
+				try {
+					await core.deleteNamespacedConfigMap({
+						name: skillConfigMapName,
+						namespace
+					});
+				} catch (cleanupError) {
+					console.warn(`Failed to clean up skill config map ${skillConfigMapName}:`, cleanupError);
+				}
+			}
+
 			if (secretCreated) {
 				try {
 					await core.deleteNamespacedSecret({
@@ -401,6 +452,15 @@ class InClusterDeploymentAgentService extends AgentService {
 		kc.loadFromCluster();
 		return kc;
 	}
+}
+
+function buildSkillMarkdown(skill: { name: string; description: string; content: string }): string {
+	const frontmatter = YAML.stringify({
+		name: skill.name,
+		description: skill.description
+	}).trimEnd();
+	const content = skill.content.endsWith('\n') ? skill.content : `${skill.content}\n`;
+	return `---\n${frontmatter}\n---\n\n${content}`;
 }
 
 function getRequiredEnv(name: string): string {
