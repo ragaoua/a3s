@@ -74,6 +74,18 @@
 				/>
 			</FieldSet>
 
+      <ItemCardsList
+        title="Skills"
+        items={s.skills}
+        primaryText={(skill) => skill.name}
+        secondaryText={(skill) => skill.description}
+        hiddenInputName="skills"
+        addLabel="Add skill"
+        onAdd={() => s.openPanel({ kind: 'skill', mode: 'add' })}
+        onEdit={(index) => s.openPanel({ kind: 'skill', mode: 'edit', index })}
+        onRemove={(index) => s.removeSkill(index)}
+      />
+
 			<FieldSet title="Model">
 				<FormField
 					label="Model"
@@ -146,18 +158,6 @@
 				onAdd={() => s.openPanel({ kind: 'mcpServer', mode: 'add' })}
 				onEdit={(index) => s.openPanel({ kind: 'mcpServer', mode: 'edit', index })}
 				onRemove={(index) => s.removeMcpServer(index)}
-			/>
-
-			<ItemCardsList
-				title="Skills"
-				items={s.skills}
-				primaryText={(skill) => skill.name}
-				secondaryText={(skill) => skill.description}
-				hiddenInputName="skills"
-				addLabel="Add skill"
-				onAdd={() => s.openPanel({ kind: 'skill', mode: 'add' })}
-				onEdit={(index) => s.openPanel({ kind: 'skill', mode: 'edit', index })}
-				onRemove={(index) => s.removeSkill(index)}
 			/>
 
 			<button
