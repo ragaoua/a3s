@@ -3,13 +3,12 @@
 	import FormField from './components/FormField.svelte';
 	import RadioGroup from './components/RadioGroup.svelte';
 	import SlideOverPanel from './components/SlideOverPanel.svelte';
-	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
+	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte';
 	import McpServerPanelForm from './components/McpServerPanelForm.svelte';
 	import SkillPanelForm from './components/SkillPanelForm.svelte';
 	import SubagentPanelForm from './components/SubagentPanelForm.svelte';
-	import { MCP_SERVER_AUTH_MODE_LABELS } from './types/mcpServer.js';
-	import { SUBAGENT_AUTH_MODE_LABELS } from './types/subagent.js';
 	import ItemCardsList from './components/ItemCardsList.svelte';
+	import { OUTBOUND_AUTH_MODE_LABELS } from './types/outboundAuthConfig';
 
 	const s = new DeployAgentFormState();
 	const { form } = $props();
@@ -100,7 +99,7 @@
 				title="Subagents"
 				items={s.subagents}
 				primaryText={(subagent) => subagent.url}
-				secondaryText={(subagent) => SUBAGENT_AUTH_MODE_LABELS[subagent.authMode]}
+				secondaryText={(subagent) => OUTBOUND_AUTH_MODE_LABELS[subagent.authMode]}
 				hiddenInputName="subagents"
 				addLabel="Add subagent"
 				onAdd={() => s.openPanel({ kind: 'subagent', mode: 'add' })}
@@ -174,7 +173,7 @@
 				title="MCP Servers"
 				items={s.mcpServers}
 				primaryText={(mcpServer) => mcpServer.url}
-				secondaryText={(mcpServer) => MCP_SERVER_AUTH_MODE_LABELS[mcpServer.authMode]}
+				secondaryText={(mcpServer) => OUTBOUND_AUTH_MODE_LABELS[mcpServer.authMode]}
 				hiddenInputName="mcpServers"
 				addLabel="Add MCP server"
 				onAdd={() => s.openPanel({ kind: 'mcpServer', mode: 'add' })}
