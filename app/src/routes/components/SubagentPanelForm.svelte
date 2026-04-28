@@ -13,6 +13,18 @@
 </script>
 
 <FormField
+	label="Name"
+	id="subagent-name"
+	name="subagentName"
+	bind:value={subagentDraft.name}
+	placeholder="lowercase-with-hyphens (max 64 chars)"
+	pattern="[a-z0-9]+(-[a-z0-9]+)*"
+	maxlength={64}
+	title="Lowercase letters, numbers, and hyphens only. Must not start or end with a hyphen."
+	required
+/>
+
+<FormField
 	label="Subagent URL"
 	id="subagent-draft"
 	name="subagentDraft"

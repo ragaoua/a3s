@@ -162,10 +162,11 @@ export class DeployAgentFormState {
 	private saveSubagent(panelState: SubagentPanelState) {
 		const subagent = {
 			...this.subagentDraft,
+			name: this.subagentDraft.name.trim(),
 			url: this.subagentDraft.url.trim()
 		};
 
-		if (subagent.url.length === 0) {
+		if (subagent.name.length === 0 || subagent.url.length === 0) {
 			return;
 		}
 

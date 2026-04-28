@@ -1,12 +1,14 @@
 import { newOutboundAuthConfig, type OutboundAuthConfig } from './outboundAuthConfig';
 
 export interface Subagent extends OutboundAuthConfig {
+	name: string;
 	url: string;
 	type: SubagentType;
 }
 
 export function newSubagent(): Subagent {
 	return {
+		name: '',
 		url: '',
 		type: 'peer',
 		...newOutboundAuthConfig()

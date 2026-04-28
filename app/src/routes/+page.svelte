@@ -8,7 +8,7 @@
 	import SkillPanelForm from './components/SkillPanelForm.svelte';
 	import SubagentPanelForm from './components/SubagentPanelForm.svelte';
 	import ItemCardsList from './components/ItemCardsList.svelte';
-	import { OUTBOUND_AUTH_MODE_LABELS } from './types/outboundAuthConfig';
+	import { OUTBOUND_AUTH_MODE_LABELS, type OutboundAuthMode } from './types/outboundAuthConfig';
 
 	const s = new DeployAgentFormState();
 	const { form } = $props();
@@ -26,6 +26,10 @@
 	);
 
 	const agentAuthMismatch = $derived(mcpServerAuthMismatch || subagentAuthMismatch);
+
+  function buildAuthLabel(authMode: OutboundAuthMode): string {
+    return `Auth: ${OUTBOUND_AUTH_MODE_LABELS[authMode]}`
+  }
 </script>
 
 <main class="min-h-screen bg-transparent px-4 py-12 text-neutral-100">
@@ -98,8 +102,8 @@
 			<ItemCardsList
 				title="Subagents"
 				items={s.subagents}
-				primaryText={(subagent) => subagent.url}
-				secondaryText={(subagent) => OUTBOUND_AUTH_MODE_LABELS[subagent.authMode]}
+				primaryText={(subagent) => `${subagent.name} (${subagent.type})`}
+				secondaryText={(subagent) => buildAuthLabel(subagent.authMode)}
 				hiddenInputName="subagents"
 				addLabel="Add subagent"
 				onAdd={() => s.openPanel({ kind: 'subagent', mode: 'add' })}
@@ -173,7 +177,7 @@
 				title="MCP Servers"
 				items={s.mcpServers}
 				primaryText={(mcpServer) => mcpServer.url}
-				secondaryText={(mcpServer) => OUTBOUND_AUTH_MODE_LABELS[mcpServer.authMode]}
+				secondaryText={(mcpServer) => buildAuthLabel(mcpServer.authMode)}
 				hiddenInputName="mcpServers"
 				addLabel="Add MCP server"
 				onAdd={() => s.openPanel({ kind: 'mcpServer', mode: 'add' })}
