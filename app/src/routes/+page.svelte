@@ -6,8 +6,7 @@
 	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
 	import McpServerPanelForm from './components/McpServerPanelForm.svelte';
 	import SkillPanelForm from './components/SkillPanelForm.svelte';
-	import { MCP_SERVER_AUTH_MODE_LABELS, type McpServer } from './types/mcpServer.js';
-	import type { Skill } from './types/skill.js';
+	import { MCP_SERVER_AUTH_MODE_LABELS } from './types/mcpServer.js';
 	import ItemCardsList from './components/ItemCardsList.svelte';
 
 	const s = new DeployAgentFormState();
