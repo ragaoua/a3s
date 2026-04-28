@@ -1,9 +1,10 @@
 import { newMcpServer, type McpServer } from '../types/mcpServer';
 import { newSkill, type Skill } from '../types/skill';
+import { newSubagent, type Subagent } from '../types/subagent';
 
 export type AgentAuthMode = 'apiKey' | 'oauth2' | 'none';
 
-type PanelKinds = 'mcpServer' | 'skill';
+type PanelKinds = 'mcpServer' | 'skill' | 'subagent';
 
 type ClosedPanelState = { kind: 'closed' };
 type OpenPanelState<TKind extends PanelKinds> =
@@ -17,6 +18,7 @@ type TKindToOpenPanelState<TKind extends PanelKinds> = TKind extends PanelKinds
 
 type McpServerPanelState = OpenPanelState<'mcpServer'>;
 type SkillPanelState = OpenPanelState<'skill'>;
+type SubagentPanelState = OpenPanelState<'subagent'>;
 
 export class DeployAgentFormState {
 	agentName: string = $state('');
@@ -36,6 +38,9 @@ export class DeployAgentFormState {
 	skills: Skill[] = $state([]);
 	skillDraft: Skill = $state(newSkill());
 
+	subagents: Subagent[] = $state([]);
+	subagentDraft: Subagent = $state(newSubagent());
+
 	panelState: ClosedPanelState | AnyOpenPanelState = $state({ kind: 'closed' });
 
 	panelTitle = $derived.by(() => {
@@ -48,6 +53,8 @@ export class DeployAgentFormState {
 			title += ' MCP server';
 		} else if (this.panelState.kind === 'skill') {
 			title += ' skill';
+		} else if (this.panelState.kind === 'subagent') {
+			title += ' subagent';
 		}
 		return title;
 	});
@@ -62,6 +69,8 @@ export class DeployAgentFormState {
 			title += ' MCP server';
 		} else if (this.panelState.kind === 'skill') {
 			title += ' skill';
+		} else if (this.panelState.kind === 'subagent') {
+			title += ' subagent';
 		}
 		return title;
 	});
@@ -79,6 +88,11 @@ export class DeployAgentFormState {
 				panelState.mode === 'edit'
 					? { ...(this.skills[panelState.index] ?? newSkill()) }
 					: newSkill();
+		} else if (panelState.kind === 'subagent') {
+			this.subagentDraft =
+				panelState.mode === 'edit'
+					? { ...(this.subagents[panelState.index] ?? newSubagent()) }
+					: newSubagent();
 		}
 	}
 
@@ -91,6 +105,8 @@ export class DeployAgentFormState {
 			this.saveMcpServer(this.panelState);
 		} else if (this.panelState.kind === 'skill') {
 			this.saveSkill(this.panelState);
+		} else if (this.panelState.kind === 'subagent') {
+			this.saveSubagent(this.panelState);
 		}
 
 		this.closePanel();
@@ -141,5 +157,28 @@ export class DeployAgentFormState {
 
 	removeSkill(index: number) {
 		this.skills = this.skills.filter((_, currentIndex) => currentIndex !== index);
+	}
+
+	private saveSubagent(panelState: SubagentPanelState) {
+		const subagent = {
+			...this.subagentDraft,
+			url: this.subagentDraft.url.trim()
+		};
+
+		if (subagent.url.length === 0) {
+			return;
+		}
+
+		if (panelState.mode === 'add') {
+			this.subagents = [...this.subagents, subagent];
+		} else {
+			this.subagents = this.subagents.map((currentSubagent, index) =>
+				index === panelState.index ? subagent : currentSubagent
+			);
+		}
+	}
+
+	removeSubagent(index: number) {
+		this.subagents = this.subagents.filter((_, currentIndex) => currentIndex !== index);
 	}
 }

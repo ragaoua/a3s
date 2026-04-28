@@ -6,17 +6,27 @@
 	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
 	import McpServerPanelForm from './components/McpServerPanelForm.svelte';
 	import SkillPanelForm from './components/SkillPanelForm.svelte';
+	import SubagentPanelForm from './components/SubagentPanelForm.svelte';
 	import { MCP_SERVER_AUTH_MODE_LABELS } from './types/mcpServer.js';
+	import { SUBAGENT_AUTH_MODE_LABELS } from './types/subagent.js';
 	import ItemCardsList from './components/ItemCardsList.svelte';
 
 	const s = new DeployAgentFormState();
 	const { form } = $props();
 
-	const agentAuthMismatch = $derived(
+	const mcpServerAuthMismatch = $derived(
 		s.authMode !== 'oauth2' &&
 			s.panelState.kind === 'mcpServer' &&
 			['oauth_token_forward', 'oauth_token_exchange'].includes(s.mcpServerDraft.authMode)
 	);
+
+	const subagentAuthMismatch = $derived(
+		s.authMode !== 'oauth2' &&
+			s.panelState.kind === 'subagent' &&
+			['oauth_token_forward', 'oauth_token_exchange'].includes(s.subagentDraft.authMode)
+	);
+
+	const agentAuthMismatch = $derived(mcpServerAuthMismatch || subagentAuthMismatch);
 </script>
 
 <main class="min-h-screen bg-transparent px-4 py-12 text-neutral-100">
@@ -74,17 +84,29 @@
 				/>
 			</FieldSet>
 
-      <ItemCardsList
-        title="Skills"
-        items={s.skills}
-        primaryText={(skill) => skill.name}
-        secondaryText={(skill) => skill.description}
-        hiddenInputName="skills"
-        addLabel="Add skill"
-        onAdd={() => s.openPanel({ kind: 'skill', mode: 'add' })}
-        onEdit={(index) => s.openPanel({ kind: 'skill', mode: 'edit', index })}
-        onRemove={(index) => s.removeSkill(index)}
-      />
+			<ItemCardsList
+				title="Skills"
+				items={s.skills}
+				primaryText={(skill) => skill.name}
+				secondaryText={(skill) => skill.description}
+				hiddenInputName="skills"
+				addLabel="Add skill"
+				onAdd={() => s.openPanel({ kind: 'skill', mode: 'add' })}
+				onEdit={(index) => s.openPanel({ kind: 'skill', mode: 'edit', index })}
+				onRemove={(index) => s.removeSkill(index)}
+			/>
+
+			<ItemCardsList
+				title="Subagents"
+				items={s.subagents}
+				primaryText={(subagent) => subagent.url}
+				secondaryText={(subagent) => SUBAGENT_AUTH_MODE_LABELS[subagent.authMode]}
+				hiddenInputName="subagents"
+				addLabel="Add subagent"
+				onAdd={() => s.openPanel({ kind: 'subagent', mode: 'add' })}
+				onEdit={(index) => s.openPanel({ kind: 'subagent', mode: 'edit', index })}
+				onRemove={(index) => s.removeSubagent(index)}
+			/>
 
 			<FieldSet title="Model">
 				<FormField
@@ -179,8 +201,16 @@
 	onAction={() => s.saveAndClosePanel()}
 >
 	{#if s.panelState.kind === 'mcpServer'}
-		<McpServerPanelForm bind:mcpServerDraft={s.mcpServerDraft} {agentAuthMismatch} />
+		<McpServerPanelForm
+			bind:mcpServerDraft={s.mcpServerDraft}
+			agentAuthMismatch={mcpServerAuthMismatch}
+		/>
 	{:else if s.panelState.kind === 'skill'}
 		<SkillPanelForm bind:skillDraft={s.skillDraft} />
+	{:else if s.panelState.kind === 'subagent'}
+		<SubagentPanelForm
+			bind:subagentDraft={s.subagentDraft}
+			agentAuthMismatch={subagentAuthMismatch}
+		/>
 	{/if}
 </SlideOverPanel>
