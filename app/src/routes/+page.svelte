@@ -5,7 +5,10 @@
 	import SlideOverPanel from './components/SlideOverPanel.svelte';
 	import { DeployAgentFormState } from './state/DeployAgentFormState.svelte.js';
 	import McpServerPanelForm from './components/McpServerPanelForm.svelte';
-	import { MCP_SERVER_AUTH_MODE_LABELS } from './types/mcpServer.js';
+	import SkillPanelForm from './components/SkillPanelForm.svelte';
+	import { MCP_SERVER_AUTH_MODE_LABELS, type McpServer } from './types/mcpServer.js';
+	import type { Skill } from './types/skill.js';
+	import ItemCardsList from './components/ItemCardsList.svelte';
 
 	const s = new DeployAgentFormState();
 	const { form } = $props();
@@ -134,51 +137,29 @@
 				{/if}
 			</FieldSet>
 
-			<FieldSet title="MCP Servers">
-				{#each s.mcpServers as mcpServer, index (index)}
-					<div
-						class="flex flex-col gap-3 rounded-xl border border-neutral-700 bg-black/45 p-3 sm:flex-row sm:items-stretch sm:justify-between"
-					>
-						<div class="min-w-0 space-y-2">
-							<p class="text-sm font-medium break-all text-neutral-100">
-								{mcpServer.url}
-							</p>
-							<p class="text-sm text-neutral-300">
-								{MCP_SERVER_AUTH_MODE_LABELS[mcpServer.authMode]}
-							</p>
-						</div>
+			<ItemCardsList
+				title="MCP Servers"
+				items={s.mcpServers}
+				primaryText={(mcpServer) => mcpServer.url}
+				secondaryText={(mcpServer) => MCP_SERVER_AUTH_MODE_LABELS[mcpServer.authMode]}
+				hiddenInputName="mcpServers"
+				addLabel="Add MCP server"
+				onAdd={() => s.openPanel({ kind: 'mcpServer', mode: 'add' })}
+				onEdit={(index) => s.openPanel({ kind: 'mcpServer', mode: 'edit', index })}
+				onRemove={(index) => s.removeMcpServer(index)}
+			/>
 
-						<div
-							class="flex items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-between"
-						>
-							<button
-								type="button"
-								onclick={() => s.openPanel({ kind: 'mcpServer', mode: 'edit', index })}
-								class="flex-1 rounded-lg border border-neutral-700 bg-neutral-900/80 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:bg-neutral-800 sm:w-24 sm:flex-none"
-							>
-								Edit
-							</button>
-							<button
-								type="button"
-								onclick={() => s.removeMcpServer(index)}
-								class="flex-1 rounded-lg border border-red-900/80 bg-red-950/40 px-3 py-1.5 text-sm font-medium text-red-200 transition hover:bg-red-900/40 sm:w-24 sm:flex-none"
-							>
-								Remove
-							</button>
-						</div>
-
-						<input type="hidden" name="mcpServers" value={JSON.stringify(mcpServer)} />
-					</div>
-				{/each}
-
-				<button
-					type="button"
-					onclick={() => s.openPanel({ kind: 'mcpServer', mode: 'add' })}
-					class="rounded-lg bg-neutral-200 px-4 py-2 text-sm font-medium text-black transition hover:bg-white"
-				>
-					Add MCP server
-				</button>
-			</FieldSet>
+			<ItemCardsList
+				title="Skills"
+				items={s.skills}
+				primaryText={(skill) => skill.name}
+				secondaryText={(skill) => skill.description}
+				hiddenInputName="skills"
+				addLabel="Add skill"
+				onAdd={() => s.openPanel({ kind: 'skill', mode: 'add' })}
+				onEdit={(index) => s.openPanel({ kind: 'skill', mode: 'edit', index })}
+				onRemove={(index) => s.removeSkill(index)}
+			/>
 
 			<button
 				type="submit"
@@ -200,5 +181,7 @@
 >
 	{#if s.panelState.kind === 'mcpServer'}
 		<McpServerPanelForm bind:mcpServerDraft={s.mcpServerDraft} {agentAuthMismatch} />
+	{:else if s.panelState.kind === 'skill'}
+		<SkillPanelForm bind:skillDraft={s.skillDraft} />
 	{/if}
 </SlideOverPanel>
