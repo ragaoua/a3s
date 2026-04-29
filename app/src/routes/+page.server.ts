@@ -8,6 +8,12 @@ function trimOrUndefined(formData: FormData, name: string): string | undefined {
 	return value === '' ? undefined : value;
 }
 
+function parseJsonField(formData: FormData, name: string) {
+	return formData.getAll(name).map((value) => {
+		return JSON.parse(String(value));
+	});
+}
+
 export const actions: Actions = {
 	default: async ({ request }) => {
 		const formData = await request.formData();
@@ -20,27 +26,9 @@ export const actions: Actions = {
 			instructions: trimOrUndefined(formData, 'instructions'),
 			authMode: trimOrUndefined(formData, 'authMode'),
 			oauth2IssuerUrl: trimOrUndefined(formData, 'oauth2IssuerUrl'),
-			mcpServers: formData.getAll('mcpServers').map((value) => {
-				try {
-					return JSON.parse(String(value));
-				} catch {
-					return value;
-				}
-			}),
-			subagents: formData.getAll('subagents').map((value) => {
-				try {
-					return JSON.parse(String(value));
-				} catch {
-					return value;
-				}
-			}),
-			skills: formData.getAll('skills').map((value) => {
-				try {
-					return JSON.parse(String(value));
-				} catch {
-					return value;
-				}
-			})
+			mcpServers: parseJsonField(formData, 'mcpServers'),
+			subagents: parseJsonField(formData, 'subagents'),
+			skills: parseJsonField(formData, 'skills')
 		};
 
 		const formDataValidationResult = agentConfigFormSchema.safeParse(formDataDict);
