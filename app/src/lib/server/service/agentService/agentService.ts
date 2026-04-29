@@ -294,8 +294,8 @@ export abstract class AgentService {
 					};
 					break;
 				}
-				case 'apikey': {
 					const apiKeyEnvVar = `${SUBAGENT_API_KEY_ENV_VAR_PREFIX}_${envVarSuffix}`;
+				case 'apiKey': {
 					secretData[apiKeyEnvVar] = subagent.apiKey;
 					subagents[subagent.name] = {
 						url: subagent.url,

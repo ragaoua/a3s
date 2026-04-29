@@ -115,7 +115,7 @@
 			{/each}
 		</select>
 	</div>
-{:else if auth.authMode === 'apikey'}
+{:else if auth.authMode === 'apiKey'}
 	<FormField
 		label="API key"
 		id="{idPrefix}-api-key"

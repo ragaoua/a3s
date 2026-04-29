@@ -17,7 +17,7 @@ const subagentFormBaseSchema = z.object({
 export const subagentFormSchema = z.discriminatedUnion('authMode', [
 	...outboundAuthArms(subagentFormBaseSchema),
 	subagentFormBaseSchema.extend({
-		authMode: z.literal('apikey'),
+		authMode: z.literal('apiKey'),
 		apiKey: z.string().min(1)
 	})
 ]);

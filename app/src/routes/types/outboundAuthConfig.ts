@@ -25,7 +25,7 @@ export const OUTBOUND_AUTH_MODE_OPTIONS = [
 	'oauth_client_credentials',
 	'oauth_token_forward',
 	'oauth_token_exchange',
-	'apikey'
+	'apiKey'
 ] as const;
 
 export type OutboundAuthMode = (typeof OUTBOUND_AUTH_MODE_OPTIONS)[number];
@@ -35,7 +35,7 @@ export const OUTBOUND_AUTH_MODE_LABELS: Record<OutboundAuthMode, string> = {
 	oauth_client_credentials: 'OAuth2 Client Credentials',
 	oauth_token_forward: 'OAuth2 Token Forward',
 	oauth_token_exchange: 'OAuth2 Token Exchange',
-	apikey: 'API key'
+	apiKey: 'API key'
 };
 
 type OutboundOauth2AuthMethod = (typeof OAUTH2_AUTH_METHOD_OPTIONS)[number];
