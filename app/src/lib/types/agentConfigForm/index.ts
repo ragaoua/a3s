@@ -35,7 +35,8 @@ export const agentConfigFormSchema = z
 		addOauth2OnlyAuthModeIssues(ctx, data.mcpServers, 'mcpServers', 'MCP server');
 		addOauth2OnlyAuthModeIssues(ctx, data.subagents, 'subagents', 'Subagent');
 	})
-	// NOTE: this will be removed when the agent supports oauth_token_exchange
+	// NOTE: this will be removed when the agent supports oauth_token_exchange.
+	// See issue #11
 	.superRefine((data, ctx) => {
 		data.mcpServers.forEach((server, index) => {
 			if (server.authMode === 'oauth_token_exchange') {
