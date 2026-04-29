@@ -9,6 +9,8 @@ import type {
 	SubagentPanelState
 } from '../types/slideOverPanel';
 
+const KIND_LABEL = { mcpServer: 'MCP server', skill: 'skill', subagent: 'subagent' } as const;
+
 export class DeployAgentFormState {
 	agentName: string = $state('');
 	description: string = $state('');
@@ -37,14 +39,7 @@ export class DeployAgentFormState {
 			return '';
 		}
 
-		let title = this.panelState.mode === 'add' ? 'Add' : 'Edit';
-		if (this.panelState.kind === 'mcpServer') {
-			title += ' MCP server';
-		} else if (this.panelState.kind === 'skill') {
-			title += ' skill';
-		} else if (this.panelState.kind === 'subagent') {
-			title += ' subagent';
-		}
+		const title = `${this.panelState.mode === 'add' ? 'Add' : 'Edit'} ${KIND_LABEL[this.panelState.kind]}`;
 		return title;
 	});
 
@@ -53,14 +48,7 @@ export class DeployAgentFormState {
 			return '';
 		}
 
-		let title = this.panelState.mode === 'add' ? 'Add' : 'Update';
-		if (this.panelState.kind === 'mcpServer') {
-			title += ' MCP server';
-		} else if (this.panelState.kind === 'skill') {
-			title += ' skill';
-		} else if (this.panelState.kind === 'subagent') {
-			title += ' subagent';
-		}
+		const title = `${this.panelState.mode === 'add' ? 'Add' : 'Update'} ${KIND_LABEL[this.panelState.kind]}`;
 		return title;
 	});
 
