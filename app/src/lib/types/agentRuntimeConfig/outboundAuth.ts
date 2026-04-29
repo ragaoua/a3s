@@ -34,3 +34,10 @@ export const outboundApiKeyAuthSchema = z.object({
 	mode: z.literal('api_key'),
 	api_key: z.string().min(1)
 });
+
+export const oauthAuthSchemas = [
+	oauthTokenForwardAuthSchema,
+	oauthClientCredentialsAuthSchema,
+	oauthDiscoveredTokenExchangeAuthSchema,
+	oauthStaticTokenExchangeAuthSchema
+];
