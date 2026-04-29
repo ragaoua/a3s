@@ -7,15 +7,20 @@ import {
 	outboundApiKeyAuthSchema
 } from './outboundAuth';
 
-export const subagentSchema = z.object({
-	url: z.url(),
-	type: z.enum(['delegate', 'peer']),
-	auth: z.union([
-		z.literal('none'),
-		oauthTokenForwardAuthSchema,
-		oauthClientCredentialsAuthSchema,
-		oauthDiscoveredTokenExchangeAuthSchema,
-		oauthStaticTokenExchangeAuthSchema,
-		outboundApiKeyAuthSchema
-	])
-});
+export const subagentsSchema = z.record(
+	z.string().min(1),
+	z.object({
+		url: z.url(),
+		type: z.enum(['delegate', 'peer']),
+		auth: z.union([
+			z.literal('none'),
+			oauthTokenForwardAuthSchema,
+			oauthClientCredentialsAuthSchema,
+			oauthDiscoveredTokenExchangeAuthSchema,
+			oauthStaticTokenExchangeAuthSchema,
+			outboundApiKeyAuthSchema
+		])
+	})
+);
+
+export type Subagents = z.infer<typeof subagentsSchema>;

@@ -9,6 +9,7 @@ import type { AgentConfigForm } from '$lib/types/agentConfigForm';
 import { AGENT_NAME_ANNOTATION, sanitizeKubernetesName } from '../kubernetesName';
 import type { AgentSummary } from './types/agentSummary';
 import type { AgentDeploymentConfig } from './types/agentDeploymentConfig';
+import type { Subagents } from '$lib/types/agentRuntimeConfig/subagent';
 
 const LLM_API_KEY_ENV_VAR = 'A3S_LLM_API_KEY';
 const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
@@ -241,7 +242,7 @@ export abstract class AgentService {
 			secretData[AGENT_API_KEY_ENV_VAR] = agentApiKey;
 		}
 
-		const subagents: NonNullable<AgentRuntimeConfig['agent']['subagents']> = {};
+		const subagents: Subagents = {};
 		agentConfig.subagents.forEach((subagent) => {
 			const envVarSuffix = subagent.name.toUpperCase().replaceAll('-', '_');
 			switch (subagent.authMode) {
