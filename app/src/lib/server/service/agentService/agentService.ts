@@ -379,7 +379,7 @@ export abstract class AgentService {
 							auth: {
 								mode: 'oauth_token_exchange',
 								client_id: mcpServer.clientId,
-								client_secret: mcpServer.clientSecret,
+								client_secret: `\${${clientSecretEnvVar}}`,
 								auth_method: mcpServer.authMethod,
 								...(mcpServer.tokenEndpoint !== undefined
 									? {
