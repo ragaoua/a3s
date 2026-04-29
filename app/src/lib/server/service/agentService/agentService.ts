@@ -320,7 +320,7 @@ export abstract class AgentService {
 				name: agentConfig.name,
 				description: agentConfig.description,
 				instructions: agentConfig.instructions,
-				...(Object.keys(subagents).length > 0 ? { subagents } : {})
+				subagents
 			},
 			server: {
 				listen_address: '0.0.0.0',
