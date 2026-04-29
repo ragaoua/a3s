@@ -3,8 +3,11 @@ import type { KubernetesClusterParams } from './types/kubernetesClusterParams';
 import { AgentService } from './agentService';
 
 export class RemoteDeploymentAgentService extends AgentService {
-	constructor(private readonly kubernetesParams: KubernetesClusterParams) {
-		super();
+	constructor(
+		a3sAgentImage: string,
+		private readonly kubernetesParams: KubernetesClusterParams
+	) {
+		super(a3sAgentImage);
 	}
 
 	protected async getNamespace() {

@@ -4,6 +4,9 @@ import { KubeConfig } from '@kubernetes/client-node';
 import { AgentService } from './agentService';
 
 export class InClusterDeploymentAgentService extends AgentService {
+	constructor(a3sAgentImage: string) {
+		super(a3sAgentImage);
+	}
 	protected async getNamespace() {
 		const namespaceFromEnv = env.K8S_AGENTS_NAMESPACE;
 		if (namespaceFromEnv) {

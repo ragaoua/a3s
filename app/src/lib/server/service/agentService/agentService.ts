@@ -17,6 +17,7 @@ const SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_SUBAGENT_CLIENT_SECRET';
 const SUBAGENT_API_KEY_ENV_VAR_PREFIX = 'A3S_SUBAGENT_API_KEY';
 
 export abstract class AgentService {
+	protected constructor(private readonly a3sAgentImage: string) {}
 	protected abstract getKubeConfig(): KubeConfig;
 
 	protected abstract getNamespace(): Promise<string>;
@@ -135,7 +136,7 @@ export abstract class AgentService {
 						containers: [
 							{
 								name: kubernetesAgentName,
-								image: 'localhost/a3s-agent',
+								image: this.a3sAgentImage,
 								imagePullPolicy: 'Never',
 								stdin: true,
 								tty: true,

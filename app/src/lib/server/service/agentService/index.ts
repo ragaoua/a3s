@@ -15,10 +15,11 @@ function resolveDeployMode(): 'inCluster' | 'remote' {
 	throw new Error(`Invalid K8S_DEPLOY_MODE: ${raw}`);
 }
 
+const A3S_AGENT_IMAGE = getRequiredEnv('A3S_AGENT_IMAGE');
 export const agentService: AgentService =
 	resolveDeployMode() === 'inCluster'
-		? new InClusterDeploymentAgentService()
-		: new RemoteDeploymentAgentService({
+		? new InClusterDeploymentAgentService(A3S_AGENT_IMAGE)
+		: new RemoteDeploymentAgentService(A3S_AGENT_IMAGE, {
 				clusterName: getRequiredEnv('K8S_CLUSTER_NAME'),
 				server: getRequiredEnv('K8S_SERVER_URL'),
 				serviceAccount: getRequiredEnv('K8S_SERVICE_ACCOUNT'),

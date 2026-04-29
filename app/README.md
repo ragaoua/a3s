@@ -32,6 +32,9 @@ the namespace dedicated to running agents. It must be able to :
 - Create and list pods
 - Create and delete secrets and config maps
 
+Use `A3S_AGENT_IMAGE` to configure the container image used for agent pods (e.g.
+`localhost/a3s-agent` for local development).
+
 Use `K8S_AGENTS_NAMESPACE` to configure the namespace in which the agent pods
 will be deployed.
 
