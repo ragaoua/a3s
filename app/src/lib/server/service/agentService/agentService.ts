@@ -243,8 +243,7 @@ export abstract class AgentService {
 		}
 
 		const subagents: Subagents = {};
-		agentConfig.subagents.forEach((subagent) => {
-			const envVarSuffix = subagent.name.toUpperCase().replaceAll('-', '_');
+		agentConfig.subagents.forEach((subagent, index) => {
 			switch (subagent.authMode) {
 				case 'none':
 					subagents[subagent.name] = {
@@ -261,7 +260,7 @@ export abstract class AgentService {
 					};
 					break;
 				case 'oauth_client_credentials': {
-					const clientSecretEnvVar = `${SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX}_${envVarSuffix}`;
+					const clientSecretEnvVar = `${SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX}${index}`;
 					secretData[clientSecretEnvVar] = subagent.clientSecret;
 					subagents[subagent.name] = {
 						url: subagent.url,
@@ -277,7 +276,7 @@ export abstract class AgentService {
 					break;
 				}
 				case 'oauth_token_exchange': {
-					const clientSecretEnvVar = `${SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX}_${envVarSuffix}`;
+					const clientSecretEnvVar = `${SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX}${index}`;
 					secretData[clientSecretEnvVar] = subagent.clientSecret;
 					subagents[subagent.name] = {
 						url: subagent.url,
@@ -294,8 +293,8 @@ export abstract class AgentService {
 					};
 					break;
 				}
-					const apiKeyEnvVar = `${SUBAGENT_API_KEY_ENV_VAR_PREFIX}_${envVarSuffix}`;
 				case 'apiKey': {
+					const apiKeyEnvVar = `${SUBAGENT_API_KEY_ENV_VAR_PREFIX}${index}`;
 					secretData[apiKeyEnvVar] = subagent.apiKey;
 					subagents[subagent.name] = {
 						url: subagent.url,
