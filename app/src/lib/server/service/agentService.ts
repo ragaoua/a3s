@@ -36,6 +36,8 @@ interface AgentDeploymentConfig {
 const LLM_API_KEY_ENV_VAR = 'A3S_LLM_API_KEY';
 const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
 const MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_MCP_SERVER_CLIENT_SECRET';
+const SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_SUBAGENT_CLIENT_SECRET';
+const SUBAGENT_API_KEY_ENV_VAR_PREFIX = 'A3S_SUBAGENT_API_KEY';
 
 abstract class AgentService {
 	protected abstract getKubeConfig(): KubeConfig;
@@ -261,6 +263,74 @@ abstract class AgentService {
 			secretData[AGENT_API_KEY_ENV_VAR] = agentApiKey;
 		}
 
+		const subagents: NonNullable<AgentRuntimeConfig['agent']['subagents']> = {};
+		agentConfig.subagents.forEach((subagent) => {
+			const envVarSuffix = subagent.name.toUpperCase().replaceAll('-', '_');
+			switch (subagent.authMode) {
+				case 'none':
+					subagents[subagent.name] = {
+						url: subagent.url,
+						type: subagent.type,
+						auth: 'none'
+					};
+					break;
+				case 'oauth_token_forward':
+					subagents[subagent.name] = {
+						url: subagent.url,
+						type: subagent.type,
+						auth: { mode: 'oauth_token_forward' }
+					};
+					break;
+				case 'oauth_client_credentials': {
+					const clientSecretEnvVar = `${SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX}_${envVarSuffix}`;
+					secretData[clientSecretEnvVar] = subagent.clientSecret;
+					subagents[subagent.name] = {
+						url: subagent.url,
+						type: subagent.type,
+						auth: {
+							mode: 'oauth_client_credentials',
+							client_id: subagent.clientId,
+							client_secret: `\${${clientSecretEnvVar}}`,
+							auth_method: subagent.authMethod,
+							token_endpoint: subagent.tokenEndpoint
+						}
+					};
+					break;
+				}
+				case 'oauth_token_exchange': {
+					const clientSecretEnvVar = `${SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX}_${envVarSuffix}`;
+					secretData[clientSecretEnvVar] = subagent.clientSecret;
+					subagents[subagent.name] = {
+						url: subagent.url,
+						type: subagent.type,
+						auth: {
+							mode: 'oauth_token_exchange',
+							client_id: subagent.clientId,
+							client_secret: `\${${clientSecretEnvVar}}`,
+							auth_method: subagent.authMethod,
+							...(subagent.tokenEndpoint !== undefined
+								? { discovered: false, token_endpoint: subagent.tokenEndpoint }
+								: { discovered: true })
+						}
+					};
+					break;
+				}
+				case 'apikey': {
+					const apiKeyEnvVar = `${SUBAGENT_API_KEY_ENV_VAR_PREFIX}_${envVarSuffix}`;
+					secretData[apiKeyEnvVar] = subagent.apiKey;
+					subagents[subagent.name] = {
+						url: subagent.url,
+						type: subagent.type,
+						auth: {
+							mode: 'api_key',
+							api_key: `\${${apiKeyEnvVar}}`
+						}
+					};
+					break;
+				}
+			}
+		});
+
 		const config: AgentRuntimeConfig = {
 			llm: {
 				api_url: agentConfig.apiUrl,
@@ -270,7 +340,8 @@ abstract class AgentService {
 			agent: {
 				name: agentConfig.name,
 				description: agentConfig.description,
-				instructions: agentConfig.instructions
+				instructions: agentConfig.instructions,
+				...(Object.keys(subagents).length > 0 ? { subagents } : {})
 			},
 			server: {
 				listen_address: '0.0.0.0',

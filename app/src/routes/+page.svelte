@@ -27,9 +27,9 @@
 
 	const agentAuthMismatch = $derived(mcpServerAuthMismatch || subagentAuthMismatch);
 
-  function buildAuthLabel(authMode: OutboundAuthMode): string {
-    return `Auth: ${OUTBOUND_AUTH_MODE_LABELS[authMode]}`
-  }
+	function buildAuthLabel(authMode: OutboundAuthMode): string {
+		return `Auth: ${OUTBOUND_AUTH_MODE_LABELS[authMode]}`;
+	}
 </script>
 
 <main class="min-h-screen bg-transparent px-4 py-12 text-neutral-100">

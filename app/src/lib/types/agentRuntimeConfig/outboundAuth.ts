@@ -29,3 +29,8 @@ export const oauthStaticTokenExchangeAuthSchema = oauthTokenExchangeAuthSchema.e
 	discovered: z.literal(false),
 	token_endpoint: z.url()
 });
+
+export const outboundApiKeyAuthSchema = z.object({
+	mode: z.literal('api_key'),
+	api_key: z.string().min(1)
+});
