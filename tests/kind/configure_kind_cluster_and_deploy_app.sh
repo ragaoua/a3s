@@ -30,7 +30,8 @@ k8s_ca_data="$(
   )"
 
 log "Running app..."
-K8S_SERVER_URL="$k8s_server_url" \
+A3S_AGENT_IMAGE="$A3S_AGENT_IMAGE" \
+  K8S_SERVER_URL="$k8s_server_url" \
   K8S_CA_DATA="$k8s_ca_data" \
   K8S_SERVICE_ACCOUNT_TOKEN="$sa_token" \
   K8S_CLUSTER_NAME=a3s-kind \

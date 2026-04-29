@@ -24,6 +24,8 @@ spec:
       image: ${APP_IMAGE}
       imagePullPolicy: Never
       env:
+        - name: A3S_AGENT_IMAGE
+          value: ${A3S_AGENT_IMAGE}
         - name: K8S_AGENTS_NAMESPACE
           value: agents-ns
         - name: ORIGIN

@@ -7,7 +7,10 @@
 		type = 'text',
 		placeholder = '',
 		required = false,
-		isTextarea = false
+		isTextarea = false,
+		maxlength,
+		pattern,
+		title
 	}: {
 		label?: string;
 		id: string;
@@ -17,6 +20,9 @@
 		placeholder?: string;
 		required?: boolean;
 		isTextarea?: boolean;
+		maxlength?: number;
+		pattern?: string;
+		title?: string;
 	} = $props();
 
 	const fieldClass =
@@ -29,9 +35,29 @@
 	{/if}
 
 	{#if isTextarea}
-		<textarea {id} {name} rows={3} bind:value {placeholder} {required} class={fieldClass}
+		<textarea
+			{id}
+			{name}
+			rows={3}
+			bind:value
+			{placeholder}
+			{required}
+			{maxlength}
+			{title}
+			class={fieldClass}
 		></textarea>
 	{:else}
-		<input {id} {name} {type} bind:value {placeholder} {required} class={fieldClass} />
+		<input
+			{id}
+			{name}
+			{type}
+			bind:value
+			{placeholder}
+			{required}
+			{maxlength}
+			{pattern}
+			{title}
+			class={fieldClass}
+		/>
 	{/if}
 </div>
