@@ -1,37 +1,14 @@
 import { CoreV1Api, KubeConfig } from '@kubernetes/client-node';
-import { env } from '$env/dynamic/private';
 import { randomBytes } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import YAML from 'yaml';
-import { agentRuntimeConfigSchema, type AgentRuntimeConfig } from '../../types/agentRuntimeConfig';
+import {
+	agentRuntimeConfigSchema,
+	type AgentRuntimeConfig
+} from '../../../types/agentRuntimeConfig';
 import type { AgentConfigForm } from '$lib/types/agentConfigForm';
-import { AGENT_NAME_ANNOTATION, sanitizeKubernetesName } from './kubernetesName';
-
-interface DeployAgentResult {
-	agentApiKey?: string;
-}
-
-export interface AgentSummary {
-	agentName: string;
-	podName: string;
-	status: string;
-	createdAt: string;
-}
-
-interface KubernetesClusterParams {
-	clusterName: string;
-	server: string;
-	serviceAccount: string;
-	serviceAccountToken: string;
-	serviceAccountNamespace: string;
-	agentsNamespace: string;
-	caData: string;
-}
-
-interface AgentDeploymentConfig {
-	runtimeConfig: AgentRuntimeConfig;
-	secretData: Record<string, string>;
-}
+import { AGENT_NAME_ANNOTATION, sanitizeKubernetesName } from '../kubernetesName';
+import type { AgentSummary } from './types/agentSummary';
+import type { AgentDeploymentConfig } from './types/agentDeploymentConfig';
 
 const LLM_API_KEY_ENV_VAR = 'A3S_LLM_API_KEY';
 const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
@@ -39,12 +16,12 @@ const MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_MCP_SERVER_CLIENT_SECRET';
 const SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_SUBAGENT_CLIENT_SECRET';
 const SUBAGENT_API_KEY_ENV_VAR_PREFIX = 'A3S_SUBAGENT_API_KEY';
 
-abstract class AgentService {
+export abstract class AgentService {
 	protected abstract getKubeConfig(): KubeConfig;
 
 	protected abstract getNamespace(): Promise<string>;
 
-	async deployToKubernetes(agentConfig: AgentConfigForm): Promise<DeployAgentResult> {
+	async deployToKubernetes(agentConfig: AgentConfigForm): Promise<{ agentApiKey?: string }> {
 		const kc = this.getKubeConfig();
 		const namespace = await this.getNamespace();
 		const core = kc.makeApiClient(CoreV1Api);
@@ -457,74 +434,6 @@ abstract class AgentService {
 	}
 }
 
-class RemoteDeploymentAgentService extends AgentService {
-	constructor(private readonly kubernetesParams: KubernetesClusterParams) {
-		super();
-	}
-
-	protected async getNamespace() {
-		return this.kubernetesParams.agentsNamespace;
-	}
-
-	protected getKubeConfig() {
-		const kc = new KubeConfig();
-		kc.loadFromOptions({
-			clusters: [
-				{
-					name: this.kubernetesParams.clusterName,
-					server: this.kubernetesParams.server,
-					caData: this.kubernetesParams.caData
-				}
-			],
-			users: [
-				{
-					name: this.kubernetesParams.serviceAccount,
-					token: this.kubernetesParams.serviceAccountToken,
-					namespace: this.kubernetesParams.serviceAccountNamespace
-				}
-			],
-			contexts: [
-				{
-					cluster: this.kubernetesParams.clusterName,
-					user: this.kubernetesParams.serviceAccount,
-					namespace: this.kubernetesParams.serviceAccountNamespace
-				}
-			]
-		});
-
-		return kc;
-	}
-}
-
-class InClusterDeploymentAgentService extends AgentService {
-	protected async getNamespace() {
-		const namespaceFromEnv = env.K8S_AGENTS_NAMESPACE;
-		if (namespaceFromEnv) {
-			return namespaceFromEnv;
-		}
-
-		const namespaceFile = '/var/run/secrets/kubernetes.io/serviceaccount/namespace';
-		try {
-			const namespace = (await readFile(namespaceFile, 'utf8')).trim();
-			if (namespace) {
-				return namespace;
-			}
-		} catch {
-			// Fall through to explicit error with expected sources.
-		}
-
-		throw new Error(
-			'Missing Kubernetes namespace. Set K8S_AGENTS_NAMESPACE or ensure in-cluster namespace file is mounted.'
-		);
-	}
-
-	protected getKubeConfig() {
-		const kc = new KubeConfig();
-		kc.loadFromCluster();
-		return kc;
-	}
-}
-
 function buildSkillMarkdown(skill: { name: string; description: string; content: string }): string {
 	const frontmatter = YAML.stringify({
 		name: skill.name,
@@ -533,37 +442,3 @@ function buildSkillMarkdown(skill: { name: string; description: string; content:
 	const content = skill.content.endsWith('\n') ? skill.content : `${skill.content}\n`;
 	return `---\n${frontmatter}\n---\n\n${content}`;
 }
-
-function getRequiredEnv(name: string): string {
-	const value = env[name];
-
-	if (!value) {
-		throw new Error(`Missing required environment variable: ${name}`);
-	}
-
-	return value;
-}
-
-type K8sDeployMode = 'inCluster' | 'remote' | 'auto';
-
-function resolveDeployMode(): 'inCluster' | 'remote' {
-	const raw = (env.K8S_DEPLOY_MODE ?? 'auto') as K8sDeployMode;
-	if (raw === 'inCluster' || raw === 'remote') return raw;
-	if (raw === 'auto') {
-		return env.KUBERNETES_SERVICE_HOST ? 'inCluster' : 'remote';
-	}
-	throw new Error(`Invalid K8S_DEPLOY_MODE: ${raw}`);
-}
-
-export const agentService: AgentService =
-	resolveDeployMode() === 'inCluster'
-		? new InClusterDeploymentAgentService()
-		: new RemoteDeploymentAgentService({
-				clusterName: getRequiredEnv('K8S_CLUSTER_NAME'),
-				server: getRequiredEnv('K8S_SERVER_URL'),
-				serviceAccount: getRequiredEnv('K8S_SERVICE_ACCOUNT'),
-				serviceAccountToken: getRequiredEnv('K8S_SERVICE_ACCOUNT_TOKEN'),
-				serviceAccountNamespace: getRequiredEnv('K8S_SERVICE_ACCOUNT_NAMESPACE'),
-				agentsNamespace: getRequiredEnv('K8S_AGENTS_NAMESPACE'),
-				caData: getRequiredEnv('K8S_CA_DATA')
-			});
