@@ -1,22 +1,13 @@
 import { newMcpServer, type McpServer } from '../types/mcpServer';
 import { newSkill, type Skill } from '../types/skill';
 import { newSubagent, type Subagent } from '../types/subagent';
-
-type PanelKinds = 'mcpServer' | 'skill' | 'subagent';
-
-type ClosedPanelState = { kind: 'closed' };
-type OpenPanelState<TKind extends PanelKinds> =
-	| { kind: TKind; mode: 'add' }
-	| { kind: TKind; mode: 'edit'; index: number };
-
-type AnyOpenPanelState = TKindToOpenPanelState<PanelKinds>;
-type TKindToOpenPanelState<TKind extends PanelKinds> = TKind extends PanelKinds
-	? OpenPanelState<TKind>
-	: never;
-
-type McpServerPanelState = OpenPanelState<'mcpServer'>;
-type SkillPanelState = OpenPanelState<'skill'>;
-type SubagentPanelState = OpenPanelState<'subagent'>;
+import type {
+	AnyOpenPanelState,
+	ClosedPanelState,
+	McpServerPanelState,
+	SkillPanelState,
+	SubagentPanelState
+} from '../types/slideOverPanel';
 
 export class DeployAgentFormState {
 	agentName: string = $state('');
