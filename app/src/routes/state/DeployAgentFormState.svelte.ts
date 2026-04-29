@@ -2,8 +2,6 @@ import { newMcpServer, type McpServer } from '../types/mcpServer';
 import { newSkill, type Skill } from '../types/skill';
 import { newSubagent, type Subagent } from '../types/subagent';
 
-export type AgentAuthMode = 'apiKey' | 'oauth2' | 'none';
-
 type PanelKinds = 'mcpServer' | 'skill' | 'subagent';
 
 type ClosedPanelState = { kind: 'closed' };
@@ -29,7 +27,7 @@ export class DeployAgentFormState {
 	apiUrl: string = $state('');
 	apiKey: string = $state('');
 
-	authMode: AgentAuthMode = $state('apiKey');
+	authMode: 'apiKey' | 'oauth2' | 'none' = $state('apiKey');
 	oauth2IssuerUrl = $state('');
 
 	mcpServers: McpServer[] = $state([]);
