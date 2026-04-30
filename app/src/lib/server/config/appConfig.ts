@@ -13,17 +13,14 @@ export const remoteDeploymentSchema = z.object({
 	server: z.string(),
 	serviceAccount: z.string(),
 	serviceAccountNamespace: z.string(),
+	serviceAccountToken: z.string(),
 	caData: z.string() // Base64-encoded
 });
 export type RemoteDeployment = z.infer<typeof remoteDeploymentSchema>;
 
-export type DeploymentSchema =
-	| InClusterDeployment
-	| (RemoteDeployment & {
-			serviceAccountToken: string;
-	  });
+export type Deployment = InClusterDeployment | RemoteDeployment;
 
 export type AppConfig = {
 	agentImage: string;
-	deployment: DeploymentSchema;
+	deployment: Deployment;
 };

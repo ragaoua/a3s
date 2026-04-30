@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 import { configFileSchema, type ConfigFile, type ConfigFileDeploymentSchema } from './configFile';
 import { resolve } from 'node:path';
-import { remoteDeploymentSchema, type AppConfig, type DeploymentSchema } from './appConfig';
+import { remoteDeploymentSchema, type AppConfig, type Deployment } from './appConfig';
 
 const CONFIG_PATH = env.A3S_CONFIG_PATH ?? './config.yaml';
 
@@ -29,7 +29,7 @@ function getRequiredEnv(name: string): string {
 	return value;
 }
 
-function resolveDeployment(deployment: ConfigFileDeploymentSchema): DeploymentSchema {
+function resolveDeployment(deployment: ConfigFileDeploymentSchema): Deployment {
 	switch (deployment.mode) {
 		case 'inCluster':
 			return deployment;
@@ -50,13 +50,11 @@ function resolveDeployment(deployment: ConfigFileDeploymentSchema): DeploymentSc
 
 			const remoteDeployment = remoteDeploymentSchema.parse({
 				...deployment,
-				mode: 'remote'
+				mode: 'remote',
+				serviceAccountToken: getRequiredEnv('K8S_SERVICE_ACCOUNT_TOKEN')
 			});
 
-			return {
-				...remoteDeployment,
-				serviceAccountToken: getRequiredEnv('K8S_SERVICE_ACCOUNT_TOKEN')
-			};
+			return remoteDeployment;
 		}
 	}
 }

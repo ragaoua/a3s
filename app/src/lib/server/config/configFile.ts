@@ -1,9 +1,11 @@
 import z from 'zod';
 import { inClusterDeploymentSchema, remoteDeploymentSchema } from './appConfig';
 
+const configFileRemoteDeploymentSchema = remoteDeploymentSchema.omit({ serviceAccountToken: true });
+
 const configFileDeploymentSchema = z.discriminatedUnion('mode', [
 	inClusterDeploymentSchema,
-	remoteDeploymentSchema,
+	configFileRemoteDeploymentSchema,
 	z.object({
 		mode: z.literal('auto'),
 		agentsNamespace: z.string().optional(),
