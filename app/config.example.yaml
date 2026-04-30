@@ -1,0 +1,20 @@
+# Container image used for agent pods, e.g. localhost/a3s-agent
+agentImage: localhost/a3s-agent
+
+# For deploying to a remote K8s cluster
+# mode defaults to auto
+deployment:
+  # mode: inCluster
+  # # When mode=inCluster, this is optional and defaults to app's namespace if missing
+  # agentsNamespace: agents-ns
+
+  mode: remote
+  agentsNamespace: agents-ns
+  clusterName: ''
+  server: ''
+  serviceAccount: ''
+  serviceAccountNamespace: ''
+  # Base64-encoded CA certificate of the remote cluster's API server.
+  caData: ''
+
+  # mode: auto

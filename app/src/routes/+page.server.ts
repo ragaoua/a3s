@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions } from './$types';
-import { agentService } from '$lib/server/service/agentService';
+import { getAgentService } from '$lib/server/service/agentService';
 import { agentConfigFormSchema } from '../lib/types/agentConfigForm';
 
 function trimOrUndefined(formData: FormData, name: string): string | undefined {
@@ -40,7 +40,7 @@ export const actions: Actions = {
 		}
 
 		const data = formDataValidationResult.data;
-		const { agentApiKey } = await agentService.deployToKubernetes(data);
+		const { agentApiKey } = await getAgentService().deployToKubernetes(data);
 
 		return {
 			success: true,

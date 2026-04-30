@@ -1,16 +1,18 @@
-import { env } from '$env/dynamic/private';
 import { readFile } from 'node:fs/promises';
 import { KubeConfig } from '@kubernetes/client-node';
 import { AgentService } from './agentService';
 
 export class InClusterDeploymentAgentService extends AgentService {
-	constructor(a3sAgentImage: string) {
+	constructor(
+		a3sAgentImage: string,
+		private readonly agentsNamespace?: string
+	) {
 		super(a3sAgentImage);
 	}
+
 	protected async getNamespace() {
-		const namespaceFromEnv = env.K8S_AGENTS_NAMESPACE;
-		if (namespaceFromEnv) {
-			return namespaceFromEnv;
+		if (this.agentsNamespace) {
+			return this.agentsNamespace;
 		}
 
 		const namespaceFile = '/var/run/secrets/kubernetes.io/serviceaccount/namespace';
@@ -24,7 +26,7 @@ export class InClusterDeploymentAgentService extends AgentService {
 		}
 
 		throw new Error(
-			'Missing Kubernetes namespace. Set K8S_AGENTS_NAMESPACE or ensure in-cluster namespace file is mounted.'
+			'Missing Kubernetes namespace. Set the agents namespace in the config file or ensure in-cluster namespace file is mounted.'
 		);
 	}
 

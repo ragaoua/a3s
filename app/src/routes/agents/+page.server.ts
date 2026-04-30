@@ -1,8 +1,8 @@
-import { agentService } from '$lib/server/service/agentService';
+import { getAgentService } from '$lib/server/service/agentService';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async () => {
-	const agents = await agentService.listAgents();
+	const agents = await getAgentService().listAgents();
 
 	return {
 		agents
