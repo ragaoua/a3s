@@ -24,8 +24,34 @@ The app reads its configuration from a YAML file (default: `./config.yaml`,
 override with the `A3S_CONFIG_PATH` env var). See
 [`config.example.yaml`](./config.example.yaml) for a fully commented template.
 
-The only secret read from the environment is `K8S_SERVICE_ACCOUNT_TOKEN`,
-required when the deployment mode resolves to `remote`.
+Secrets read from the environment:
+
+- `K8S_SERVICE_ACCOUNT_TOKEN`: required when the deployment mode resolves to
+  `remote`.
+- `AUTH_CLIENT_SECRET`: the OIDC client secret for the configured identity
+  provider (`auth.clientId` in the configuration file). Used and required
+  only when `auth.publicClient` is `false` (the default).
+- `AUTH_SECRET`: a random string used to sign session cookies.
+
+### Authentication
+
+The app delegates authentication to an external OIDC provider (Keycloak,
+Auth0, Google, ...).
+
+Configure the provider in `config.yaml`:
+
+```yaml
+auth:
+  issuerUrl: https://example.com/realms/a3s
+  clientId: a3s-app
+  # publicClient: false  # set to true for a PKCE-only public client
+```
+
+By default the app acts as a confidential OIDC client and requires
+`AUTH_CLIENT_SECRET`. Set `auth.publicClient: true` if the IdP registers a3s
+as a public client; in that case PKCE is used and no client secret is read.
+
+The provider must allow the redirect URI `<app-url>/auth/callback/oidc`.
 
 ### Kubernetes deployment modes
 

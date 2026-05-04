@@ -3,7 +3,12 @@ import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 import { configFileSchema, type ConfigFile, type ConfigFileDeploymentSchema } from './configFile';
 import { resolve } from 'node:path';
-import { remoteDeploymentSchema, type AppConfig, type Deployment } from './appConfig';
+import {
+	remoteDeploymentSchema,
+	type AppConfig,
+	type AuthConfig,
+	type Deployment
+} from './appConfig';
 
 const CONFIG_PATH = env.A3S_CONFIG_PATH ?? './config.yaml';
 
@@ -59,6 +64,18 @@ function resolveDeployment(deployment: ConfigFileDeploymentSchema): Deployment {
 	}
 }
 
+function resolveAuth(auth: {
+	issuerUrl: string;
+	clientId: string;
+	publicClient: boolean;
+}): AuthConfig {
+	return {
+		...auth,
+		clientSecret: auth.publicClient ? undefined : getRequiredEnv('AUTH_CLIENT_SECRET'),
+		secret: getRequiredEnv('AUTH_SECRET')
+	};
+}
+
 let cachedConfig: AppConfig | undefined;
 
 export function getConfig(): AppConfig {
@@ -66,7 +83,8 @@ export function getConfig(): AppConfig {
 		const yaml = loadYaml();
 		cachedConfig = {
 			...yaml,
-			deployment: resolveDeployment(yaml.deployment)
+			deployment: resolveDeployment(yaml.deployment),
+			auth: resolveAuth(yaml.auth)
 		};
 	}
 	return cachedConfig;

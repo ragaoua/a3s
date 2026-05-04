@@ -43,6 +43,7 @@
 		"vitest-browser-svelte": "^2.0.2"
 	},
 	"dependencies": {
+		"@auth/sveltekit": "^1.11.2",
 		"@kubernetes/client-node": "^1.4.0",
 		"yaml": "^2.8.3",
 		"zod": "^4.3.6"

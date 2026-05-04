@@ -1,5 +1,11 @@
 import z from 'zod';
-import { inClusterDeploymentSchema, remoteDeploymentSchema } from './appConfig';
+import { authConfigSchema, inClusterDeploymentSchema, remoteDeploymentSchema } from './appConfig';
+
+const configFileAuthSchema = authConfigSchema
+	.omit({ clientSecret: true, secret: true, publicClient: true })
+	.extend({
+		publicClient: z.boolean().default(false)
+	});
 
 const configFileRemoteDeploymentSchema = remoteDeploymentSchema.omit({ serviceAccountToken: true });
 
@@ -20,6 +26,7 @@ export type ConfigFileDeploymentSchema = z.infer<typeof configFileDeploymentSche
 
 export const configFileSchema = z.object({
 	agentImage: z.string(),
-	deployment: configFileDeploymentSchema
+	deployment: configFileDeploymentSchema,
+	auth: configFileAuthSchema
 });
 export type ConfigFile = z.infer<typeof configFileSchema>;

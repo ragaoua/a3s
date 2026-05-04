@@ -1,6 +1,15 @@
 # Container image used for agent pods, e.g. localhost/a3s-agent
 agentImage: localhost/a3s-agent
 
+# Authentication via an external OIDC provider (Keycloak, Auth0, Google, ...).
+# AUTH_SECRET (random, used to sign session cookies) env var is required.
+# When publicClient is false (default), AUTH_CLIENT_SECRET is also required.
+# When publicClient is true, the client uses PKCE only and no secret is read.
+auth:
+  issuerUrl: https://example.com/realms/a3s
+  clientId: a3s-app
+  # publicClient: false
+
 # For deploying to a remote K8s cluster
 # mode defaults to auto
 deployment:

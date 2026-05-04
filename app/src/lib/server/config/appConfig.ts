@@ -1,5 +1,14 @@
 import z from 'zod';
 
+export const authConfigSchema = z.object({
+	issuerUrl: z.url(),
+	clientId: z.string().min(1),
+	clientSecret: z.string().min(1).optional(),
+	publicClient: z.boolean(),
+	secret: z.string().min(1)
+});
+export type AuthConfig = z.infer<typeof authConfigSchema>;
+
 export const inClusterDeploymentSchema = z.object({
 	mode: z.literal('inCluster'),
 	agentsNamespace: z.string().optional()
@@ -23,4 +32,5 @@ export type Deployment = InClusterDeployment | RemoteDeployment;
 export type AppConfig = {
 	agentImage: string;
 	deployment: Deployment;
+	auth: AuthConfig;
 };

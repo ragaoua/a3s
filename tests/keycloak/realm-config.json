@@ -7,6 +7,7 @@
       "enabled": true,
       "publicClient": false,
       "secret": "a3s-test-secret",
+      "redirectUris": ["http://localhost:5173/*"],
       "attributes": {
         "standard.token.exchange.enabled": "true",
         "access.token.header.type.rfc9068": "true"
@@ -36,6 +37,22 @@
             "id.token.claim": "true",
             "introspection.token.claim": "true"
           }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "testuser@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
         }
       ]
     }
