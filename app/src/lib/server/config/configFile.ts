@@ -1,11 +1,21 @@
 import z from 'zod';
-import { authConfigSchema, inClusterDeploymentSchema, remoteDeploymentSchema } from './appConfig';
+import {
+	disabledAuthConfigSchema,
+	enabledAuthConfigSchema,
+	inClusterDeploymentSchema,
+	remoteDeploymentSchema
+} from './appConfig';
 
-const configFileAuthSchema = authConfigSchema
+const configFileEnabledAuthSchema = enabledAuthConfigSchema
 	.omit({ clientSecret: true, secret: true, publicClient: true })
 	.extend({
 		publicClient: z.boolean().default(false)
 	});
+
+const configFileAuthSchema = z.discriminatedUnion('enabled', [
+	configFileEnabledAuthSchema,
+	disabledAuthConfigSchema
+]);
 
 const configFileRemoteDeploymentSchema = remoteDeploymentSchema.omit({ serviceAccountToken: true });
 

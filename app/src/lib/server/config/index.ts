@@ -64,11 +64,14 @@ function resolveDeployment(deployment: ConfigFileDeploymentSchema): Deployment {
 	}
 }
 
-function resolveAuth(auth: {
-	issuerUrl: string;
-	clientId: string;
-	publicClient: boolean;
-}): AuthConfig {
+function resolveAuth(
+	auth:
+		| { enabled: true; issuerUrl: string; clientId: string; publicClient: boolean }
+		| { enabled: false }
+): AuthConfig {
+	if (!auth.enabled) {
+		return { enabled: false };
+	}
 	return {
 		...auth,
 		clientSecret: auth.publicClient ? undefined : getRequiredEnv('AUTH_CLIENT_SECRET'),

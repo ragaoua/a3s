@@ -1,6 +1,6 @@
 import { redirect, type Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
-import { handle as authHandle } from './auth';
+import { authEnabled, handle as authHandle } from './auth';
 
 const PUBLIC_PATHS = ['/signin'];
 
@@ -17,4 +17,4 @@ const authorize: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = sequence(authHandle, authorize);
+export const handle = authEnabled ? sequence(authHandle, authorize) : authHandle;

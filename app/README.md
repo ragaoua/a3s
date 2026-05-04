@@ -42,6 +42,7 @@ Configure the provider in `config.yaml`:
 
 ```yaml
 auth:
+  enabled: true
   issuerUrl: https://example.com/realms/a3s
   clientId: a3s-app
   # publicClient: false  # set to true for a PKCE-only public client
@@ -52,6 +53,17 @@ By default the app acts as a confidential OIDC client and requires
 as a public client; in that case PKCE is used and no client secret is read.
 
 The provider must allow the redirect URI `<app-url>/auth/callback/oidc`.
+
+Authentication can be disabled entirely (intended for local development or
+single-tenant setups) by setting:
+
+```yaml
+auth:
+  enabled: false
+```
+
+When disabled, no IdP fields or env vars are read and all routes are
+accessible without sign-in.
 
 ### Kubernetes deployment modes
 
