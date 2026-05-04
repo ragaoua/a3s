@@ -1,9 +1,6 @@
 <script lang="ts">
-	import {
-		OAUTH2_ENDPOINT_SOURCE_LABELS,
-		OAUTH2_ENDPOINT_SOURCE_OPTIONS,
-		type Oauth2JwtPolicy
-	} from '../types/oauth2Policies';
+	import { OAUTH2_ENDPOINT_SOURCE_LABELS, type Oauth2JwtPolicy } from '../types/oauth2Policies';
+	import { OAUTH2_ENDPOINT_SOURCE_OPTIONS } from '$lib/types/agentConfigForm/oauth2Policies';
 	import FormField from './FormField.svelte';
 	import RadioGroup from './RadioGroup.svelte';
 
@@ -48,11 +45,7 @@
 <div class="flex items-center justify-between gap-3">
 	<p class="text-sm font-medium text-neutral-100">RFC 9068 claims validation</p>
 	<label class={checkboxLabelClass}>
-		<input
-			type="checkbox"
-			class="accent-neutral-300"
-			bind:checked={jwtDraft.rfc9068Enabled}
-		/>
+		<input type="checkbox" class="accent-neutral-300" bind:checked={jwtDraft.rfc9068Enabled} />
 		<span>Enabled</span>
 	</label>
 </div>

@@ -3,6 +3,7 @@ import { skillFormSchema } from './skill';
 import { subagentFormSchema } from './subagent';
 import { mcpServerFormSchema } from './mcpServer';
 import { addOauth2OnlyAuthModeIssues } from './outboundAuth';
+import { oauth2PoliciesFormSchema } from './oauth2Policies';
 
 const baseAgentConfigFormSchema = z.object({
 	name: z.string().min(1),
@@ -26,7 +27,8 @@ export const agentConfigFormSchema = z
 		}),
 		baseAgentConfigFormSchema.extend({
 			authMode: z.literal('oauth2'),
-			oauth2IssuerUrl: z.url()
+			oauth2IssuerUrl: z.url(),
+			oauth2Policies: oauth2PoliciesFormSchema
 		})
 	])
 	.superRefine((data, ctx) => {

@@ -1,6 +1,5 @@
+import { OAUTH2_ENDPOINT_SOURCE_OPTIONS } from '$lib/types/agentConfigForm/oauth2Policies';
 import { OAUTH2_AUTH_METHOD_OPTIONS } from '$lib/types/agentRuntimeConfig/outboundAuth';
-
-export const OAUTH2_ENDPOINT_SOURCE_OPTIONS = ['discovered', 'static'] as const;
 
 export type Oauth2EndpointSource = (typeof OAUTH2_ENDPOINT_SOURCE_OPTIONS)[number];
 

@@ -177,6 +177,12 @@
 						onConfigureIntrospection={() => s.openPanel({ kind: 'oauth2Introspection' })}
 						onDisableIntrospection={() => s.disableOauth2Introspection()}
 					/>
+
+					<input
+						type="hidden"
+						name="oauth2Policies"
+						value={JSON.stringify(s.oauth2Policies)}
+					/>
 				{:else}
 					<div class="flex gap-3">
 						<span class="text-neutral-400">Authentication will be disabled.</span>

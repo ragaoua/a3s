@@ -8,10 +8,18 @@ function trimOrUndefined(formData: FormData, name: string): string | undefined {
 	return value === '' ? undefined : value;
 }
 
-function parseJsonField(formData: FormData, name: string) {
+function parseRepeatedJsonField(formData: FormData, name: string) {
 	return formData.getAll(name).map((value) => {
 		return JSON.parse(String(value));
 	});
+}
+
+function parseJsonField(formData: FormData, name: string): unknown {
+	const value = formData.get(name);
+	if (typeof value !== 'string' || value === '') {
+		return undefined;
+	}
+	return JSON.parse(value);
 }
 
 export const actions: Actions = {
@@ -26,9 +34,10 @@ export const actions: Actions = {
 			instructions: trimOrUndefined(formData, 'instructions'),
 			authMode: trimOrUndefined(formData, 'authMode'),
 			oauth2IssuerUrl: trimOrUndefined(formData, 'oauth2IssuerUrl'),
-			mcpServers: parseJsonField(formData, 'mcpServers'),
-			subagents: parseJsonField(formData, 'subagents'),
-			skills: parseJsonField(formData, 'skills')
+			oauth2Policies: parseJsonField(formData, 'oauth2Policies'),
+			mcpServers: parseRepeatedJsonField(formData, 'mcpServers'),
+			subagents: parseRepeatedJsonField(formData, 'subagents'),
+			skills: parseRepeatedJsonField(formData, 'skills')
 		};
 
 		const formDataValidationResult = agentConfigFormSchema.safeParse(formDataDict);

@@ -2,10 +2,10 @@
 	import { OAUTH2_AUTH_METHOD_OPTIONS } from '$lib/types/agentRuntimeConfig/outboundAuth';
 	import {
 		OAUTH2_ENDPOINT_SOURCE_LABELS,
-		OAUTH2_ENDPOINT_SOURCE_OPTIONS,
 		OAUTH2_INTROSPECTION_AUTH_METHOD_LABELS,
 		type Oauth2IntrospectionPolicy
 	} from '../types/oauth2Policies';
+	import { OAUTH2_ENDPOINT_SOURCE_OPTIONS } from '$lib/types/agentConfigForm/oauth2Policies';
 	import FormField from './FormField.svelte';
 	import RadioGroup from './RadioGroup.svelte';
 
