@@ -8,6 +8,9 @@
 	import SkillPanelForm from './components/SkillPanelForm.svelte';
 	import SubagentPanelForm from './components/SubagentPanelForm.svelte';
 	import ItemCardsList from './components/ItemCardsList.svelte';
+	import Oauth2PoliciesForm from './components/Oauth2PoliciesForm.svelte';
+	import Oauth2JwtPanelForm from './components/Oauth2JwtPanelForm.svelte';
+	import Oauth2IntrospectionPanelForm from './components/Oauth2IntrospectionPanelForm.svelte';
 	import { OUTBOUND_AUTH_MODE_LABELS, type OutboundAuthMode } from './types/outboundAuthConfig';
 
 	const s = new DeployAgentFormState();
@@ -166,6 +169,14 @@
 						bind:value={s.oauth2IssuerUrl}
 						required
 					/>
+
+					<Oauth2PoliciesForm
+						policies={s.oauth2Policies}
+						onConfigureJwt={() => s.openPanel({ kind: 'oauth2Jwt' })}
+						onDisableJwt={() => s.disableOauth2Jwt()}
+						onConfigureIntrospection={() => s.openPanel({ kind: 'oauth2Introspection' })}
+						onDisableIntrospection={() => s.disableOauth2Introspection()}
+					/>
 				{:else}
 					<div class="flex gap-3">
 						<span class="text-neutral-400">Authentication will be disabled.</span>
@@ -215,5 +226,13 @@
 			bind:subagentDraft={s.subagentDraft}
 			agentAuthMismatch={subagentAuthMismatch}
 		/>
+	{:else if s.panelState.kind === 'oauth2Jwt'}
+		<Oauth2JwtPanelForm
+			bind:jwtDraft={s.oauth2JwtDraft}
+			onAddClaim={() => s.addOauth2JwtClaimDraft()}
+			onRemoveClaim={(index) => s.removeOauth2JwtClaimDraft(index)}
+		/>
+	{:else if s.panelState.kind === 'oauth2Introspection'}
+		<Oauth2IntrospectionPanelForm bind:introspectionDraft={s.oauth2IntrospectionDraft} />
 	{/if}
 </SlideOverPanel>

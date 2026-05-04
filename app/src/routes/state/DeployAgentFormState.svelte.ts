@@ -1,4 +1,12 @@
 import { newMcpServer, type McpServer } from '../types/mcpServer';
+import {
+	newOauth2IntrospectionPolicy,
+	newOauth2JwtPolicy,
+	newOauth2PoliciesConfig,
+	type Oauth2IntrospectionPolicy,
+	type Oauth2JwtPolicy,
+	type Oauth2PoliciesConfig
+} from '../types/oauth2Policies';
 import { newSkill, type Skill } from '../types/skill';
 import { newSubagent, type Subagent } from '../types/subagent';
 import type {
@@ -9,7 +17,13 @@ import type {
 	SubagentPanelState
 } from '../types/slideOverPanel';
 
-const KIND_LABEL = { mcpServer: 'MCP server', skill: 'skill', subagent: 'subagent' } as const;
+const KIND_LABEL = {
+	mcpServer: 'MCP server',
+	skill: 'skill',
+	subagent: 'subagent',
+	oauth2Jwt: 'JWT validation policy',
+	oauth2Introspection: 'introspection policy'
+} as const;
 
 export class DeployAgentFormState {
 	agentName: string = $state('');
@@ -22,6 +36,28 @@ export class DeployAgentFormState {
 
 	authMode: 'apiKey' | 'oauth2' | 'none' = $state('apiKey');
 	oauth2IssuerUrl = $state('');
+	oauth2Policies: Oauth2PoliciesConfig = $state(newOauth2PoliciesConfig());
+
+	oauth2JwtDraft: Oauth2JwtPolicy = $state(newOauth2JwtPolicy());
+	oauth2IntrospectionDraft: Oauth2IntrospectionPolicy = $state(newOauth2IntrospectionPolicy());
+
+	addOauth2JwtClaimDraft() {
+		this.oauth2JwtDraft.claims = [...this.oauth2JwtDraft.claims, { key: '', value: '' }];
+	}
+
+	removeOauth2JwtClaimDraft(index: number) {
+		this.oauth2JwtDraft.claims = this.oauth2JwtDraft.claims.filter(
+			(_, currentIndex) => currentIndex !== index
+		);
+	}
+
+	disableOauth2Jwt() {
+		this.oauth2Policies.jwtEnabled = false;
+	}
+
+	disableOauth2Introspection() {
+		this.oauth2Policies.introspectionEnabled = false;
+	}
 
 	mcpServers: McpServer[] = $state([]);
 	mcpServerDraft: McpServer = $state(newMcpServer());
@@ -39,8 +75,13 @@ export class DeployAgentFormState {
 			return '';
 		}
 
-		const title = `${this.panelState.mode === 'add' ? 'Add' : 'Edit'} ${KIND_LABEL[this.panelState.kind]}`;
-		return title;
+		const subject = KIND_LABEL[this.panelState.kind];
+
+		if (this.panelState.kind === 'oauth2Jwt' || this.panelState.kind === 'oauth2Introspection') {
+			return `Configure ${subject}`;
+		}
+
+		return `${this.panelState.mode === 'add' ? 'Add' : 'Edit'} ${subject}`;
 	});
 
 	panelActionLabel = $derived.by(() => {
@@ -48,28 +89,46 @@ export class DeployAgentFormState {
 			return '';
 		}
 
-		const title = `${this.panelState.mode === 'add' ? 'Add' : 'Update'} ${KIND_LABEL[this.panelState.kind]}`;
-		return title;
+		const subject = KIND_LABEL[this.panelState.kind];
+
+		if (this.panelState.kind === 'oauth2Jwt' || this.panelState.kind === 'oauth2Introspection') {
+			return `Save ${subject}`;
+		}
+
+		return `${this.panelState.mode === 'add' ? 'Add' : 'Update'} ${subject}`;
 	});
 
 	openPanel(panelState: AnyOpenPanelState) {
 		this.panelState = panelState;
 
-		if (panelState.kind === 'mcpServer') {
-			this.mcpServerDraft =
-				panelState.mode === 'edit'
-					? { ...(this.mcpServers[panelState.index] ?? newMcpServer()) }
-					: newMcpServer();
-		} else if (panelState.kind === 'skill') {
-			this.skillDraft =
-				panelState.mode === 'edit'
-					? { ...(this.skills[panelState.index] ?? newSkill()) }
-					: newSkill();
-		} else if (panelState.kind === 'subagent') {
-			this.subagentDraft =
-				panelState.mode === 'edit'
-					? { ...(this.subagents[panelState.index] ?? newSubagent()) }
-					: newSubagent();
+		switch (panelState.kind) {
+			case 'mcpServer':
+				this.mcpServerDraft =
+					panelState.mode === 'edit'
+						? { ...(this.mcpServers[panelState.index] ?? newMcpServer()) }
+						: newMcpServer();
+				break;
+			case 'skill':
+				this.skillDraft =
+					panelState.mode === 'edit'
+						? { ...(this.skills[panelState.index] ?? newSkill()) }
+						: newSkill();
+				break;
+			case 'subagent':
+				this.subagentDraft =
+					panelState.mode === 'edit'
+						? { ...(this.subagents[panelState.index] ?? newSubagent()) }
+						: newSubagent();
+				break;
+			case 'oauth2Jwt':
+				this.oauth2JwtDraft = {
+					...this.oauth2Policies.jwt,
+					claims: this.oauth2Policies.jwt.claims.map((claim) => ({ ...claim }))
+				};
+				break;
+			case 'oauth2Introspection':
+				this.oauth2IntrospectionDraft = { ...this.oauth2Policies.introspection };
+				break;
 		}
 	}
 
@@ -78,15 +137,48 @@ export class DeployAgentFormState {
 	}
 
 	saveAndClosePanel() {
-		if (this.panelState.kind === 'mcpServer') {
-			this.saveMcpServer(this.panelState);
-		} else if (this.panelState.kind === 'skill') {
-			this.saveSkill(this.panelState);
-		} else if (this.panelState.kind === 'subagent') {
-			this.saveSubagent(this.panelState);
+		switch (this.panelState.kind) {
+			case 'mcpServer':
+				this.saveMcpServer(this.panelState);
+				break;
+			case 'skill':
+				this.saveSkill(this.panelState);
+				break;
+			case 'subagent':
+				this.saveSubagent(this.panelState);
+				break;
+			case 'oauth2Jwt':
+				this.saveOauth2Jwt();
+				break;
+			case 'oauth2Introspection':
+				this.saveOauth2Introspection();
+				break;
 		}
 
 		this.closePanel();
+	}
+
+	private saveOauth2Jwt() {
+		this.oauth2Policies.jwt = {
+			...this.oauth2JwtDraft,
+			rfc9068ResourceServer: this.oauth2JwtDraft.rfc9068ResourceServer.trim(),
+			jwksUrl: this.oauth2JwtDraft.jwksUrl.trim(),
+			claims: this.oauth2JwtDraft.claims.map((claim) => ({
+				key: claim.key.trim(),
+				value: claim.value.trim()
+			}))
+		};
+		this.oauth2Policies.jwtEnabled = true;
+	}
+
+	private saveOauth2Introspection() {
+		this.oauth2Policies.introspection = {
+			...this.oauth2IntrospectionDraft,
+			endpoint: this.oauth2IntrospectionDraft.endpoint.trim(),
+			clientId: this.oauth2IntrospectionDraft.clientId.trim(),
+			clientSecret: this.oauth2IntrospectionDraft.clientSecret
+		};
+		this.oauth2Policies.introspectionEnabled = true;
 	}
 
 	private saveMcpServer(panelState: McpServerPanelState) {
