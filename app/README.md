@@ -39,7 +39,7 @@ Regarding Kubernetes deployment of agents, the platform operates in 2 modes:
 In any case, a service account must be configured with proper permissions in
 the namespace dedicated to running agents. It must be able to:
 
-- Create and list pods
+- Create, get, list and delete pods
 - Create and delete secrets and config maps
 
 The mode is selected via `deployment.mode` in `config.yaml`:

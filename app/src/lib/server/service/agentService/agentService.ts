@@ -401,6 +401,52 @@ export abstract class AgentService {
 		};
 	}
 
+	async deleteAgent(podName: string): Promise<void> {
+		const kc = this.getKubeConfig();
+		const namespace = await this.getNamespace();
+		const core = kc.makeApiClient(CoreV1Api);
+
+		const pod = await core.readNamespacedPod({ name: podName, namespace });
+
+		const configMapNames = new Set<string>();
+		const secretNames = new Set<string>();
+
+		for (const volume of pod.spec?.volumes ?? []) {
+			for (const source of volume.projected?.sources ?? []) {
+				if (source.configMap?.name) {
+					configMapNames.add(source.configMap.name);
+				}
+			}
+		}
+
+		for (const container of pod.spec?.containers ?? []) {
+			for (const env of container.env ?? []) {
+				const secretName = env.valueFrom?.secretKeyRef?.name;
+				if (secretName) {
+					secretNames.add(secretName);
+				}
+			}
+		}
+
+		await core.deleteNamespacedPod({ name: podName, namespace });
+
+		for (const configMapName of configMapNames) {
+			try {
+				await core.deleteNamespacedConfigMap({ name: configMapName, namespace });
+			} catch (error) {
+				console.warn(`Failed to delete config map ${configMapName}:`, error);
+			}
+		}
+
+		for (const secretName of secretNames) {
+			try {
+				await core.deleteNamespacedSecret({ name: secretName, namespace });
+			} catch (error) {
+				console.warn(`Failed to delete secret ${secretName}:`, error);
+			}
+		}
+	}
+
 	async listAgents(): Promise<AgentSummary[]> {
 		const kc = this.getKubeConfig();
 		const core = kc.makeApiClient(CoreV1Api);
