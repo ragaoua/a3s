@@ -1,5 +1,5 @@
 <script lang="ts">
-	const { data } = $props();
+	const { data, form } = $props();
 
 	const formatCreatedAt = (value: string) => {
 		if (!value) return 'Unknown';
@@ -30,6 +30,15 @@
 		<h1 class="text-2xl font-semibold">Agents</h1>
 		<p class="mt-2 text-sm text-neutral-400">Currently deployed agent pods in Kubernetes.</p>
 
+		{#if form?.error}
+			<div
+				class="mt-6 rounded-lg border border-orange-600/70 bg-orange-900/30 px-4 py-3 text-sm text-orange-100"
+			>
+				<p class="font-semibold">Error while deleting agent.</p>
+				<p class="mt-1 font-mono break-all text-orange-200">{form.error}</p>
+			</div>
+		{/if}
+
 		{#if data.agents.length === 0}
 			<div class="mt-8 rounded-xl border border-neutral-800 bg-black/30 px-4 py-8 text-center">
 				<p class="text-neutral-300">No deployed agents found.</p>
@@ -44,11 +53,22 @@
 								<h2 class="text-lg font-semibold text-neutral-100">{agent.agentName}</h2>
 								<p class="mt-1 text-xs break-all text-neutral-500">{agent.podName}</p>
 							</div>
-							<span
-								class={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColor(agent.status)}`}
-							>
-								{agent.status}
-							</span>
+							<div class="flex items-center gap-2">
+								<span
+									class={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColor(agent.status)}`}
+								>
+									{agent.status}
+								</span>
+								<form method="POST" action="?/delete">
+									<input type="hidden" name="podName" value={agent.podName} />
+									<button
+										type="submit"
+										class="rounded-lg border border-rose-700/70 bg-rose-900/30 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:bg-rose-900/60"
+									>
+										Delete
+									</button>
+								</form>
+							</div>
 						</div>
 						<dl class="mt-4 grid gap-3 text-sm text-neutral-300 sm:grid-cols-3">
 							<div>
