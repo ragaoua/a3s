@@ -1,18 +1,18 @@
 import { CoreV1Api, KubeConfig } from '@kubernetes/client-node';
 import { randomBytes } from 'node:crypto';
 import YAML from 'yaml';
-import {
-	agentRuntimeConfigSchema,
-	type AgentRuntimeConfig
-} from '../../../types/agentRuntimeConfig';
+import { agentRuntimeConfigSchema, type AgentRuntimeConfig } from '$lib/types/agentRuntimeConfig';
 import type { AgentConfigForm } from '$lib/types/agentConfigForm';
+import type { Oauth2PoliciesForm } from '$lib/types/agentConfigForm/oauth2Policies';
 import { AGENT_NAME_ANNOTATION, sanitizeKubernetesName } from '../kubernetesName';
 import type { AgentSummary } from './types/agentSummary';
 import type { AgentDeploymentConfig } from './types/agentDeploymentConfig';
 import type { Subagents } from '$lib/types/agentRuntimeConfig/subagent';
+import { policiesSchema, type OAuth2RuntimePolicies } from '$lib/types/agentRuntimeConfig/auth';
 
 const LLM_API_KEY_ENV_VAR = 'A3S_LLM_API_KEY';
 const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
+const INTROSPECTION_CLIENT_SECRET_ENV_VAR = 'A3S_INTROSPECTION_CLIENT_SECRET';
 const MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_MCP_SERVER_CLIENT_SECRET';
 const SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_SUBAGENT_CLIENT_SECRET';
 const SUBAGENT_API_KEY_ENV_VAR_PREFIX = 'A3S_SUBAGENT_API_KEY';
@@ -332,11 +332,7 @@ export abstract class AgentService {
 						? {
 								mode: 'oauth2',
 								issuer_url: agentConfig.oauth2IssuerUrl,
-								policies: {
-									jwt: {
-										jwks: { discovered: true }
-									}
-								}
+								policies: buildOauth2Policies(agentConfig.oauth2Policies, secretData)
 							}
 						: {
 								mode: 'api_key',
@@ -442,4 +438,49 @@ function buildSkillMarkdown(skill: { name: string; description: string; content:
 	}).trimEnd();
 	const content = skill.content.endsWith('\n') ? skill.content : `${skill.content}\n`;
 	return `---\n${frontmatter}\n---\n\n${content}`;
+}
+
+function buildOauth2Policies(
+	formPolicies: Oauth2PoliciesForm,
+	secretData: Record<string, string>
+): OAuth2RuntimePolicies {
+	const policies: OAuth2RuntimePolicies = {};
+
+	if (formPolicies.jwtEnabled) {
+		policies.jwt = {
+			jwks:
+				formPolicies.jwt.jwksSource === 'discovered'
+					? { discovered: true }
+					: { discovered: false, url: formPolicies.jwt.jwksUrl },
+			rfc9068: formPolicies.jwt.rfc9068Enabled
+				? {
+						resource_server: formPolicies.jwt.rfc9068ResourceServer
+					}
+				: undefined,
+			claims:
+				formPolicies.jwt.claims.length > 0
+					? Object.fromEntries(formPolicies.jwt.claims.map((claim) => [claim.key, claim.value]))
+					: undefined
+		};
+	}
+
+	if (formPolicies.introspectionEnabled) {
+		secretData[INTROSPECTION_CLIENT_SECRET_ENV_VAR] = formPolicies.introspection.clientSecret;
+
+		policies.introspection = {
+			client_id: formPolicies.introspection.clientId,
+			client_secret: `\${${INTROSPECTION_CLIENT_SECRET_ENV_VAR}}`,
+			auth_method: formPolicies.introspection.authMethod,
+			...(formPolicies.introspection.endpointSource === 'discovered'
+				? {
+						discovered: true
+					}
+				: {
+						discovered: false,
+						endpoint: formPolicies.introspection.endpoint
+					})
+		};
+	}
+
+	return policiesSchema.parse(policies);
 }
