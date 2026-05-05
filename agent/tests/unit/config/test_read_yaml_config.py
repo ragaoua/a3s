@@ -32,3 +32,27 @@ def test_read_yaml_config_raises_for_non_mapping_yaml(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         read_yaml_config(config_file)  # pyright: ignore[reportUnusedCallResult]
+
+
+def test_read_yaml_config_raises_for_malformed_yaml(tmp_path: Path) -> None:
+    config_file = tmp_path / "agent.yaml"
+    config_file.write_text("foo: [unclosed\n", encoding="utf-8")  # pyright: ignore[reportUnusedCallResult]
+
+    with pytest.raises(ValueError, match="Error while parsing YAML file"):
+        read_yaml_config(config_file)  # pyright: ignore[reportUnusedCallResult]
+
+
+def test_read_yaml_config_raises_for_empty_file(tmp_path: Path) -> None:
+    config_file = tmp_path / "agent.yaml"
+    config_file.write_text("", encoding="utf-8")  # pyright: ignore[reportUnusedCallResult]
+
+    with pytest.raises(ValueError, match="Invalid YAML"):
+        read_yaml_config(config_file)  # pyright: ignore[reportUnusedCallResult]
+
+
+def test_read_yaml_config_raises_for_scalar_yaml(tmp_path: Path) -> None:
+    config_file = tmp_path / "agent.yaml"
+    config_file.write_text("42\n", encoding="utf-8")  # pyright: ignore[reportUnusedCallResult]
+
+    with pytest.raises(ValueError, match="Invalid YAML"):
+        read_yaml_config(config_file)  # pyright: ignore[reportUnusedCallResult]
