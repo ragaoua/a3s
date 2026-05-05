@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -16,7 +16,7 @@ def get_current_authorization_header() -> str | None:
 @contextmanager
 def bind_current_authorization_header(
     authorization_header: str,
-) -> Iterator[None]:
+) -> Generator[None]:
     token = _CURRENT_AUTHORIZATION_HEADER.set(authorization_header)
     try:
         yield
