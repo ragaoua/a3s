@@ -117,8 +117,8 @@ class Config(StrictModel):
         return self
 
 
-def resolve_config_file() -> Path:
-    raw_value = os.environ.get(CONFIG_FILE_ENV_VAR_NAME)
+def resolve_config_file(env: Mapping[str, str] = os.environ) -> Path:
+    raw_value = env.get(CONFIG_FILE_ENV_VAR_NAME)
     if raw_value is not None:
         stripped_value = raw_value.strip()
         if stripped_value != "":
