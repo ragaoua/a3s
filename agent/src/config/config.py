@@ -1,5 +1,6 @@
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -28,7 +29,10 @@ DEFAULT_CONFIG_FILE = Path("config/agent.yaml")
 ENV_VAR_PATTERN = re.compile(r"^\$\{([^}]+)\}$")
 
 
-def substitute_env_vars(config: dict[str, Any]) -> dict[str, Any]:
+def substitute_env_vars(
+    config: dict[str, Any],
+    env: Mapping[str, str] = os.environ,
+) -> dict[str, Any]:
     """
     By design, only values that fully match `${VAR}` are substituted;
     strings that merely contain `${VAR}` are left unchanged.
@@ -46,7 +50,7 @@ def substitute_env_vars(config: dict[str, Any]) -> dict[str, Any]:
                 return value
 
             env_var_name = match.group(1)
-            substituted_value = os.environ.get(env_var_name)
+            substituted_value = env.get(env_var_name)
             if substituted_value is None or substituted_value == "":
                 errors.append(
                     {
