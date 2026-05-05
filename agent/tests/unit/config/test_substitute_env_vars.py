@@ -53,6 +53,13 @@ def test_substitute_env_vars_leaves_partial_placeholders_unchanged() -> None:
     assert substitute_env_vars(config, env=env) == config
 
 
+def test_substitute_env_vars_does_not_re_resolve_substituted_values() -> None:
+    """A substituted value containing `${...}` is returned literally; no second pass."""
+    env = {"OUTER": "${INNER}", "INNER": "should-not-appear"}
+
+    assert substitute_env_vars({"value": "${OUTER}"}, env=env) == {"value": "${INNER}"}
+
+
 def test_substitute_env_vars_raises_for_missing_or_empty_env_vars() -> None:
     env = {"EMPTY_TOKEN": ""}
 
