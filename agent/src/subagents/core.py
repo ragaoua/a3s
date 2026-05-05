@@ -1,15 +1,14 @@
 from typing import NamedTuple
+
 import httpx
 from a2a.client.client import ClientConfig
 from a2a.client.client_factory import ClientFactory
-from a2a.client.middleware import ClientCallContext
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 from google.adk.a2a.agent.config import A2aRemoteAgentConfig, RequestInterceptor
 from google.adk.agents import BaseAgent
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.tools import agent_tool
 
-from src.auth.context import get_current_authorization_header
 from src.auth.outbound import OAuthClientCredentialsAuth
 from src.config.types import (
     OAuthClientCredentialsAuthConfig,
@@ -18,6 +17,7 @@ from src.config.types import (
     OutboundApiKeyAuthConfig,
     SubagentConfig,
 )
+from src.subagents.interceptors import token_forward_before_request
 
 
 class GetSubagentResult(NamedTuple):
@@ -45,23 +45,6 @@ def get_subagents(config: dict[str, SubagentConfig]) -> GetSubagentResult:
                 )
             )
         elif isinstance(agent_config.auth, OAuthTokenForwardAuthConfig):
-
-            async def token_forward_before_request(ctx, a2a_request, params):
-                authorization_header = get_current_authorization_header()
-                if not authorization_header:
-                    return a2a_request, params
-
-                if params.client_call_context is None:
-                    params.client_call_context = ClientCallContext()
-
-                http_kwargs = params.client_call_context.state.get("http_kwargs", {})
-                headers = http_kwargs.get("headers", {})
-                headers["Authorization"] = authorization_header
-                http_kwargs["headers"] = headers
-                params.client_call_context.state["http_kwargs"] = http_kwargs
-
-                return a2a_request, params
-
             remote_agent_config = A2aRemoteAgentConfig(
                 request_interceptors=[
                     RequestInterceptor(before_request=token_forward_before_request)
