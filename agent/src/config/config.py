@@ -142,8 +142,8 @@ def read_yaml_config(config_file: Path) -> dict[str, Any]:
     return data
 
 
-def load_config() -> Config:
-    config_file = resolve_config_file()
+def load_config(env: Mapping[str, str] = os.environ) -> Config:
+    config_file = resolve_config_file(env=env)
     config_dict = read_yaml_config(config_file)
-    config_dict = substitute_env_vars(config_dict)
+    config_dict = substitute_env_vars(config_dict, env=env)
     return Config.model_validate(config_dict)
