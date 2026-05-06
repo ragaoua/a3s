@@ -1,4 +1,5 @@
-import { CoreV1Api, KubeConfig } from '@kubernetes/client-node';
+import { AppsV1Api, CoreV1Api, KubeConfig } from '@kubernetes/client-node';
+import type { V1DeploymentStatus, V1OwnerReference } from '@kubernetes/client-node';
 import { randomBytes } from 'node:crypto';
 import YAML from 'yaml';
 import { agentRuntimeConfigSchema, type AgentRuntimeConfig } from '$lib/types/agentRuntimeConfig';
@@ -27,6 +28,7 @@ export abstract class AgentService {
 		const kc = this.getKubeConfig();
 		const namespace = await this.getNamespace();
 		const core = kc.makeApiClient(CoreV1Api);
+		const apps = kc.makeApiClient(AppsV1Api);
 
 		const { runtimeConfig, secretData } = this.buildAgentDeploymentConfig(agentConfig);
 		const kubernetesAgentName = sanitizeKubernetesName(runtimeConfig.agent.name);
@@ -42,16 +44,114 @@ export abstract class AgentService {
 		}
 
 		const resourceSuffix = randomBytes(8).toString('hex');
-		const configMapName = `a3s-${kubernetesAgentName}-config-${resourceSuffix}`;
+		const deploymentName = `a3s-${kubernetesAgentName}-${resourceSuffix}`;
+		const agentConfigMapName = `a3s-${kubernetesAgentName}-config-${resourceSuffix}`;
 		const secretName = `a3s-${kubernetesAgentName}-secret-${resourceSuffix}`;
 		const skillConfigMaps = agentConfig.skills.map((skill) => ({
 			skillName: skill.name,
 			configMapName: `a3s-${kubernetesAgentName}-skill-${skill.name}-${resourceSuffix}`,
 			body: buildSkillMarkdown(skill)
 		}));
-		let configMapCreated = false;
-		let secretCreated = false;
-		const createdSkillConfigMaps: string[] = [];
+
+		const podLabels = {
+			run: 'agent',
+			name: kubernetesAgentName,
+			'a3s.dev/deployment': deploymentName
+		};
+
+		const deployment = await apps.createNamespacedDeployment({
+			namespace,
+			body: {
+				apiVersion: 'apps/v1',
+				kind: 'Deployment',
+				metadata: {
+					name: deploymentName,
+					annotations: {
+						[AGENT_NAME_ANNOTATION]: runtimeConfig.agent.name
+					},
+					labels: {
+						run: 'agent',
+						name: kubernetesAgentName
+					}
+				},
+				spec: {
+					replicas: 0,
+					selector: {
+						matchLabels: { 'a3s.dev/deployment': deploymentName }
+					},
+					template: {
+						metadata: {
+							annotations: {
+								[AGENT_NAME_ANNOTATION]: runtimeConfig.agent.name
+							},
+							labels: podLabels
+						},
+						spec: {
+							containers: [
+								{
+									name: kubernetesAgentName,
+									image: this.a3sAgentImage,
+									imagePullPolicy: 'Never',
+									stdin: true,
+									tty: true,
+									ports: [{ containerPort: runtimeConfig.server.listen_port }],
+									env: Object.keys(secretData).map((envVarName) => ({
+										name: envVarName,
+										valueFrom: {
+											secretKeyRef: {
+												name: secretName,
+												key: envVarName
+											}
+										}
+									})),
+									volumeMounts: [
+										{
+											name: 'agent-config',
+											mountPath: '/app/config',
+											readOnly: true
+										}
+									]
+								}
+							],
+							volumes: [
+								{
+									name: 'agent-config',
+									projected: {
+										sources: [
+											{
+												configMap: {
+													name: agentConfigMapName,
+													items: [{ key: 'agent.yaml', path: 'agent.yaml' }]
+												}
+											},
+											...skillConfigMaps.map((skill) => ({
+												configMap: {
+													name: skill.configMapName,
+													items: [{ key: 'SKILL.md', path: `skills/${skill.skillName}/SKILL.md` }]
+												}
+											}))
+										]
+									}
+								}
+							]
+						}
+					}
+				}
+			}
+		});
+
+		const deploymentUid = deployment.metadata?.uid;
+		if (!deploymentUid) {
+			throw new Error(`Created deployment ${deploymentName} did not return a UID.`);
+		}
+
+		const ownerReference: V1OwnerReference = {
+			apiVersion: 'apps/v1',
+			kind: 'Deployment',
+			name: deploymentName,
+			uid: deploymentUid,
+			blockOwnerDeletion: true
+		};
 
 		try {
 			await core.createNamespacedConfigMap({
@@ -60,17 +160,15 @@ export abstract class AgentService {
 					apiVersion: 'v1',
 					kind: 'ConfigMap',
 					metadata: {
-						name: configMapName,
-						labels: {
-							run: 'agent'
-						}
+						name: agentConfigMapName,
+						labels: { run: 'agent' },
+						ownerReferences: [ownerReference]
 					},
 					data: {
 						'agent.yaml': YAML.stringify(runtimeConfig)
 					}
 				}
 			});
-			configMapCreated = true;
 
 			await core.createNamespacedSecret({
 				namespace,
@@ -79,15 +177,13 @@ export abstract class AgentService {
 					kind: 'Secret',
 					metadata: {
 						name: secretName,
-						labels: {
-							run: 'agent'
-						}
+						labels: { run: 'agent' },
+						ownerReferences: [ownerReference]
 					},
 					type: 'Opaque',
 					stringData: secretData
 				}
 			});
-			secretCreated = true;
 
 			for (const skill of skillConfigMaps) {
 				await core.createNamespacedConfigMap({
@@ -101,125 +197,34 @@ export abstract class AgentService {
 								run: 'agent',
 								'a3s.dev/agent': kubernetesAgentName,
 								'a3s.dev/skill': skill.skillName
-							}
+							},
+							ownerReferences: [ownerReference]
 						},
 						data: {
 							'SKILL.md': skill.body
 						}
 					}
 				});
-				createdSkillConfigMaps.push(skill.configMapName);
 			}
 
-			const pod = await core.createNamespacedPod({
+			await apps.patchNamespacedDeployment({
+				name: deploymentName,
 				namespace,
-				body: {
-					apiVersion: 'v1',
-					kind: 'Pod',
-					metadata: {
-						generateName: `${kubernetesAgentName}-`,
-						annotations: {
-							[AGENT_NAME_ANNOTATION]: runtimeConfig.agent.name
-						},
-						// NOTE: these can then be used as selectors to create a service
-						// that will make the agent available from the outside.
-						// Problem is, the agent's name is nowhere constrained to be unique,
-						// which means that multiple pods can share the same labels and
-						// be matched by the same ClusterIP, NodePort or whatever.
-						// Something to think about later
-						labels: {
-							run: 'agent',
-							name: kubernetesAgentName
-						}
-					},
-					spec: {
-						restartPolicy: 'Never',
-						containers: [
-							{
-								name: kubernetesAgentName,
-								image: this.a3sAgentImage,
-								imagePullPolicy: 'Never',
-								stdin: true,
-								tty: true,
-								ports: [{ containerPort: runtimeConfig.server.listen_port }],
-								env: Object.keys(secretData).map((envVarName) => ({
-									name: envVarName,
-									valueFrom: {
-										secretKeyRef: {
-											name: secretName,
-											key: envVarName
-										}
-									}
-								})),
-								volumeMounts: [
-									{
-										name: 'agent-config',
-										mountPath: '/app/config',
-										readOnly: true
-									}
-								]
-							}
-						],
-						volumes: [
-							{
-								name: 'agent-config',
-								projected: {
-									sources: [
-										{
-											configMap: {
-												name: configMapName,
-												items: [{ key: 'agent.yaml', path: 'agent.yaml' }]
-											}
-										},
-										...skillConfigMaps.map((skill) => ({
-											configMap: {
-												name: skill.configMapName,
-												items: [{ key: 'SKILL.md', path: `skills/${skill.skillName}/SKILL.md` }]
-											}
-										}))
-									]
-								}
-							}
-						]
-					}
-				}
+				body: [{ op: 'replace', path: '/spec/replicas', value: 1 }]
 			});
 
 			console.log(
-				`Started Kubernetes agent pod ${pod.metadata?.name ?? '<pending-name>'} in namespace ${namespace}.`
+				`Started Kubernetes agent deployment ${deploymentName} in namespace ${namespace}.`
 			);
 		} catch (error) {
-			for (const skillConfigMapName of createdSkillConfigMaps) {
-				try {
-					await core.deleteNamespacedConfigMap({
-						name: skillConfigMapName,
-						namespace
-					});
-				} catch (cleanupError) {
-					console.warn(`Failed to clean up skill config map ${skillConfigMapName}:`, cleanupError);
-				}
-			}
-
-			if (secretCreated) {
-				try {
-					await core.deleteNamespacedSecret({
-						name: secretName,
-						namespace
-					});
-				} catch (cleanupError) {
-					console.warn(`Failed to clean up agent secret ${secretName}:`, cleanupError);
-				}
-			}
-
-			if (configMapCreated) {
-				try {
-					await core.deleteNamespacedConfigMap({
-						name: configMapName,
-						namespace
-					});
-				} catch (cleanupError) {
-					console.warn(`Failed to clean up agent config map ${configMapName}:`, cleanupError);
-				}
+			try {
+				await apps.deleteNamespacedDeployment({
+					name: deploymentName,
+					namespace,
+					propagationPolicy: 'Foreground'
+				});
+			} catch (cleanupError) {
+				console.warn(`Failed to clean up deployment ${deploymentName}:`, cleanupError);
 			}
 
 			throw error;
@@ -401,80 +406,68 @@ export abstract class AgentService {
 		};
 	}
 
-	async deleteAgent(podName: string): Promise<void> {
+	async deleteAgent(deploymentName: string): Promise<void> {
 		const kc = this.getKubeConfig();
 		const namespace = await this.getNamespace();
-		const core = kc.makeApiClient(CoreV1Api);
+		const apps = kc.makeApiClient(AppsV1Api);
 
-		const pod = await core.readNamespacedPod({ name: podName, namespace });
-
-		const configMapNames = new Set<string>();
-		const secretNames = new Set<string>();
-
-		for (const volume of pod.spec?.volumes ?? []) {
-			for (const source of volume.projected?.sources ?? []) {
-				if (source.configMap?.name) {
-					configMapNames.add(source.configMap.name);
-				}
-			}
-		}
-
-		for (const container of pod.spec?.containers ?? []) {
-			for (const env of container.env ?? []) {
-				const secretName = env.valueFrom?.secretKeyRef?.name;
-				if (secretName) {
-					secretNames.add(secretName);
-				}
-			}
-		}
-
-		await core.deleteNamespacedPod({ name: podName, namespace });
-
-		for (const configMapName of configMapNames) {
-			try {
-				await core.deleteNamespacedConfigMap({ name: configMapName, namespace });
-			} catch (error) {
-				console.warn(`Failed to delete config map ${configMapName}:`, error);
-			}
-		}
-
-		for (const secretName of secretNames) {
-			try {
-				await core.deleteNamespacedSecret({ name: secretName, namespace });
-			} catch (error) {
-				console.warn(`Failed to delete secret ${secretName}:`, error);
-			}
-		}
+		await apps.deleteNamespacedDeployment({
+			name: deploymentName,
+			namespace,
+			propagationPolicy: 'Foreground'
+		});
 	}
 
 	async listAgents(): Promise<AgentSummary[]> {
 		const kc = this.getKubeConfig();
-		const core = kc.makeApiClient(CoreV1Api);
+		const apps = kc.makeApiClient(AppsV1Api);
 
 		const namespace = await this.getNamespace();
-		const podList = await core.listNamespacedPod({
+		const deploymentList = await apps.listNamespacedDeployment({
 			namespace,
 			labelSelector: 'run=agent'
 		});
 
-		return podList.items
-			.map((pod) => {
-				const createdAt = pod.metadata?.creationTimestamp;
-				const annotations = pod.metadata?.annotations;
+		return deploymentList.items
+			.map((deployment) => {
+				const createdAt = deployment.metadata?.creationTimestamp;
+				const annotations = deployment.metadata?.annotations;
 
 				return {
-					podName: pod.metadata?.name ?? '<unknown-pod>',
+					deploymentName: deployment.metadata?.name ?? '<unknown-deployment>',
 					agentName:
 						annotations?.[AGENT_NAME_ANNOTATION] ??
-						pod.metadata?.labels?.name ??
-						pod.metadata?.name ??
+						deployment.metadata?.labels?.name ??
+						deployment.metadata?.name ??
 						'<unknown-agent>',
-					status: pod.status?.phase ?? 'Unknown',
+					status: deriveDeploymentStatus(deployment.status),
 					createdAt: createdAt ? new Date(createdAt).toISOString() : ''
 				} satisfies AgentSummary;
 			})
 			.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 	}
+}
+
+function deriveDeploymentStatus(status: V1DeploymentStatus | undefined): string {
+	if (!status) {
+		return 'Pending';
+	}
+
+	if ((status.readyReplicas ?? 0) >= 1) {
+		return 'Running';
+	}
+
+	const conditions = status.conditions ?? [];
+	const replicaFailure = conditions.find((c) => c.type === 'ReplicaFailure');
+	if (replicaFailure?.status === 'True') {
+		return 'Failed';
+	}
+	const progressing = conditions.find((c) => c.type === 'Progressing');
+	if (progressing?.status === 'False') {
+		return 'Failed';
+	}
+
+	return 'Pending';
 }
 
 function buildSkillMarkdown(skill: { name: string; description: string; content: string }): string {

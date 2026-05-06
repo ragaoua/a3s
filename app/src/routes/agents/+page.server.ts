@@ -13,14 +13,14 @@ export const load: PageServerLoad = async () => {
 export const actions: Actions = {
 	delete: async ({ request }) => {
 		const formData = await request.formData();
-		const podName = String(formData.get('podName') ?? '').trim();
+		const deploymentName = String(formData.get('deploymentName') ?? '').trim();
 
-		if (!podName) {
-			return fail(400, { error: 'Missing pod name.' });
+		if (!deploymentName) {
+			return fail(400, { error: 'Missing deployment name.' });
 		}
 
 		try {
-			await getAgentService().deleteAgent(podName);
+			await getAgentService().deleteAgent(deploymentName);
 		} catch (error) {
 			return fail(500, {
 				error: `Failed to delete agent: ${error instanceof Error ? error.message : String(error)}`

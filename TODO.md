@@ -36,5 +36,3 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - After an agent has been deployed, should the platform configure (or provide
     a way to configure) a clusterIP/nodePort/loadbalancer/ingress service for external
     access to the agent ?
-  - Run a deployment for agents, not a simple pod
-  - Clean up per-agent ConfigMaps and Secrets when agent pods are deleted

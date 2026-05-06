@@ -51,7 +51,7 @@
 						<div class="flex flex-wrap items-start justify-between gap-3">
 							<div>
 								<h2 class="text-lg font-semibold text-neutral-100">{agent.agentName}</h2>
-								<p class="mt-1 text-xs break-all text-neutral-500">{agent.podName}</p>
+								<p class="mt-1 text-xs break-all text-neutral-500">{agent.deploymentName}</p>
 							</div>
 							<div class="flex items-center gap-2">
 								<span
@@ -60,7 +60,7 @@
 									{agent.status}
 								</span>
 								<form method="POST" action="?/delete">
-									<input type="hidden" name="podName" value={agent.podName} />
+									<input type="hidden" name="deploymentName" value={agent.deploymentName} />
 									<button
 										type="submit"
 										class="rounded-lg border border-rose-700/70 bg-rose-900/30 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:bg-rose-900/60"

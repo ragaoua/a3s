@@ -3,8 +3,10 @@
 The a3s app provides a centralized platform for running agents on any
 Kubernetes environment.
 
-For each deployment request, the app creates a Kubernetes pod running an [a3s
-agent](../agent).
+For each deployment request, the app creates a Kubernetes Deployment running
+an [a3s agent](../agent), along with a ConfigMap and Secret holding its
+configuration. The ConfigMap and Secret are owned by the Deployment, so
+deleting the agent cascades to all of its dependent resources automatically.
 
 When selecting API Key auth mode, the platform generates an API Key and
 displays it to the user.
@@ -77,7 +79,7 @@ Regarding Kubernetes deployment of agents, the platform operates in 2 modes:
 In any case, a service account must be configured with proper permissions in
 the namespace dedicated to running agents. It must be able to:
 
-- Create, get, list and delete pods
+- Create, patch, list and delete deployments (in the `apps` API group)
 - Create and delete secrets and config maps
 
 The mode is selected via `deployment.mode` in `config.yaml`:

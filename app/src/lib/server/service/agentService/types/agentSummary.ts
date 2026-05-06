@@ -1,6 +1,6 @@
 export interface AgentSummary {
 	agentName: string;
-	podName: string;
+	deploymentName: string;
 	status: string;
 	createdAt: string;
 }

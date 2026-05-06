@@ -13,17 +13,15 @@ as a building block for other use cases.
 
 ## Current limitations and planned features
 
-Deployments currently create standalone pods directly (no built-in
-Service/Ingress/lifecycle orchestration). It is left to the Kubernetes admin to
-set up according to the use cases and internal policies.
+Each agent is deployed as a Kubernetes Deployment with its own ConfigMap and
+Secret. The Deployment owns those dependent resources via owner references, so
+deleting the agent cascades to its config and secret automatically. The
+platform does not yet create a Service or Ingress for the agent, so external
+access is left to the Kubernetes admin to set up according to the use case and
+internal policies.
 
-Each deployment also creates a dedicated ConfigMap and Secret for the agent
-configuration. These resources are not automatically garbage-collected when the
-pod is deleted, so they currently need manual cleanup until lifecycle
-management is implemented.
-
-Right now, the platform only supports deploying and listing agents. More
-management features will be added.
+Right now, the platform only supports deploying, listing and deleting agents.
+More management features will be added.
 
 Check out [TODO.md](TODO.md) for more information about planned features and
 future work.
