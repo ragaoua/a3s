@@ -9,12 +9,16 @@ from src.config.config import (
 )
 
 
-@pytest.mark.parametrize("raw_path", [None, "", "   "])
-def test_resolve_config_file_returns_default_when_env_var_missing_or_blank(
-    raw_path: str | None,
-) -> None:
-    env: dict[str, str] = {} if raw_path is None else {CONFIG_FILE_ENV_VAR_NAME: raw_path}
+def test_resolve_config_file_returns_default_when_env_var_missing() -> None:
+    env: dict[str, str] = {}
+    assert resolve_config_file(env=env) == DEFAULT_CONFIG_FILE
 
+
+@pytest.mark.parametrize("raw_path", ["", "   "])
+def test_resolve_config_file_returns_default_when_env_var_blank(
+    raw_path: str,
+) -> None:
+    env: dict[str, str] = {CONFIG_FILE_ENV_VAR_NAME: raw_path}
     assert resolve_config_file(env=env) == DEFAULT_CONFIG_FILE
 
 
