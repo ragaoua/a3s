@@ -1,21 +1,17 @@
 from pathlib import Path
-from textwrap import dedent
 
 import pytest
 from pydantic import ValidationError
 
 from src.config.config import CONFIG_FILE_ENV_VAR_NAME, load_config
-
-
-def _write_config(path: Path, body: str) -> None:
-    path.write_text(dedent(body), encoding="utf-8")
+from tests.unit.config.utils import write_config
 
 
 def test_load_config_resolves_file_reads_yaml_substitutes_env_and_validates(
     tmp_path: Path,
 ) -> None:
     config_file = tmp_path / "agent.yaml"
-    _write_config(
+    write_config(
         config_file,
         """
         llm:
@@ -48,7 +44,7 @@ def test_load_config_propagates_substitution_errors_for_missing_env(
     tmp_path: Path,
 ) -> None:
     config_file = tmp_path / "agent.yaml"
-    _write_config(
+    write_config(
         config_file,
         """
         llm:
@@ -73,7 +69,7 @@ def test_load_config_propagates_schema_errors_for_invalid_config(
     tmp_path: Path,
 ) -> None:
     config_file = tmp_path / "agent.yaml"
-    _write_config(
+    write_config(
         config_file,
         """
         llm:
