@@ -54,9 +54,9 @@ def set_current_span_attribute(name: str, value) -> None:
 
 class TracingMiddleware:
     def __init__(self, app: ASGIApp, *, agent_name: str, auth_mode: str):
-        self.app = app
-        self.agent_name = agent_name
-        self.auth_mode = auth_mode
+        self.app: ASGIApp = app
+        self.agent_name: str = agent_name
+        self.auth_mode: str = auth_mode
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":

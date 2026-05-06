@@ -2,7 +2,7 @@ import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 import yaml
 from pydantic import (
@@ -77,7 +77,7 @@ def substitute_env_vars(
 
 
 class Config(StrictModel):
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         title="A3S Agent Config",
         extra="forbid",
     )

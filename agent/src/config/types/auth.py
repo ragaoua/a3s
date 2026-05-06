@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import ConfigDict, Field, SecretStr, model_validator
 from pydantic_core import Url
@@ -43,7 +43,7 @@ class OAuthStaticIntrospectionPolicyConfig(OAuthIntrospectionPolicyConfig):
 
 
 class OAuthPoliciesConfig(StrictModel):
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         extra="forbid",
         # `"anyOf": ...` is necessary here to signal that at least one of jwt
         # or introspection must be set and not null. This is the JSON schema
