@@ -111,8 +111,8 @@ def test_mcp_server_token_modes_require_root_oauth2(
         )
 
     assert any(
-        f"`mcp_servers[0].auth.mode` '{expected_mode}' requires root-level "
-        "`auth.mode: 'oauth2'`" in msg
+        f"`mcp_servers[0].auth.mode` '{expected_mode}' requires root-level `auth.mode: 'oauth2'`"
+        in msg
         for msg in _error_msgs(exc_info.value)
     )
 
@@ -144,8 +144,8 @@ def test_subagent_token_modes_require_root_oauth2(
         )
 
     assert any(
-        f"`agent.subagents['helper'].auth.mode` '{expected_mode}' requires root-level "
-        "`auth.mode: 'oauth2'`" in msg
+        f"`agent.subagents['helper'].auth.mode` '{expected_mode}' requires root-level `auth.mode: 'oauth2'`"
+        in msg
         for msg in _error_msgs(exc_info.value)
     )
 
