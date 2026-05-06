@@ -20,6 +20,8 @@ data:
     deployment:
       mode: inCluster
       agentsNamespace: agents-ns
+    auth:
+      enabled: false
 EOF
 
 log "Applying app pod..."
