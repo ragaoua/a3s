@@ -39,7 +39,7 @@ export abstract class AgentService {
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
 			console.log(
-				`Agent will be configured with API Key Authorization.\nUse API Key ${runtimeConfig.auth.api_key}`
+				`Agent will be configured with API Key Authorization.\nUse API Key ${secretData[AGENT_API_KEY_ENV_VAR]}`
 			);
 		}
 
