@@ -10,8 +10,8 @@ from src.config.types import (
 from src.config.types.auth import OAuthDiscoveredJwksPolicyConfig
 
 
-JWT_ONLY = OAuthJwtPolicyConfig(jwks=OAuthDiscoveredJwksPolicyConfig())
-INTROSPECTION_ONLY = OAuthStaticIntrospectionPolicyConfig(
+JWT_POLICY_CONFIG = OAuthJwtPolicyConfig(jwks=OAuthDiscoveredJwksPolicyConfig())
+INTROSPECTION_POLICY_CONFIG = OAuthStaticIntrospectionPolicyConfig(
     client_id="c",
     client_secret=SecretStr("s"),
     endpoint=Url("http://idp.example.com/introspect"),
@@ -39,21 +39,23 @@ def test_validate_policies_rejects_when_both_explicitly_none() -> None:
 
 
 def test_validate_policies_accepts_jwt_only() -> None:
-    policies = OAuthPoliciesConfig(jwt=JWT_ONLY)
+    policies = OAuthPoliciesConfig(jwt=JWT_POLICY_CONFIG)
 
-    assert policies.jwt is JWT_ONLY
+    assert policies.jwt is JWT_POLICY_CONFIG
     assert policies.introspection is None
 
 
 def test_validate_policies_accepts_introspection_only() -> None:
-    policies = OAuthPoliciesConfig(introspection=INTROSPECTION_ONLY)
+    policies = OAuthPoliciesConfig(introspection=INTROSPECTION_POLICY_CONFIG)
 
     assert policies.jwt is None
-    assert policies.introspection is INTROSPECTION_ONLY
+    assert policies.introspection is INTROSPECTION_POLICY_CONFIG
 
 
 def test_validate_policies_accepts_both() -> None:
-    policies = OAuthPoliciesConfig(jwt=JWT_ONLY, introspection=INTROSPECTION_ONLY)
+    policies = OAuthPoliciesConfig(
+        jwt=JWT_POLICY_CONFIG, introspection=INTROSPECTION_POLICY_CONFIG
+    )
 
-    assert policies.jwt is JWT_ONLY
-    assert policies.introspection is INTROSPECTION_ONLY
+    assert policies.jwt is JWT_POLICY_CONFIG
+    assert policies.introspection is INTROSPECTION_POLICY_CONFIG
