@@ -30,6 +30,79 @@ DEFAULT_CONFIG_FILE = Path("config/agent.yaml")
 ENV_VAR_PATTERN = re.compile(r"^\$\{([^}]+)\}$")
 
 
+class Config(StrictModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        title="A3S Agent Config",
+        extra="forbid",
+    )
+
+    llm: LlmConfig
+    agent: AgentConfig
+    server: ServerConfig = ServerConfig()
+    auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"]
+    mcp_servers: list[McpServerConfig] = list()
+    logging: LoggingConfig = LoggingConfig()
+
+    @model_validator(mode="after")
+    def validate_outbound_auth_requires_oauth2(self):
+        if isinstance(self.auth, OAuthConfig):
+            return self
+
+        oauth_token_modes = {"oauth_token_forward", "oauth_token_exchange"}
+
+        for index, server_config in enumerate(self.mcp_servers):
+            if (
+                server_config.auth != "none"
+                and server_config.auth.mode in oauth_token_modes
+            ):
+                raise ValueError(
+                    f"`mcp_servers[{index}].auth.mode` '{server_config.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
+                )
+
+        for name, subagent_config in self.agent.subagents.items():
+            if (
+                subagent_config.auth != "none"
+                and subagent_config.auth.mode in oauth_token_modes
+            ):
+                raise ValueError(
+                    f"`agent.subagents['{name}'].auth.mode` '{subagent_config.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
+                )
+
+        return self
+
+
+def load_config(env: Mapping[str, str] = os.environ) -> Config:
+    config_file = resolve_config_file(env=env)
+    config_dict = read_yaml_config(config_file)
+    config_dict = substitute_env_vars(config_dict, env=env)
+    return Config.model_validate(config_dict)
+
+
+def resolve_config_file(env: Mapping[str, str] = os.environ) -> Path:
+    raw_value = env.get(CONFIG_FILE_ENV_VAR_NAME)
+    if raw_value is not None:
+        stripped_value = raw_value.strip()
+        if stripped_value != "":
+            return Path(stripped_value)
+
+    return DEFAULT_CONFIG_FILE
+
+
+def read_yaml_config(config_file: Path) -> dict[str, JsonValue]:
+    if not config_file.exists():
+        raise ValueError(f"File not found: {config_file}")
+
+    try:
+        data = cast(object, yaml.safe_load(config_file.read_text(encoding="utf-8")))
+    except Exception as e:
+        raise ValueError(f"Error while parsing YAML file {config_file}: {e}")
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid YAML in {config_file}")
+
+    return cast(dict[str, JsonValue], data)
+
+
 def substitute_env_vars(
     config: dict[str, JsonValue],
     env: Mapping[str, str] = os.environ,
@@ -75,76 +148,3 @@ def substitute_env_vars(
         raise ValidationError.from_exception_data("Config", errors)
 
     return resolved_config
-
-
-class Config(StrictModel):
-    model_config: ClassVar[ConfigDict] = ConfigDict(
-        title="A3S Agent Config",
-        extra="forbid",
-    )
-
-    llm: LlmConfig
-    agent: AgentConfig
-    server: ServerConfig = ServerConfig()
-    auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"]
-    mcp_servers: list[McpServerConfig] = list()
-    logging: LoggingConfig = LoggingConfig()
-
-    @model_validator(mode="after")
-    def validate_outbound_auth_requires_oauth2(self):
-        if isinstance(self.auth, OAuthConfig):
-            return self
-
-        oauth_token_modes = {"oauth_token_forward", "oauth_token_exchange"}
-
-        for index, server_config in enumerate(self.mcp_servers):
-            if (
-                server_config.auth != "none"
-                and server_config.auth.mode in oauth_token_modes
-            ):
-                raise ValueError(
-                    f"`mcp_servers[{index}].auth.mode` '{server_config.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
-                )
-
-        for name, subagent_config in self.agent.subagents.items():
-            if (
-                subagent_config.auth != "none"
-                and subagent_config.auth.mode in oauth_token_modes
-            ):
-                raise ValueError(
-                    f"`agent.subagents['{name}'].auth.mode` '{subagent_config.auth.mode}' requires root-level `auth.mode: 'oauth2'`"
-                )
-
-        return self
-
-
-def resolve_config_file(env: Mapping[str, str] = os.environ) -> Path:
-    raw_value = env.get(CONFIG_FILE_ENV_VAR_NAME)
-    if raw_value is not None:
-        stripped_value = raw_value.strip()
-        if stripped_value != "":
-            return Path(stripped_value)
-
-    return DEFAULT_CONFIG_FILE
-
-
-def read_yaml_config(config_file: Path) -> dict[str, JsonValue]:
-    if not config_file.exists():
-        raise ValueError(f"File not found: {config_file}")
-
-    try:
-        data = cast(object, yaml.safe_load(config_file.read_text(encoding="utf-8")))
-    except Exception as e:
-        raise ValueError(f"Error while parsing YAML file {config_file}: {e}")
-
-    if not isinstance(data, dict):
-        raise ValueError(f"Invalid YAML in {config_file}")
-
-    return cast(dict[str, JsonValue], data)
-
-
-def load_config(env: Mapping[str, str] = os.environ) -> Config:
-    config_file = resolve_config_file(env=env)
-    config_dict = read_yaml_config(config_file)
-    config_dict = substitute_env_vars(config_dict, env=env)
-    return Config.model_validate(config_dict)
