@@ -1,5 +1,5 @@
 import pytest
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 
 from src.config.config import substitute_env_vars
 
@@ -11,7 +11,7 @@ def test_substitute_env_vars_replaces_exact_placeholders_recursively() -> None:
         "HOSTNAME": "example.com",
     }
 
-    config = {
+    config: dict[str, JsonValue] = {
         "llm": {
             "model": "${MODEL_NAME}",
             "apiKey": "${API_KEY}",
@@ -43,7 +43,7 @@ def test_substitute_env_vars_replaces_exact_placeholders_recursively() -> None:
 def test_substitute_env_vars_leaves_partial_placeholders_unchanged() -> None:
     env: dict[str, str] = {}
 
-    config = {
+    config: dict[str, JsonValue] = {
         "baseUrl": "https://${HOSTNAME}/v1",
         "relativePath": "${HOSTNAME}/v1",
         "message": "prefix ${HOSTNAME} suffix",
@@ -63,7 +63,7 @@ def test_substitute_env_vars_does_not_re_resolve_substituted_values() -> None:
 def test_substitute_env_vars_raises_for_missing_or_empty_env_vars() -> None:
     env = {"EMPTY_TOKEN": ""}
 
-    config = {
+    config: dict[str, JsonValue] = {
         "auth": {"apiKey": "${MISSING_API_KEY}"},
         "servers": [{"token": "${EMPTY_TOKEN}"}],
     }

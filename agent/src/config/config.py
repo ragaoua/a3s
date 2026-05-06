@@ -2,11 +2,12 @@ import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal, cast
 
 import yaml
 from pydantic import (
     ConfigDict,
+    JsonValue,
     ValidationError,
     model_validator,
 )
@@ -30,16 +31,16 @@ ENV_VAR_PATTERN = re.compile(r"^\$\{([^}]+)\}$")
 
 
 def substitute_env_vars(
-    config: dict[str, Any],
+    config: dict[str, JsonValue],
     env: Mapping[str, str] = os.environ,
-) -> dict[str, Any]:
+) -> dict[str, JsonValue]:
     """
     By design, only values that fully match `${VAR}` are substituted;
     strings that merely contain `${VAR}` are left unchanged.
     """
     errors: list[InitErrorDetails] = []
 
-    def _resolve(value: Any, path: tuple[str | int, ...]) -> Any:
+    def _resolve(value: JsonValue, path: tuple[str | int, ...]) -> JsonValue:
         if isinstance(value, dict):
             return {k: _resolve(v, (*path, k)) for k, v in value.items()}
         if isinstance(value, list):
@@ -68,7 +69,7 @@ def substitute_env_vars(
             return substituted_value
         return value
 
-    resolved_config = _resolve(config, ())
+    resolved_config = {k: _resolve(v, (k,)) for k, v in config.items()}
 
     if errors:
         raise ValidationError.from_exception_data("Config", errors)
@@ -127,19 +128,19 @@ def resolve_config_file(env: Mapping[str, str] = os.environ) -> Path:
     return DEFAULT_CONFIG_FILE
 
 
-def read_yaml_config(config_file: Path) -> dict[str, Any]:
+def read_yaml_config(config_file: Path) -> dict[str, JsonValue]:
     if not config_file.exists():
         raise ValueError(f"File not found: {config_file}")
 
     try:
-        data = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+        data = cast(object, yaml.safe_load(config_file.read_text(encoding="utf-8")))
     except Exception as e:
         raise ValueError(f"Error while parsing YAML file {config_file}: {e}")
 
     if not isinstance(data, dict):
         raise ValueError(f"Invalid YAML in {config_file}")
 
-    return data
+    return cast(dict[str, JsonValue], data)
 
 
 def load_config(env: Mapping[str, str] = os.environ) -> Config:
