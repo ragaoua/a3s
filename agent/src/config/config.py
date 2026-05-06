@@ -1,11 +1,13 @@
 import os
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Literal
+from typing import ClassVar, Literal, cast
 
 import yaml
 from pydantic import (
     ConfigDict,
+    JsonValue,
     ValidationError,
     model_validator,
 )
@@ -28,52 +30,8 @@ DEFAULT_CONFIG_FILE = Path("config/agent.yaml")
 ENV_VAR_PATTERN = re.compile(r"^\$\{([^}]+)\}$")
 
 
-def substitute_env_vars(config: dict[str, Any]) -> dict[str, Any]:
-    """
-    By design, only values that fully match `${VAR}` are substituted;
-    strings that merely contain `${VAR}` are left unchanged.
-    """
-    errors: list[InitErrorDetails] = []
-
-    def _resolve(value: Any, path: tuple[str | int, ...]) -> Any:
-        if isinstance(value, dict):
-            return {k: _resolve(v, (*path, k)) for k, v in value.items()}
-        if isinstance(value, list):
-            return [_resolve(item, (*path, index)) for index, item in enumerate(value)]
-        if isinstance(value, str):
-            match = ENV_VAR_PATTERN.fullmatch(value)
-            if not match:
-                return value
-
-            env_var_name = match.group(1)
-            substituted_value = os.environ.get(env_var_name)
-            if substituted_value is None or substituted_value == "":
-                errors.append(
-                    {
-                        "type": "value_error",
-                        "loc": path,
-                        "input": value,
-                        "ctx": {
-                            "error": ValueError(
-                                f"Environment variable '{env_var_name}' is not set or empty"
-                            )
-                        },
-                    }
-                )
-                return value
-            return substituted_value
-        return value
-
-    resolved_config = _resolve(config, ())
-
-    if errors:
-        raise ValidationError.from_exception_data("Config", errors)
-
-    return resolved_config
-
-
 class Config(StrictModel):
-    model_config = ConfigDict(
+    model_config: ClassVar[ConfigDict] = ConfigDict(
         title="A3S Agent Config",
         extra="forbid",
     )
@@ -113,8 +71,15 @@ class Config(StrictModel):
         return self
 
 
-def resolve_config_file() -> Path:
-    raw_value = os.environ.get(CONFIG_FILE_ENV_VAR_NAME)
+def load_config(env: Mapping[str, str] = os.environ) -> Config:
+    config_file = resolve_config_file_path(env=env)
+    config_dict = read_yaml_config(config_file)
+    config_dict = substitute_env_vars(config_dict, env=env)
+    return Config.model_validate(config_dict)
+
+
+def resolve_config_file_path(env: Mapping[str, str] = os.environ) -> Path:
+    raw_value = env.get(CONFIG_FILE_ENV_VAR_NAME)
     if raw_value is not None:
         stripped_value = raw_value.strip()
         if stripped_value != "":
@@ -123,23 +88,63 @@ def resolve_config_file() -> Path:
     return DEFAULT_CONFIG_FILE
 
 
-def read_yaml_config(config_file: Path) -> dict[str, Any]:
+def read_yaml_config(config_file: Path) -> dict[str, JsonValue]:
     if not config_file.exists():
         raise ValueError(f"File not found: {config_file}")
 
     try:
-        data = yaml.safe_load(config_file.read_text(encoding="utf-8"))
+        data = cast(object, yaml.safe_load(config_file.read_text(encoding="utf-8")))
     except Exception as e:
         raise ValueError(f"Error while parsing YAML file {config_file}: {e}")
 
     if not isinstance(data, dict):
         raise ValueError(f"Invalid YAML in {config_file}")
 
-    return data
+    return cast(dict[str, JsonValue], data)
 
 
-def load_config() -> Config:
-    config_file = resolve_config_file()
-    config_dict = read_yaml_config(config_file)
-    config_dict = substitute_env_vars(config_dict)
-    return Config.model_validate(config_dict)
+def substitute_env_vars(
+    config: dict[str, JsonValue],
+    env: Mapping[str, str] = os.environ,
+) -> dict[str, JsonValue]:
+    """
+    By design, only values that fully match `${VAR}` are substituted;
+    strings that merely contain `${VAR}` are left unchanged.
+    """
+    errors: list[InitErrorDetails] = []
+
+    def _resolve(value: JsonValue, path: tuple[str | int, ...]) -> JsonValue:
+        if isinstance(value, dict):
+            return {k: _resolve(v, (*path, k)) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_resolve(item, (*path, index)) for index, item in enumerate(value)]
+        if isinstance(value, str):
+            match = ENV_VAR_PATTERN.fullmatch(value)
+            if not match:
+                return value
+
+            env_var_name = match.group(1)
+            substituted_value = env.get(env_var_name)
+            if substituted_value is None or substituted_value == "":
+                errors.append(
+                    {
+                        "type": "value_error",
+                        "loc": path,
+                        "input": value,
+                        "ctx": {
+                            "error": ValueError(
+                                f"Environment variable '{env_var_name}' is not set or empty"
+                            )
+                        },
+                    }
+                )
+                return value
+            return substituted_value
+        return value
+
+    resolved_config = {k: _resolve(v, (k,)) for k, v in config.items()}
+
+    if errors:
+        raise ValidationError.from_exception_data("Config", errors)
+
+    return resolved_config

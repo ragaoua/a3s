@@ -26,7 +26,7 @@ from src.config.types import (
     OAuthStaticJwksPolicyConfig,
 )
 from src.logging import get_logger
-from src.utils import fetch_json
+from src.utils import FetchJson, fetch_json
 
 logger = get_logger(__name__)
 
@@ -52,17 +52,19 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         issuer_url: str,
         realm: str,
         config: OAuthPoliciesConfig,
+        fetch_json: FetchJson = fetch_json,
     ):
         super().__init__(app)
         self.issuer_url = issuer_url.rstrip("/")
         self.realm = realm
         self.config = config
+        self._fetch_json = fetch_json
 
     async def _fetch_authorization_server_metadata(
         self,
     ) -> AuthorizationServerMetadata:
         metadata_url = get_well_known_url(self.issuer_url, external=True)
-        metadata_raw = await fetch_json(metadata_url)
+        metadata_raw = await self._fetch_json(metadata_url)
         metadata = AuthorizationServerMetadata(metadata_raw)
         metadata.validate_issuer()
 
@@ -114,7 +116,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             if isinstance(jwtPolicyConfig.jwks, OAuthStaticJwksPolicyConfig)
             else await self._discover_jwks_uri(metadata)
         )
-        jwks_raw = await fetch_json(jwks_url)
+        jwks_raw = await self._fetch_json(jwks_url)
         return JsonWebKey.import_key_set(jwks_raw)
 
     def _requires_authorization_server_metadata(self) -> bool:
@@ -180,7 +182,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 "Failed to discover token introspection endpoint"
             ) from err
 
-        introspection_response = await fetch_json(
+        introspection_response = await self._fetch_json(
             self._get_introspection_request(
                 token=token,
                 endpoint=endpoint,

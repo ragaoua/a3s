@@ -1,7 +1,17 @@
 import json
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
+
+
+class FetchJson(Protocol):
+    async def __call__(
+        self,
+        url: str | httpx.Request,
+        *,
+        error_cls: type[Exception] = ...,
+        error_message: str | None = ...,
+    ) -> dict[str, Any]: ...
 
 
 async def fetch_json(
