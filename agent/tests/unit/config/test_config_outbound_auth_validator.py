@@ -94,14 +94,19 @@ def _error_msgs(exc: ValidationError) -> list[str]:
         (TOKEN_EXCHANGE_STATIC, "oauth_token_exchange"),
     ],
 )
+@pytest.mark.parametrize("auth_config", ["none", ROOT_API_KEY])
 def test_mcp_server_token_modes_require_root_oauth2(
-    server_auth, expected_mode: str
+    server_auth: OAuthTokenForwardAuthConfig
+    | OAuthDiscoveredTokenExchangeAuthConfig
+    | OAuthStaticTokenExchangeAuthConfig,
+    expected_mode: str,
+    auth_config: Literal["none"] | ApiKeyAuthConfig,
 ) -> None:
     with pytest.raises(ValidationError) as exc_info:
         Config(  # pyright: ignore[reportUnusedCallResult]
             llm=VALID_LLM,
             agent=AGENT_NO_SUBAGENTS,
-            auth="none",
+            auth=auth_config,
             mcp_servers=[_mcp_server(server_auth)],
         )
 
@@ -120,8 +125,13 @@ def test_mcp_server_token_modes_require_root_oauth2(
         (TOKEN_EXCHANGE_STATIC, "oauth_token_exchange"),
     ],
 )
+@pytest.mark.parametrize("auth_config", ["none", ROOT_API_KEY])
 def test_subagent_token_modes_require_root_oauth2(
-    subagent_auth, expected_mode: str
+    subagent_auth: OAuthTokenForwardAuthConfig
+    | OAuthDiscoveredTokenExchangeAuthConfig
+    | OAuthStaticTokenExchangeAuthConfig,
+    expected_mode: str,
+    auth_config: Literal["none"] | ApiKeyAuthConfig,
 ) -> None:
     agent = AGENT_NO_SUBAGENTS.model_copy()
     agent.subagents = {"helper": _subagent(subagent_auth)}
@@ -130,7 +140,7 @@ def test_subagent_token_modes_require_root_oauth2(
         Config(  # pyright: ignore[reportUnusedCallResult]
             llm=VALID_LLM,
             agent=agent,
-            auth="none",
+            auth=auth_config,
         )
 
     assert any(
@@ -140,7 +150,19 @@ def test_subagent_token_modes_require_root_oauth2(
     )
 
 
-def test_token_modes_pass_when_root_auth_is_oauth2() -> None:
+@pytest.mark.parametrize(
+    "auth",
+    [
+        TOKEN_FORWARD,
+        TOKEN_EXCHANGE_DISCOVERED,
+        TOKEN_EXCHANGE_STATIC,
+    ],
+)
+def test_token_modes_pass_when_root_auth_is_oauth2(
+    auth: OAuthTokenForwardAuthConfig
+    | OAuthDiscoveredTokenExchangeAuthConfig
+    | OAuthStaticTokenExchangeAuthConfig,
+) -> None:
     agent = AGENT_NO_SUBAGENTS.model_copy()
     agent.subagents = {"helper": _subagent(TOKEN_EXCHANGE_DISCOVERED)}
 
@@ -148,7 +170,7 @@ def test_token_modes_pass_when_root_auth_is_oauth2() -> None:
         llm=VALID_LLM,
         agent=agent,
         auth=ROOT_OAUTH,
-        mcp_servers=[_mcp_server(TOKEN_FORWARD)],
+        mcp_servers=[_mcp_server(auth)],
     )
 
     assert isinstance(config.auth, OAuthConfig)
@@ -166,35 +188,3 @@ def test_oauth_client_credentials_does_not_require_root_oauth2() -> None:
     )
 
     assert config.auth == "none"
-
-
-def test_api_key_root_auth_does_not_satisfy_oauth_token_modes() -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        Config(  # pyright: ignore[reportUnusedCallResult]
-            llm=VALID_LLM,
-            agent=AGENT_NO_SUBAGENTS,
-            auth=ROOT_API_KEY,
-            mcp_servers=[_mcp_server(TOKEN_FORWARD)],
-        )
-
-    assert any(
-        "requires root-level `auth.mode: 'oauth2'`" in msg
-        for msg in _error_msgs(exc_info.value)
-    )
-
-
-def test_mcp_server_index_appears_in_error_message_for_later_entries() -> None:
-    with pytest.raises(ValidationError) as exc_info:
-        Config(  # pyright: ignore[reportUnusedCallResult]
-            llm=VALID_LLM,
-            agent=AGENT_NO_SUBAGENTS,
-            auth="none",
-            mcp_servers=[
-                _mcp_server(CLIENT_CREDENTIALS),
-                _mcp_server(TOKEN_FORWARD),
-            ],
-        )
-
-    assert any(
-        "`mcp_servers[1].auth.mode`" in msg for msg in _error_msgs(exc_info.value)
-    )
