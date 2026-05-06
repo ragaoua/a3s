@@ -72,13 +72,13 @@ class Config(StrictModel):
 
 
 def load_config(env: Mapping[str, str] = os.environ) -> Config:
-    config_file = resolve_config_file(env=env)
+    config_file = resolve_config_file_path(env=env)
     config_dict = read_yaml_config(config_file)
     config_dict = substitute_env_vars(config_dict, env=env)
     return Config.model_validate(config_dict)
 
 
-def resolve_config_file(env: Mapping[str, str] = os.environ) -> Path:
+def resolve_config_file_path(env: Mapping[str, str] = os.environ) -> Path:
     raw_value = env.get(CONFIG_FILE_ENV_VAR_NAME)
     if raw_value is not None:
         stripped_value = raw_value.strip()

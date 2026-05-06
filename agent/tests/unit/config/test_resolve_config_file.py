@@ -1,17 +1,16 @@
 from pathlib import Path
-
 import pytest
 
 from src.config.config import (
     CONFIG_FILE_ENV_VAR_NAME,
     DEFAULT_CONFIG_FILE,
-    resolve_config_file,
+    resolve_config_file_path,
 )
 
 
 def test_resolve_config_file_returns_default_when_env_var_missing() -> None:
     env: dict[str, str] = {}
-    assert resolve_config_file(env=env) == DEFAULT_CONFIG_FILE
+    assert resolve_config_file_path(env=env) == DEFAULT_CONFIG_FILE
 
 
 @pytest.mark.parametrize("raw_path", ["", "   "])
@@ -19,11 +18,11 @@ def test_resolve_config_file_returns_default_when_env_var_blank(
     raw_path: str,
 ) -> None:
     env: dict[str, str] = {CONFIG_FILE_ENV_VAR_NAME: raw_path}
-    assert resolve_config_file(env=env) == DEFAULT_CONFIG_FILE
+    assert resolve_config_file_path(env=env) == DEFAULT_CONFIG_FILE
 
 
-def test_resolve_config_file_strips_surrounding_whitespace(tmp_path: Path) -> None:
-    config_file = tmp_path / "agent.yaml"
+def test_resolve_config_file_strips_surrounding_whitespace() -> None:
+    config_file = Path("some/dir/agent.yaml")
     env = {CONFIG_FILE_ENV_VAR_NAME: f"  {config_file}  "}
 
-    assert resolve_config_file(env=env) == config_file
+    assert resolve_config_file_path(env=env) == config_file
