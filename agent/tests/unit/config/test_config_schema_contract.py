@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import cast
+
+from pydantic import JsonValue
 
 from src.config.config import Config
 
@@ -10,14 +12,14 @@ SCHEMA_PATH = (
 ENV_VAR_PLACEHOLDER_REF = "#/$defs/EnvVarPlaceholder"
 
 
-def strip_env_var_placeholder_exceptions(node: Any) -> Any:
+def strip_env_var_placeholder_exceptions(node: JsonValue) -> JsonValue:
     if isinstance(node, list):
         return [strip_env_var_placeholder_exceptions(item) for item in node]
 
     if not isinstance(node, dict):
         return node
 
-    cleaned = {
+    cleaned: dict[str, JsonValue] = {
         key: strip_env_var_placeholder_exceptions(value)
         for key, value in node.items()
         if key != "$schema"
@@ -27,7 +29,7 @@ def strip_env_var_placeholder_exceptions(node: Any) -> Any:
     # Delete the top-level EnvVarPlaceholder definition
     defs = cleaned.get("$defs")
     if isinstance(defs, dict):
-        defs.pop("EnvVarPlaceholder", None)
+        _ = defs.pop("EnvVarPlaceholder", None)
 
     # For each property, drop the EnvVarPlaceholder branch
     for keyword in ("anyOf", "oneOf"):
@@ -38,7 +40,8 @@ def strip_env_var_placeholder_exceptions(node: Any) -> Any:
         branches = [
             branch
             for branch in branches
-            if "$ref" not in branch or branch["$ref"] != ENV_VAR_PLACEHOLDER_REF
+            if not isinstance(branch, dict)
+            or branch.get("$ref") != ENV_VAR_PLACEHOLDER_REF
         ]
 
         if len(branches) == 1:
@@ -50,7 +53,9 @@ def strip_env_var_placeholder_exceptions(node: Any) -> Any:
 
 
 def test_checked_in_schema_matches_generated_model_schema() -> None:
-    checked_in_schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    checked_in_schema = cast(
+        JsonValue, json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    )
 
     assert (
         strip_env_var_placeholder_exceptions(checked_in_schema)
