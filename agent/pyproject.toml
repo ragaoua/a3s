@@ -12,6 +12,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.59b0",
     "opentelemetry-sdk>=1.38.0",
     "pyyaml>=6.0",
+    "returns>=0.27.0",
 ]
 
 [build-system]

@@ -1,11 +1,11 @@
 import base64
 from typing import Literal, final
 from urllib.parse import urlencode
+from returns.result import Failure, Result, Success
 
 import httpx
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
-from authlib.jose.errors import DecodeError, JoseError
-from authlib.oauth2.rfc6750 import InvalidTokenError
+from authlib.jose.errors import JoseError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
 from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
 from pydantic import JsonValue, SecretStr
@@ -33,10 +33,6 @@ from src.logging import get_logger
 from src.utils import FetchJson, fetch_json
 
 logger = get_logger(__name__)
-
-
-class TokenIntrospectionServiceError(RuntimeError):
-    pass
 
 
 @final
@@ -69,21 +65,30 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         metadata_raw: dict[str, JsonValue],
         *,
         expected_issuer: str,
-    ) -> AuthorizationServerMetadata:
-        metadata = AuthorizationServerMetadata(metadata_raw)
-        metadata.validate_issuer()
+    ) -> Result[AuthorizationServerMetadata, str]:
+        try:
+            metadata = AuthorizationServerMetadata(metadata_raw)
+            metadata.validate_issuer()
+        except Exception as err:
+            return Failure(f"Failed to validate authorization server metadata: {err}")
 
         metadata_issuer = str(metadata.get("issuer", "")).rstrip("/")
         if metadata_issuer != expected_issuer:
-            raise ValueError("Issuer mismatch in OAuth2 authorization server metadata")
+            return Failure(
+                "Failed to validate authorization server metadata: Issuer mismatch in OAuth2 authorization server metadata"
+            )
 
-        return metadata
+        return Success(metadata)
 
     async def _fetch_authorization_server_metadata(
         self,
-    ) -> AuthorizationServerMetadata:
-        metadata_url = get_well_known_url(self.issuer_url, external=True)
-        metadata_raw = await self._fetch_json(metadata_url)
+    ) -> Result[AuthorizationServerMetadata, str]:
+        try:
+            metadata_url = get_well_known_url(self.issuer_url, external=True)
+            metadata_raw = await self._fetch_json(metadata_url)
+        except Exception as err:
+            return Failure(f"Failed to fetch authorization server metadata: {err}")
+
         return self._validate_authorization_server_metadata(
             metadata_raw,
             expected_issuer=self.issuer_url,
@@ -92,46 +97,49 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
     async def _discover_jwks_uri(
         self,
         metadata: AuthorizationServerMetadata | None = None,
-    ) -> str:
-        metadata = metadata or await self._fetch_authorization_server_metadata()
-        metadata.validate_jwks_uri()
+    ) -> Result[str, str]:
+        if not metadata:
+            res = await self._fetch_authorization_server_metadata()
+            if isinstance(res, Failure):
+                return res
+            metadata = res.unwrap()
+
+        try:
+            metadata.validate_jwks_uri()
+        except Exception as err:
+            return Failure(
+                f"Failed to validate authorization server metadata JWKS URI: {err}"
+            )
 
         jwks_uri = metadata.get("jwks_uri")
         if not isinstance(jwks_uri, str) or not jwks_uri:
-            raise ValueError(
+            return Failure(
                 "OAuth2 authorization server metadata does not contain a valid jwks_uri"
             )
 
-        return jwks_uri
-
-    async def _discover_introspection_endpoint(
-        self,
-        metadata: AuthorizationServerMetadata | None = None,
-    ) -> str:
-        metadata = metadata or await self._fetch_authorization_server_metadata()
-        metadata.validate_introspection_endpoint()
-
-        introspection_endpoint = metadata.get("introspection_endpoint")
-        if not isinstance(introspection_endpoint, str) or not introspection_endpoint:
-            raise ValueError(
-                "OAuth2 authorization server metadata does not contain a valid introspection_endpoint"
-            )
-
-        return introspection_endpoint
+        return Success(jwks_uri)
 
     async def _fetch_jwk_set(
         self,
         *,
-        jwtPolicyConfig: OAuthJwtPolicyConfig,
+        jwt_policy_config: OAuthJwtPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
-    ) -> KeySet:
-        jwks_url = (
-            str(jwtPolicyConfig.jwks.url)
-            if isinstance(jwtPolicyConfig.jwks, OAuthStaticJwksPolicyConfig)
-            else await self._discover_jwks_uri(metadata)
-        )
-        jwks_raw = await self._fetch_json(jwks_url)
-        return JsonWebKey.import_key_set(jwks_raw)
+    ) -> Result[KeySet, str]:
+        if isinstance(jwt_policy_config.jwks, OAuthStaticJwksPolicyConfig):
+            jwks_url = str(jwt_policy_config.jwks.url)
+        else:
+            res = await self._discover_jwks_uri(metadata)
+            if isinstance(res, Failure):
+                return res
+            jwks_url = res.unwrap()
+
+        try:
+            jwks_raw = await self._fetch_json(jwks_url)
+            jwks = JsonWebKey.import_key_set(jwks_raw)
+        except Exception as err:
+            return Failure(f"Failed to fetch JWKS from authorization server: {err}")
+
+        return Success(jwks)
 
     def _requires_authorization_server_metadata(self) -> bool:
         return (
@@ -143,6 +151,31 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 self.config.introspection, OAuthDiscoveredIntrospectionPolicyConfig
             )
         )
+
+    async def _discover_introspection_endpoint(
+        self,
+        metadata: AuthorizationServerMetadata | None = None,
+    ) -> Result[str, str]:
+        if not metadata:
+            res = await self._fetch_authorization_server_metadata()
+            if isinstance(res, Failure):
+                return res
+            metadata = res.unwrap()
+
+        try:
+            metadata.validate_introspection_endpoint()
+        except Exception as err:
+            return Failure(
+                f"Failed to validate authorization server metadata introspection endpoint: {err}"
+            )
+
+        introspection_endpoint = metadata.get("introspection_endpoint")
+        if not isinstance(introspection_endpoint, str) or not introspection_endpoint:
+            return Failure(
+                "OAuth2 authorization server metadata does not contain a valid introspection_endpoint"
+            )
+
+        return Success(introspection_endpoint)
 
     def _get_introspection_request(
         self,
@@ -178,46 +211,70 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
     async def _introspect_access_token(
         self,
         token: str,
+        *,
+        introspection_config: OAuthStaticIntrospectionPolicyConfig
+        | OAuthDiscoveredIntrospectionPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
-    ) -> None:
-        if self.config.introspection is None:
-            return
+    ) -> Result[None, JSONResponse]:
+        if isinstance(self.config.introspection, OAuthStaticIntrospectionPolicyConfig):
+            endpoint = str(self.config.introspection.endpoint)
+        else:
+            res = await self._discover_introspection_endpoint(metadata)
+            if isinstance(res, Failure):
+                return res.alt(
+                    lambda err: JSONResponse(
+                        status_code=503,
+                        content={"detail": res.failure()},
+                    )
+                )
+            endpoint = res.unwrap()
 
         try:
-            endpoint = (
-                str(self.config.introspection.endpoint)
-                if isinstance(
-                    self.config.introspection, OAuthStaticIntrospectionPolicyConfig
-                )
-                else await self._discover_introspection_endpoint(metadata)
+            introspection_response = await self._fetch_json(
+                self._get_introspection_request(
+                    token=token,
+                    endpoint=endpoint,
+                    auth_method=introspection_config.auth_method,
+                    client_id=introspection_config.client_id,
+                    client_secret=introspection_config.client_secret,
+                ),
             )
         except Exception as err:
-            raise TokenIntrospectionServiceError(
-                "Failed to discover token introspection endpoint"
-            ) from err
+            return Failure(
+                JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": f"Failed to introspect token via '{endpoint}': {err}"
+                    },
+                )
+            )
 
-        introspection_response = await self._fetch_json(
-            self._get_introspection_request(
-                token=token,
-                endpoint=endpoint,
-                auth_method=self.config.introspection.auth_method,
-                client_id=self.config.introspection.client_id,
-                client_secret=self.config.introspection.client_secret,
-            ),
-            error_cls=TokenIntrospectionServiceError,
-            error_message=(f"Failed to introspect token via '{endpoint}'"),
-        )
         active = introspection_response.get("active")
 
         if active is False:
-            raise InvalidTokenError(realm=self.realm)
-
-        if active is not True:
-            raise TokenIntrospectionServiceError(
-                "OAuth2 token introspection response is missing a valid 'active' flag"
+            return Failure(
+                self._unauthorized_error_response(
+                    error="invalid_token",
+                    error_description="The access token provided is expired, revoked, malformed, or invalid for other reasons.",
+                )
             )
 
-    def _get_rfc9068_claims_options(self, resource_server: str) -> dict[str, JsonValue]:
+        if active is not True:
+            return Failure(
+                JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": "OAuth2 token introspection response is missing a valid 'active' flag"
+                    },
+                )
+            )
+
+        return Success(None)
+
+    def _get_rfc9068_claims_options(
+        self,
+        resource_server: str,
+    ) -> dict[str, JsonValue]:
         return {
             "iss": {"essential": True, "value": self.issuer_url},
             "exp": {"essential": True},
@@ -235,23 +292,28 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             "entitlements": {"essential": False},
         }
 
-    def _validate_access_token(self, token: str, jwk_set: KeySet):
+    def _validate_jwt(
+        self,
+        token: str,
+        *,
+        jwt_config: OAuthJwtPolicyConfig,
+        jwk_set: KeySet,
+    ) -> Result[None, str]:
         # Base JWT validation always uses JWTClaims so registered NumericDate
         # claims like exp/nbf/iat are validated when the token includes them.
         claims_cls: type[JWTClaims] = JWTClaims
         claims_options: dict[str, JsonValue] = {
             "iss": {"essential": True, "value": self.issuer_url},
         }
-        jwt_config = self.config.jwt
 
-        if jwt_config is not None and jwt_config.rfc9068 is not None:
+        if jwt_config.rfc9068 is not None:
             claims_cls = JWTAccessTokenClaims
             claims_options = {
                 **claims_options,
                 **self._get_rfc9068_claims_options(jwt_config.rfc9068.resource_server),
             }
 
-        for key, value in (jwt_config.claims if jwt_config is not None else {}).items():
+        for key, value in jwt_config.claims.items():
             claims_options = {
                 **claims_options,
                 key: {"essential": True, "value": value},
@@ -265,8 +327,13 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 claims_options=claims_options,
             )
             claims.validate()  # pyright: ignore[reportUnknownMemberType]
-        except DecodeError as exc:
-            raise InvalidTokenError(realm=self.realm) from exc
+        except Exception as err:
+            if isinstance(err, JoseError) and err.error == "expired_token":
+                return Failure("The access token expired")
+
+            return Failure("The access token is invalid")
+
+        return Success(None)
 
     def _unauthorized_error_response(
         self,
@@ -287,6 +354,58 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             headers={"WWW-Authenticate": authenticate_header},
         )
 
+    async def _validate_token(self, token: str) -> Result[None, JSONResponse]:
+        auth_server_metadata: AuthorizationServerMetadata | None = None
+        if self._requires_authorization_server_metadata():
+            res = await self._fetch_authorization_server_metadata()
+
+            if isinstance(res, Failure):
+                return Failure(
+                    JSONResponse(
+                        status_code=503,
+                        content={"detail": res.failure()},
+                    ),
+                )
+
+            auth_server_metadata = res.unwrap()
+
+        if self.config.jwt is not None:
+            res = await self._fetch_jwk_set(
+                jwt_policy_config=self.config.jwt, metadata=auth_server_metadata
+            )
+
+            if isinstance(res, Failure):
+                return Failure(
+                    JSONResponse(
+                        status_code=503,
+                        content={"detail": res.failure()},
+                    ),
+                )
+
+            jwk_set = res.unwrap()
+
+            res = self._validate_jwt(token, jwt_config=self.config.jwt, jwk_set=jwk_set)
+
+            if isinstance(res, Failure):
+                return Failure(
+                    self._unauthorized_error_response(
+                        error="invalid_token",
+                        error_description=res.failure(),
+                    )
+                )
+
+        if self.config.introspection is not None:
+            res = await self._introspect_access_token(
+                token,
+                introspection_config=self.config.introspection,
+                metadata=auth_server_metadata,
+            )
+
+            if isinstance(res, Failure):
+                return res
+
+        return Success(None)
+
     @override
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         if request.url.path in EXCLUDED_PATHS:
@@ -305,49 +424,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 error_description="Authorization header must use Bearer token",
             )
 
-        auth_server_metadata: AuthorizationServerMetadata | None = None
-        if self._requires_authorization_server_metadata():
-            try:
-                auth_server_metadata = await self._fetch_authorization_server_metadata()
-            except Exception:
-                logger.exception("Authorization server metadata fetch failed")
-                return JSONResponse(
-                    status_code=503,
-                    content={"detail": "Failed to fetch authorization server metadata"},
-                )
-
-        jwk_set: KeySet | None = None
-        if self.config.jwt is not None:
-            try:
-                jwk_set = await self._fetch_jwk_set(
-                    jwtPolicyConfig=self.config.jwt, metadata=auth_server_metadata
-                )
-            except Exception:
-                logger.exception("JWKS fetch failed")
-                return JSONResponse(
-                    status_code=503, content={"detail": "Failed to fetch JWKS"}
-                )
-
-        try:
-            if jwk_set is not None:
-                self._validate_access_token(token, jwk_set)
-            await self._introspect_access_token(token, auth_server_metadata)
-        except TokenIntrospectionServiceError:
-            logger.exception("Token introspection failed")
-            return JSONResponse(
-                status_code=503, content={"detail": "Failed to introspect token"}
-            )
-        except Exception as err:
-            logger.error("Token validation failed: %s", err)
-            if isinstance(err, JoseError) and err.error == "expired_token":
-                return self._unauthorized_error_response(
-                    error="invalid_token",
-                    error_description="The access token expired",
-                )
-            return self._unauthorized_error_response(
-                error="invalid_token",
-                error_description="The access token is invalid",
-            )
+        res = await self._validate_token(token)
+        if isinstance(res, Failure):
+            return res.failure()
 
         with bind_current_authorization_header(f"Bearer {token}"):
             return await call_next(request)
