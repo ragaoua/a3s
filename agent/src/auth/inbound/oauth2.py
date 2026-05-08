@@ -1,5 +1,5 @@
 import base64
-from typing import Any, Literal, final
+from typing import Literal, final
 from urllib.parse import urlencode
 
 import httpx
@@ -8,7 +8,7 @@ from authlib.jose.errors import DecodeError, JoseError
 from authlib.oauth2.rfc6750 import InvalidTokenError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
 from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
-from pydantic import SecretStr
+from pydantic import JsonValue, SecretStr
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -103,8 +103,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         introspection_endpoint = metadata.get("introspection_endpoint")
         if not isinstance(introspection_endpoint, str) or not introspection_endpoint:
             raise ValueError(
-                "OAuth2 authorization server metadata does not contain a valid "
-                "introspection_endpoint"
+                "OAuth2 authorization server metadata does not contain a valid introspection_endpoint"
             )
 
         return introspection_endpoint
@@ -207,7 +206,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 "OAuth2 token introspection response is missing a valid 'active' flag"
             )
 
-    def _get_rfc9068_claims_options(self, resource_server: str):
+    def _get_rfc9068_claims_options(self, resource_server: str) -> dict[str, JsonValue]:
         return {
             "iss": {"essential": True, "value": self.issuer_url},
             "exp": {"essential": True},
@@ -229,7 +228,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         # Base JWT validation always uses JWTClaims so registered NumericDate
         # claims like exp/nbf/iat are validated when the token includes them.
         claims_cls: type[JWTClaims] = JWTClaims
-        claims_options: dict[str, Any] = {
+        claims_options: dict[str, JsonValue] = {
             "iss": {"essential": True, "value": self.issuer_url},
         }
         jwt_config = self.config.jwt
@@ -248,13 +247,13 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             }
 
         try:
-            claims = jwt.decode(
+            claims = jwt.decode(  # pyright: ignore[reportUnknownMemberType]
                 token,
                 jwk_set,
                 claims_cls=claims_cls,
                 claims_options=claims_options,
             )
-            claims.validate()
+            claims.validate()  # pyright: ignore[reportUnknownMemberType]
         except DecodeError as exc:
             raise InvalidTokenError(realm=self.realm) from exc
 
