@@ -69,7 +69,7 @@ async def test_dispatch_bypasses_auth_for_excluded_paths(path: str) -> None:
         API_KEY.upper(),  # Tests case sensitivity
     ],
 )
-async def test_dispatch_returns_401_when_api_key_header_none_or_empty_or_wrong(
+async def test_dispatch_returns_401_when_api_key_header_missing_or_empty_or_wrong(
     header: str | None,
 ) -> None:
     middleware = _build_middleware()
