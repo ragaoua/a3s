@@ -2,6 +2,7 @@ import pytest
 from authlib.jose import KeySet
 from pydantic import SecretStr
 from pydantic_core import Url
+from starlette.types import Receive, Scope, Send
 
 from src.auth.inbound.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
@@ -14,31 +15,30 @@ from src.config.types.auth import (
     OAuthDiscoveredJwksPolicyConfig,
     OAuthStaticIntrospectionPolicyConfig,
 )
+from src.utils import FetchJson
 
 
 ISSUER_URL = "https://issuer.example"
 
 
 def _build_middleware(
-    *, config: OAuthPoliciesConfig, fetch_json=None
+    *,
+    config: OAuthPoliciesConfig,
+    fetch_json: FetchJson | None = None,
 ) -> OAuth2BearerAuthMiddleware:
-    async def app(scope, receive, send):
+    async def app(_scope: Scope, _receive: Receive, _send: Send):
         return None
-
-    kwargs = {}
-    if fetch_json is not None:
-        kwargs["fetch_json"] = fetch_json
 
     return OAuth2BearerAuthMiddleware(
         app=app,
         issuer_url=ISSUER_URL,
         realm="test-realm",
         config=config,
-        **kwargs,
+        **({"fetch_json": fetch_json} if fetch_json is not None else {}),
     )
 
 
-def _jwt_static_config() -> OAuthPoliciesConfig:
+def _static_jwt_config() -> OAuthPoliciesConfig:
     return OAuthPoliciesConfig(
         jwt=OAuthJwtPolicyConfig(
             jwks=OAuthStaticJwksPolicyConfig(url=Url(f"{ISSUER_URL}/jwks")),
@@ -48,7 +48,7 @@ def _jwt_static_config() -> OAuthPoliciesConfig:
     )
 
 
-def _jwt_discovered_config() -> OAuthPoliciesConfig:
+def _discovered_jwt_config() -> OAuthPoliciesConfig:
     return OAuthPoliciesConfig(
         jwt=OAuthJwtPolicyConfig(
             jwks=OAuthDiscoveredJwksPolicyConfig(),
@@ -85,7 +85,7 @@ async def test_fetch_jwk_set_uses_static_url_without_discovery() -> None:
         captured_urls.append(url)
         return {"keys": []}
 
-    config = _jwt_static_config()
+    config = _static_jwt_config()
     middleware = _build_middleware(config=config, fetch_json=fetch_json)
     assert config.jwt is not None
 
@@ -96,12 +96,12 @@ async def test_fetch_jwk_set_uses_static_url_without_discovery() -> None:
 
 
 def test_requires_metadata_false_for_jwt_static_only() -> None:
-    middleware = _build_middleware(config=_jwt_static_config())
+    middleware = _build_middleware(config=_static_jwt_config())
     assert middleware._requires_authorization_server_metadata() is False
 
 
 def test_requires_metadata_true_for_jwt_discovered() -> None:
-    middleware = _build_middleware(config=_jwt_discovered_config())
+    middleware = _build_middleware(config=_discovered_jwt_config())
     assert middleware._requires_authorization_server_metadata() is True
 
 

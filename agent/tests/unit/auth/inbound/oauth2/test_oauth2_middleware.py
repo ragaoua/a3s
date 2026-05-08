@@ -1,14 +1,14 @@
-from typing import Any
-
+import httpx
 import pytest
 from authlib.jose import JsonWebKey, KeySet, jwt
 from authlib.jose.errors import ExpiredTokenError, InvalidClaimError
 from authlib.jose.errors import InvalidTokenError as JoseInvalidTokenError
 from authlib.oauth2.rfc6750 import InvalidTokenError
-from pydantic import SecretStr
+from pydantic import JsonValue, SecretStr
 from pydantic_core import Url
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
+from starlette.types import Receive, Scope, Send
 
 from src.auth.context import get_current_authorization_header
 from src.auth.inbound.constants import EXCLUDED_PATHS
@@ -26,7 +26,7 @@ from src.config.types.auth import (
 
 
 ISSUER_URL = "https://issuer.example"
-_JWK_DICT = {
+JWK_DICT = {
     "kty": "oct",
     "k": "c2VjcmV0c2VjcmV0c2VjcmV0c2VjcmV0",
     "kid": "test-key-id",
@@ -34,19 +34,19 @@ _JWK_DICT = {
 
 
 def _build_jwk_set() -> KeySet:
-    return JsonWebKey.import_key_set({"keys": [_JWK_DICT]})
+    return JsonWebKey.import_key_set({"keys": [JWK_DICT]})
 
 
-def _encode_access_token(*, claims: dict[str, Any]) -> str:
-    key = JsonWebKey.import_key(_JWK_DICT)
-    token = jwt.encode({"alg": "HS256", "kid": "test-key-id"}, claims, key)
+def _encode_access_token(*, claims: dict[str, JsonValue]) -> str:
+    key = JsonWebKey.import_key(JWK_DICT)
+    token = jwt.encode({"alg": "HS256", "kid": "test-key-id"}, claims, key)  # pyright: ignore[reportUnknownMemberType]
     return token.decode("utf-8")
 
 
-def _build_request(*, path: str, authorization: str | None = None) -> Request:
+def _build_request(*, path: str, authorization_header: str | None = None) -> Request:
     headers: list[tuple[bytes, bytes]] = []
-    if authorization is not None:
-        headers.append((b"authorization", authorization.encode("utf-8")))
+    if authorization_header is not None:
+        headers.append((b"authorization", authorization_header.encode("utf-8")))
 
     scope = {
         "type": "http",
@@ -72,12 +72,8 @@ def _build_middleware(
     config: OAuthPoliciesConfig | None = None,
     fetch_json: FetchJson | None = None,
 ):
-    async def app(scope, receive, send):
+    async def app(_scope: Scope, _receive: Receive, _send: Send):
         return None
-
-    kwargs: dict[str, Any] = {}
-    if fetch_json is not None:
-        kwargs["fetch_json"] = fetch_json
 
     return OAuth2BearerAuthMiddleware(
         app=app,
@@ -91,18 +87,15 @@ def _build_middleware(
                 claims={},
             )
         ),
-        **kwargs,
+        **({"fetch_json": fetch_json} if fetch_json is not None else {}),
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("excluded_path", EXCLUDED_PATHS)
-async def test_dispatch_bypasses_auth_for_excluded_paths(excluded_path: str) -> None:
+@pytest.mark.parametrize("path", EXCLUDED_PATHS)
+async def test_dispatch_bypasses_auth_for_excluded_paths(path: str) -> None:
     middleware = _build_middleware()
-    request = _build_request(
-        path=excluded_path,
-        authorization=None,
-    )
+    request = _build_request(path=path, authorization_header=None)
     called = False
 
     async def call_next(_: Request) -> Response:
@@ -118,14 +111,14 @@ async def test_dispatch_bypasses_auth_for_excluded_paths(excluded_path: str) -> 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "authorization_header",
+    "header",
     [None, ""],
 )
-async def test_dispatch_returns_401_when_authorization_header_is_missing(
-    authorization_header: str | None,
+async def test_dispatch_returns_401_when_authorization_header_missing_or_empty(
+    header: str | None,
 ) -> None:
     middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization=authorization_header)
+    request = _build_request(path="/rpc", authorization_header=header)
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called when auth header is missing")
@@ -145,7 +138,10 @@ async def test_dispatch_returns_invalid_request_for_malformed_bearer_header(
     authorization_header: str,
 ) -> None:
     middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization=authorization_header)
+    request = _build_request(
+        path="/rpc",
+        authorization_header=authorization_header,
+    )
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called for malformed bearer auth")
@@ -164,7 +160,7 @@ async def test_dispatch_returns_expired_token_error_when_validation_detects_expi
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization="Bearer expired-token")
+    request = _build_request(path="/rpc", authorization_header="Bearer expired-token")
 
     async def fetch_jwk_set(*, jwtPolicyConfig, metadata=None):
         return object()
@@ -204,7 +200,7 @@ def test_validate_access_token_accepts_tokens_without_optional_date_claims() -> 
     ],
 )
 def test_validate_access_token_rejects_invalid_registered_date_claim_values(
-    claims: dict[str, Any],
+    claims: dict[str, JsonValue],
 ) -> None:
     middleware = _build_middleware()
     token = _encode_access_token(claims=claims)
@@ -229,7 +225,7 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     expected_jwks_url = "https://issuer.example/.well-known/jwks.json"
-    captured_url: str | None = None
+    captured_url: str | httpx.Request | None = None
     config = OAuthJwtPolicyConfig(
         jwks=OAuthDiscoveredJwksPolicyConfig(),
         rfc9068=None,
@@ -237,11 +233,11 @@ async def test_dispatch_uses_discovered_jwks_uri_when_not_configured(
     )
 
     async def fetch_json(
-        url,
+        url: str | httpx.Request,
         *,
-        error_cls: type[Exception] = ValueError,
-        error_message: str | None = None,
-    ):
+        error_cls: type[Exception] = ValueError,  # pyright: ignore[reportUnusedParameter]
+        error_message: str | None = None,  # pyright: ignore[reportUnusedParameter]
+    ) -> dict[str, JsonValue]:
         nonlocal captured_url
         captured_url = url
         return {"keys": []}
@@ -266,7 +262,7 @@ async def test_dispatch_returns_503_when_jwks_fetch_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization="Bearer valid-token")
+    request = _build_request(path="/rpc", authorization_header="Bearer valid-token")
 
     async def raise_fetch_jwk_set(*, jwtPolicyConfig, metadata=None):
         raise ValueError("boom")
@@ -300,7 +296,7 @@ async def test_dispatch_calls_next_and_binds_authorization_header_on_success(
 ) -> None:
     token = _encode_access_token(claims={"iss": ISSUER_URL})
     middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization=f"Bearer {token}")
+    request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
 
     async def fetch_jwk_set(*, jwtPolicyConfig, metadata=None):
         return _build_jwk_set()
@@ -334,7 +330,7 @@ async def test_dispatch_with_introspection_only_calls_next_when_active() -> None
     middleware = _build_middleware(
         config=_introspection_config(), fetch_json=fetch_json
     )
-    request = _build_request(path="/rpc", authorization="Bearer t")
+    request = _build_request(path="/rpc", authorization_header="Bearer t")
     called = False
 
     async def call_next(_: Request) -> Response:
@@ -361,7 +357,7 @@ async def test_dispatch_with_introspection_returns_401_when_inactive() -> None:
     middleware = _build_middleware(
         config=_introspection_config(), fetch_json=fetch_json
     )
-    request = _build_request(path="/rpc", authorization="Bearer t")
+    request = _build_request(path="/rpc", authorization_header="Bearer t")
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called for inactive tokens")
@@ -385,7 +381,7 @@ async def test_dispatch_returns_503_when_introspection_active_flag_invalid() -> 
     middleware = _build_middleware(
         config=_introspection_config(), fetch_json=fetch_json
     )
-    request = _build_request(path="/rpc", authorization="Bearer t")
+    request = _build_request(path="/rpc", authorization_header="Bearer t")
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called when introspection malformed")
@@ -409,7 +405,7 @@ async def test_dispatch_returns_503_when_introspection_request_fails() -> None:
     middleware = _build_middleware(
         config=_introspection_config(), fetch_json=fetch_json
     )
-    request = _build_request(path="/rpc", authorization="Bearer t")
+    request = _build_request(path="/rpc", authorization_header="Bearer t")
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called when introspection fails")
@@ -439,7 +435,7 @@ async def test_dispatch_returns_503_when_metadata_fetch_fails() -> None:
         raise ValueError("metadata down")
 
     middleware = _build_middleware(config=config, fetch_json=fetch_json)
-    request = _build_request(path="/rpc", authorization="Bearer t")
+    request = _build_request(path="/rpc", authorization_header="Bearer t")
 
     async def call_next(_: Request) -> Response:
         pytest.fail("call_next should not be called when metadata fetch fails")
@@ -457,7 +453,7 @@ async def test_dispatch_returns_invalid_token_for_non_expired_validation_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     middleware = _build_middleware()
-    request = _build_request(path="/rpc", authorization="Bearer bad-token")
+    request = _build_request(path="/rpc", authorization_header="Bearer bad-token")
 
     async def fetch_jwk_set(*, jwtPolicyConfig, metadata=None):
         return object()
