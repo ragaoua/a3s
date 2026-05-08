@@ -25,6 +25,10 @@ from src.config.types import (
     OAuthStaticIntrospectionPolicyConfig,
     OAuthStaticJwksPolicyConfig,
 )
+from src.config.types.auth import (
+    OAuthDiscoveredIntrospectionPolicyConfig,
+    OAuthDiscoveredJwksPolicyConfig,
+)
 from src.logging import get_logger
 from src.utils import FetchJson, fetch_json
 
@@ -122,11 +126,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
     def _requires_authorization_server_metadata(self) -> bool:
         return (
             self.config.jwt is not None
-            and not isinstance(self.config.jwt.jwks, OAuthStaticJwksPolicyConfig)
+            and isinstance(self.config.jwt.jwks, OAuthDiscoveredJwksPolicyConfig)
         ) or (
             self.config.introspection is not None
-            and not isinstance(
-                self.config.introspection, OAuthStaticIntrospectionPolicyConfig
+            and isinstance(
+                self.config.introspection, OAuthDiscoveredIntrospectionPolicyConfig
             )
         )
 
