@@ -64,19 +64,30 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         self.config = config
         self._fetch_json = fetch_json
 
+    @staticmethod
+    def _validate_authorization_server_metadata(
+        metadata_raw: dict[str, JsonValue],
+        *,
+        expected_issuer: str,
+    ) -> AuthorizationServerMetadata:
+        metadata = AuthorizationServerMetadata(metadata_raw)
+        metadata.validate_issuer()
+
+        metadata_issuer = str(metadata.get("issuer", "")).rstrip("/")
+        if metadata_issuer != expected_issuer:
+            raise ValueError("Issuer mismatch in OAuth2 authorization server metadata")
+
+        return metadata
+
     async def _fetch_authorization_server_metadata(
         self,
     ) -> AuthorizationServerMetadata:
         metadata_url = get_well_known_url(self.issuer_url, external=True)
         metadata_raw = await self._fetch_json(metadata_url)
-        metadata = AuthorizationServerMetadata(metadata_raw)
-        metadata.validate_issuer()
-
-        metadata_issuer = str(metadata.get("issuer", "")).rstrip("/")
-        if metadata_issuer != self.issuer_url:
-            raise ValueError("Issuer mismatch in OAuth2 authorization server metadata")
-
-        return metadata
+        return self._validate_authorization_server_metadata(
+            metadata_raw,
+            expected_issuer=self.issuer_url,
+        )
 
     async def _discover_jwks_uri(
         self,

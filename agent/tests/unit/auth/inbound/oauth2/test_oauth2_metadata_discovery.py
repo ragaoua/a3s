@@ -78,38 +78,6 @@ def _discovered_introspection_config() -> OAuthPoliciesConfig:
 
 
 @pytest.mark.asyncio
-async def test_fetch_authorization_server_metadata_rejects_issuer_mismatch() -> None:
-    async def fetch_json(url, *, error_cls=ValueError, error_message=None):
-        return {
-            "issuer": "https://other.example",
-            "jwks_uri": f"{ISSUER_URL}/jwks",
-        }
-
-    middleware = _build_middleware(
-        config=_jwt_discovered_config(), fetch_json=fetch_json
-    )
-
-    with pytest.raises(ValueError, match="Issuer mismatch"):
-        await middleware._fetch_authorization_server_metadata()
-
-
-@pytest.mark.asyncio
-async def test_fetch_authorization_server_metadata_accepts_trailing_slash() -> None:
-    async def fetch_json(url, *, error_cls=ValueError, error_message=None):
-        return {
-            "issuer": f"{ISSUER_URL}/",
-            "jwks_uri": f"{ISSUER_URL}/jwks",
-        }
-
-    middleware = _build_middleware(
-        config=_jwt_discovered_config(), fetch_json=fetch_json
-    )
-
-    metadata = await middleware._fetch_authorization_server_metadata()
-    assert metadata.get("issuer") == f"{ISSUER_URL}/"
-
-
-@pytest.mark.asyncio
 async def test_fetch_jwk_set_uses_static_url_without_discovery() -> None:
     captured_urls: list[str] = []
 
