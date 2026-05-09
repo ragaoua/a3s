@@ -216,8 +216,8 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         | OAuthDiscoveredIntrospectionPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> Result[None, JSONResponse]:
-        if isinstance(self.config.introspection, OAuthStaticIntrospectionPolicyConfig):
-            endpoint = str(self.config.introspection.endpoint)
+        if isinstance(introspection_config, OAuthStaticIntrospectionPolicyConfig):
+            endpoint = str(introspection_config.endpoint)
         else:
             res = await self._discover_introspection_endpoint(metadata)
             if isinstance(res, Failure):
