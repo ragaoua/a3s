@@ -1,3 +1,8 @@
+import time
+
+from authlib.jose import JsonWebKey, jwt
+import httpx
+from pydantic import JsonValue
 from pydantic_core import Url
 import pytest
 from starlette.requests import Request
@@ -14,6 +19,50 @@ from src.config.types import (
 from src.utils import FetchJson
 
 ISSUER_URL = "https://issuer.example"
+JWKS_URL = f"{ISSUER_URL}/jwks"
+
+SIGNING_KEY_DICT: dict[str, str] = {
+    "kty": "oct",
+    "k": "GawgguFyGrWKav7AX4VKUg",
+    "kid": "test",
+}
+OTHER_KEY_DICT: dict[str, str] = {
+    "kty": "oct",
+    "k": "OmFuZHRoZW5pY2FtZWFub3RoZXI",
+    "kid": "test",
+}
+JWKS_PAYLOAD: dict[str, JsonValue] = {
+    "keys": [
+        {
+            "kty": "oct",
+            "k": "GawgguFyGrWKav7AX4VKUg",
+            "kid": "test",
+        }
+    ]
+}
+
+
+def _encode(
+    payload: dict[str, JsonValue],
+    *,
+    key_dict: dict[str, str] = SIGNING_KEY_DICT,
+) -> str:
+    header: dict[str, JsonValue] = {"alg": "HS256", "kid": "test"}
+    key = JsonWebKey.import_key(key_dict)
+    token: bytes = jwt.encode(header, payload, key)  # pyright: ignore[reportUnknownMemberType]
+    return token.decode("ascii")
+
+
+def _build_jwks_fetch_json() -> FetchJson:
+    async def _fetch_json(
+        url: str | httpx.Request,  # pyright: ignore[reportUnusedParameter]
+        *,
+        error_cls: type[Exception] = ValueError,  # pyright: ignore[reportUnusedParameter]
+        error_message: str | None = None,  # pyright: ignore[reportUnusedParameter]
+    ) -> dict[str, JsonValue]:
+        return JWKS_PAYLOAD
+
+    return _fetch_json
 
 
 def _build_middleware(
@@ -127,3 +176,47 @@ async def test_dispatch_returns_invalid_request_for_malformed_bearer_header(
         'Bearer realm="test-realm", error="invalid_request", '
         'error_description="Authorization header must use Bearer token"'
     )
+
+
+@pytest.mark.asyncio
+async def test_dispatch_propagates_validate_token_failure() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        fetch_json=_build_jwks_fetch_json(),
+    )
+    # Token is signed with a key that is NOT in the JWKS, so JWT validation fails.
+    token = _encode(
+        {"iss": ISSUER_URL, "exp": int(time.time()) + 3600},
+        key_dict=OTHER_KEY_DICT,
+    )
+    request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
+
+    async def call_next(_: Request) -> Response:
+        pytest.fail("call_next should not be called when token validation fails")
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == (
+        'Bearer realm="test-realm", error="invalid_token", '
+        'error_description="The access token is invalid"'
+    )
+
+
+@pytest.mark.asyncio
+async def test_dispatch_calls_next_when_validate_token_succeeds() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        fetch_json=_build_jwks_fetch_json(),
+    )
+    token = _encode({"iss": ISSUER_URL, "exp": int(time.time()) + 3600})
+    request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
+
+    expected = JSONResponse({"ok": True}, status_code=200)
+
+    async def call_next(_: Request) -> Response:
+        return expected
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response is expected
