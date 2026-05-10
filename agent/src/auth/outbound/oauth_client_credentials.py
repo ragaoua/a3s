@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 import httpx
 import jwt
 from mcp.shared._httpx_utils import create_mcp_http_client
+from pydantic import JsonValue
 from pydantic_core import Url
 
 from src.config.types import OAuthClientCredentialsAuthConfig
@@ -220,15 +221,18 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         # No expires_in key in the token response. Try and
         # decode the token as a JWT to fetch the "exp" claim
         try:
-            return OAuthClientCredentialsAuth._get_exp_datetime_from_jwt(token)
+            payload = jwt.decode(token, options={"verify_signature": False})
         except jwt.DecodeError:
             # Not a JWT, we can't know the expiry date.
             # We'll fallback to reactive token refreshing
             return None
 
+        return OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload)
+
     @staticmethod
-    def _get_exp_datetime_from_jwt(token: str) -> datetime | None:
-        payload = jwt.decode(token, options={"verify_signature": False})
+    def _get_exp_datetime_from_jwt_payload(
+        payload: dict[str, JsonValue],
+    ) -> datetime | None:
         exp = payload.get("exp")
 
         if isinstance(exp, (int, float)):
