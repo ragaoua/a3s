@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import jwt
+from pydantic import JsonValue
 import pytest
 
 from src.auth.outbound import OAuthClientCredentialsAuth
@@ -29,26 +30,21 @@ def test_get_access_token_expiry_date_uses_expires_in_when_present(
 
 @pytest.mark.parametrize(
     "expires_in",
-    [True, "not-a-number", None],
+    [True, "not-a-number", None, [], {}],
 )
-def test_get_access_token_expiry_date_falls_back_to_jwt_when_expires_in_is_invalid(
-    expires_in: bool | str | None,
+def test_get_access_token_expiry_date_falls_back_to_jwt_when_expires_in_is_invalid_or_missing(
+    expires_in: JsonValue,
 ) -> None:
     expiry = datetime.fromtimestamp(1_700_000_000, tz=timezone.utc)
     token = _encode_jwt({"exp": expiry.timestamp()})
+    token_response: dict[str, JsonValue] = (
+        {"expires_in": expires_in} if expires_in is not None else {}
+    )
 
-    if expires_in is not None:
-        assert (
-            OAuthClientCredentialsAuth._get_access_token_expiry_date(
-                {"expires_in": expires_in}, token
-            )
-            == expiry
-        )
-    else:
-        assert (
-            OAuthClientCredentialsAuth._get_access_token_expiry_date({}, token)
-            == expiry
-        )
+    assert (
+        OAuthClientCredentialsAuth._get_access_token_expiry_date(token_response, token)
+        == expiry
+    )
 
 
 def test_get_access_token_expiry_date_returns_none_for_jwt_without_expires_in() -> None:

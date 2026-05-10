@@ -203,20 +203,16 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         token_response: dict[str, JsonValue],
         token: str,
     ) -> datetime | None:
-        expires_in_raw = token_response.get("expires_in")
-        expires_in: int | float | None = None
+        expires_in = token_response.get("expires_in")
 
-        if isinstance(expires_in_raw, (int, float)):
-            if not isinstance(expires_in_raw, bool):
-                expires_in = expires_in_raw
-        elif isinstance(expires_in_raw, str):
+        if isinstance(expires_in, (int, float)):
+            if not isinstance(expires_in, bool):
+                return datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        elif isinstance(expires_in, str):
             try:
-                expires_in = float(expires_in_raw)
+                return datetime.now(timezone.utc) + timedelta(seconds=float(expires_in))
             except ValueError:
                 pass
-
-        if expires_in is not None:
-            return datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
         # No expires_in key in the token response. Try and
         # decode the token as a JWT to fetch the "exp" claim
@@ -224,7 +220,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
             payload = jwt.decode(token, options={"verify_signature": False})
         except jwt.DecodeError:
             # Not a JWT, we can't know the expiry date.
-            # We'll fallback to reactive token refreshing
+            # We'll fall back to reactive token refreshing
             return None
 
         return OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload)
