@@ -125,6 +125,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwt_policy_config: OAuthJwtPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> Result[KeySet, str]:
+        """
+        jwt_policy_config is taken as a parameter rather than read from
+        self.config.jwt so the caller's null-narrowing flows through and
+        is shared with sibling calls (e.g. _validate_jwt) without rechecking.
+        """
         if isinstance(jwt_policy_config.jwks, OAuthStaticJwksPolicyConfig):
             jwks_url = str(jwt_policy_config.jwks.url)
         else:
@@ -216,6 +221,12 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         | OAuthDiscoveredIntrospectionPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> Result[None, JSONResponse]:
+        """
+        introspection_config is taken as a parameter rather than read from
+        self.config.introspection so the caller's null-narrowing flows
+        through without rechecking.
+        """
+
         if isinstance(introspection_config, OAuthStaticIntrospectionPolicyConfig):
             endpoint = str(introspection_config.endpoint)
         else:
@@ -302,6 +313,12 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         jwt_config: OAuthJwtPolicyConfig,
         jwk_set: KeySet,
     ) -> Result[None, str]:
+        """
+        jwt_config is taken as a parameter rather than read from
+        self.config.jwt so the caller's null-narrowing flows through and
+        is shared with sibling calls (e.g. _fetch_jwk_set) without rechecking.
+        """
+
         # Base JWT validation always uses JWTClaims so registered NumericDate
         # claims like exp/nbf/iat are validated when the token includes them.
         claims_cls: type[JWTClaims] = JWTClaims
