@@ -115,8 +115,8 @@ async def test_fetch_access_token_from_auth_server_uses_basic_auth_header(
 
     monkeypatch.setattr(oauth_client_credentials_module, "fetch_json", fake_fetch_json)
     monkeypatch.setattr(
-        oauth_client_credentials_module,
-        "get_access_token_expiry_date",
+        auth,
+        "_get_access_token_expiry_date",
         lambda token_response, access_token: expected_expiry,
     )
 
@@ -155,8 +155,8 @@ async def test_fetch_access_token_from_auth_server_uses_client_secret_post(
 
     monkeypatch.setattr(oauth_client_credentials_module, "fetch_json", fake_fetch_json)
     monkeypatch.setattr(
-        oauth_client_credentials_module,
-        "get_access_token_expiry_date",
+        auth,
+        "_get_access_token_expiry_date",
         lambda token_response, access_token: None,
     )
 
