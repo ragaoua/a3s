@@ -12,7 +12,7 @@ from pydantic_core import Url
 import src.auth.outbound.oauth_client_credentials as oauth_client_credentials_module
 from src.config.types import OAuthClientCredentialsAuthConfig
 from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
-from src.auth.outbound.internal.types import AccessTokenInfo
+from src.auth.outbound.types import AccessTokenInfo
 
 
 @pytest.fixture(autouse=True)

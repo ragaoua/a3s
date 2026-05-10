@@ -11,7 +11,7 @@ from mcp.shared._httpx_utils import create_mcp_http_client
 from pydantic_core import Url
 
 from src.config.types import OAuthClientCredentialsAuthConfig
-from src.auth.outbound.internal.types import AccessTokenCacheKey, AccessTokenInfo
+from src.auth.outbound.types import AccessTokenCacheKey, AccessTokenInfo
 from src.utils import fetch_json
 
 
