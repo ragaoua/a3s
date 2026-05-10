@@ -1,13 +1,9 @@
 from datetime import datetime, timezone
 
-import jwt
 import pytest
 
 from src.auth.outbound import OAuthClientCredentialsAuth
-
-
-def _encode_jwt(payload: dict[str, object]) -> str:
-    return jwt.encode(payload, key="", algorithm="none")
+from tests.unit.auth.outbound.utils import encode_jwt
 
 
 @pytest.mark.parametrize(
@@ -35,7 +31,7 @@ def test_get_access_token_expiry_date_falls_back_to_jwt_when_expires_in_is_inval
     expires_in: bool | str | None,
 ) -> None:
     expiry = datetime.fromtimestamp(1_700_000_000, tz=timezone.utc)
-    token = _encode_jwt({"exp": expiry.timestamp()})
+    token = encode_jwt({"exp": expiry.timestamp()})
 
     if expires_in is not None:
         assert (
@@ -52,7 +48,7 @@ def test_get_access_token_expiry_date_falls_back_to_jwt_when_expires_in_is_inval
 
 
 def test_get_access_token_expiry_date_returns_none_for_jwt_without_expires_in() -> None:
-    token = _encode_jwt({"scope": "email profile"})
+    token = encode_jwt({"scope": "email profile"})
     assert OAuthClientCredentialsAuth._get_access_token_expiry_date({}, token) is None
 
 
@@ -63,26 +59,3 @@ def test_get_access_token_expiry_date_returns_none_for_non_jwt_without_expires_i
         OAuthClientCredentialsAuth._get_access_token_expiry_date({}, "not-a-jwt")
         is None
     )
-
-
-def test_get_exp_datetime_from_jwt_returns_datetime_for_numeric_exp() -> None:
-    expiry = datetime.fromtimestamp(1_700_000_000, tz=timezone.utc)
-    token = _encode_jwt({"exp": expiry.timestamp()})
-
-    assert OAuthClientCredentialsAuth._get_exp_datetime_from_jwt(token) == expiry
-
-
-def test_get_exp_datetime_from_jwt_parses_string_exp() -> None:
-    expiry = datetime.fromtimestamp(1_700_000_000.5, tz=timezone.utc)
-    token = _encode_jwt({"exp": str(expiry.timestamp())})
-
-    assert OAuthClientCredentialsAuth._get_exp_datetime_from_jwt(token) == expiry
-
-
-@pytest.mark.parametrize("exp", [True, None, [], {}])
-def test_get_exp_datetime_from_jwt_returns_none_for_unsupported_exp_types(
-    exp: object,
-) -> None:
-    token = _encode_jwt({"exp": exp})
-
-    assert OAuthClientCredentialsAuth._get_exp_datetime_from_jwt(token) is None
