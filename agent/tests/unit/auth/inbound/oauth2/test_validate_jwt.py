@@ -5,12 +5,10 @@ from pydantic import JsonValue
 import pytest
 from pydantic_core import Url
 from returns.result import Failure, Success
-from starlette.types import Receive, Scope, Send
 
 from src.auth.inbound.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
     OAuthJwtPolicyConfig,
-    OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
 )
 from src.config.types.auth import OAuthRfc9068PolicyConfig
@@ -45,24 +43,6 @@ def _encode(
     return token.decode("ascii")
 
 
-def _build_middleware() -> OAuth2BearerAuthMiddleware:
-    async def app(_scope: Scope, _receive: Receive, _send: Send):
-        return None
-
-    return OAuth2BearerAuthMiddleware(
-        app=app,
-        issuer_url=ISSUER_URL,
-        realm="test-realm",
-        config=OAuthPoliciesConfig(
-            jwt=OAuthJwtPolicyConfig(
-                jwks=OAuthStaticJwksPolicyConfig(url=Url(f"{ISSUER_URL}/jwks")),
-                rfc9068=None,
-                claims={},
-            )
-        ),
-    )
-
-
 def _base_jwt_config(
     *,
     rfc9068: OAuthRfc9068PolicyConfig | None = None,
@@ -89,22 +69,26 @@ def _rfc9068_payload(*, exp_offset: int = 3600) -> dict[str, JsonValue]:
 
 
 def test_returns_success_for_valid_base_jwt() -> None:
-    middleware = _build_middleware()
     token = _encode({"iss": ISSUER_URL, "exp": int(time.time()) + 3600})
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
-        token, jwt_config=_base_jwt_config(), jwk_set=JW_KEY_SET
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+        token,
+        issuer_url=ISSUER_URL,
+        jwt_config=_base_jwt_config(),
+        jwk_set=JW_KEY_SET,
     )
 
     assert isinstance(res, Success)
 
 
 def test_returns_failure_when_token_is_expired() -> None:
-    middleware = _build_middleware()
     token = _encode({"iss": ISSUER_URL, "exp": int(time.time()) - 60})
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
-        token, jwt_config=_base_jwt_config(), jwk_set=JW_KEY_SET
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+        token,
+        issuer_url=ISSUER_URL,
+        jwt_config=_base_jwt_config(),
+        jwk_set=JW_KEY_SET,
     )
 
     assert isinstance(res, Failure)
@@ -112,11 +96,13 @@ def test_returns_failure_when_token_is_expired() -> None:
 
 
 def test_returns_failure_when_issuer_does_not_match() -> None:
-    middleware = _build_middleware()
     token = _encode({"iss": "https://other.example", "exp": int(time.time()) + 3600})
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
-        token, jwt_config=_base_jwt_config(), jwk_set=JW_KEY_SET
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+        token,
+        issuer_url=ISSUER_URL,
+        jwt_config=_base_jwt_config(),
+        jwk_set=JW_KEY_SET,
     )
 
     assert isinstance(res, Failure)
@@ -124,14 +110,16 @@ def test_returns_failure_when_issuer_does_not_match() -> None:
 
 
 def test_returns_failure_when_signature_is_invalid() -> None:
-    middleware = _build_middleware()
     token = _encode(
         {"iss": ISSUER_URL, "exp": int(time.time()) + 3600},
         key_dict=OTHER_KEY_DICT,
     )
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
-        token, jwt_config=_base_jwt_config(), jwk_set=JW_KEY_SET
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+        token,
+        issuer_url=ISSUER_URL,
+        jwt_config=_base_jwt_config(),
+        jwk_set=JW_KEY_SET,
     )
 
     assert isinstance(res, Failure)
@@ -139,11 +127,11 @@ def test_returns_failure_when_signature_is_invalid() -> None:
 
 
 def test_returns_success_for_valid_rfc9068_token() -> None:
-    middleware = _build_middleware()
     token = _encode(_rfc9068_payload(), header_extras={"typ": "at+jwt"})
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
         token,
+        issuer_url=ISSUER_URL,
         jwt_config=_base_jwt_config(
             rfc9068=OAuthRfc9068PolicyConfig(resource_server=RESOURCE_SERVER)
         ),
@@ -154,13 +142,13 @@ def test_returns_success_for_valid_rfc9068_token() -> None:
 
 
 def test_returns_failure_when_rfc9068_required_claim_is_missing() -> None:
-    middleware = _build_middleware()
     payload = _rfc9068_payload()
     del payload["aud"]
     token = _encode(payload, header_extras={"typ": "at+jwt"})
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
         token,
+        issuer_url=ISSUER_URL,
         jwt_config=_base_jwt_config(
             rfc9068=OAuthRfc9068PolicyConfig(resource_server=RESOURCE_SERVER)
         ),
@@ -172,13 +160,13 @@ def test_returns_failure_when_rfc9068_required_claim_is_missing() -> None:
 
 
 def test_returns_failure_when_rfc9068_audience_does_not_match() -> None:
-    middleware = _build_middleware()
     payload = _rfc9068_payload()
     payload["aud"] = "other-rs"
     token = _encode(payload, header_extras={"typ": "at+jwt"})
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
         token,
+        issuer_url=ISSUER_URL,
         jwt_config=_base_jwt_config(
             rfc9068=OAuthRfc9068PolicyConfig(resource_server=RESOURCE_SERVER)
         ),
@@ -197,14 +185,14 @@ def test_returns_failure_when_rfc9068_audience_does_not_match() -> None:
 def test_returns_failure_when_required_custom_claim_is_missing_or_mismatched(
     actual_value: str | None,
 ) -> None:
-    middleware = _build_middleware()
     payload: dict[str, JsonValue] = {"iss": ISSUER_URL, "exp": int(time.time()) + 3600}
     if actual_value is not None:
         payload["tenant"] = actual_value
     token = _encode(payload)
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
         token,
+        issuer_url=ISSUER_URL,
         jwt_config=_base_jwt_config(claims={"tenant": "acme"}),
         jwk_set=JW_KEY_SET,
     )
@@ -214,7 +202,6 @@ def test_returns_failure_when_required_custom_claim_is_missing_or_mismatched(
 
 
 def test_returns_success_when_required_custom_claim_matches() -> None:
-    middleware = _build_middleware()
     token = _encode(
         {
             "iss": ISSUER_URL,
@@ -223,8 +210,9 @@ def test_returns_success_when_required_custom_claim_matches() -> None:
         }
     )
 
-    res = middleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
+    res = OAuth2BearerAuthMiddleware._validate_jwt(  # pyright: ignore[reportPrivateUsage]
         token,
+        issuer_url=ISSUER_URL,
         jwt_config=_base_jwt_config(claims={"tenant": "acme"}),
         jwk_set=JW_KEY_SET,
     )

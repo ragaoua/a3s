@@ -177,8 +177,8 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         return Success(introspection_endpoint)
 
+    @staticmethod
     def _get_introspection_request(
-        self,
         *,
         token: str,
         endpoint: str,
@@ -271,12 +271,14 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         return Success(None)
 
+    @staticmethod
     def _get_rfc9068_claims_options(
-        self,
+        *,
+        issuer_url: str,
         resource_server: str,
     ) -> dict[str, JsonValue]:
         return {
-            "iss": {"essential": True, "value": self.issuer_url},
+            "iss": {"essential": True, "value": issuer_url},
             "exp": {"essential": True},
             "aud": {"essential": True, "value": resource_server},
             "sub": {"essential": True},
@@ -292,10 +294,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             "entitlements": {"essential": False},
         }
 
+    @staticmethod
     def _validate_jwt(
-        self,
         token: str,
         *,
+        issuer_url: str,
         jwt_config: OAuthJwtPolicyConfig,
         jwk_set: KeySet,
     ) -> Result[None, str]:
@@ -303,14 +306,17 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         # claims like exp/nbf/iat are validated when the token includes them.
         claims_cls: type[JWTClaims] = JWTClaims
         claims_options: dict[str, JsonValue] = {
-            "iss": {"essential": True, "value": self.issuer_url},
+            "iss": {"essential": True, "value": issuer_url},
         }
 
         if jwt_config.rfc9068 is not None:
             claims_cls = JWTAccessTokenClaims
             claims_options = {
                 **claims_options,
-                **self._get_rfc9068_claims_options(jwt_config.rfc9068.resource_server),
+                **OAuth2BearerAuthMiddleware._get_rfc9068_claims_options(
+                    issuer_url=issuer_url,
+                    resource_server=jwt_config.rfc9068.resource_server,
+                ),
             }
 
         for key, value in jwt_config.claims.items():
@@ -384,7 +390,12 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
             jwk_set = res.unwrap()
 
-            res = self._validate_jwt(token, jwt_config=self.config.jwt, jwk_set=jwk_set)
+            res = self._validate_jwt(
+                token,
+                issuer_url=self.issuer_url,
+                jwt_config=self.config.jwt,
+                jwk_set=jwk_set,
+            )
 
             if isinstance(res, Failure):
                 return Failure(
