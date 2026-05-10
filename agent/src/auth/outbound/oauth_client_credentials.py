@@ -2,7 +2,7 @@ import asyncio
 import base64
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
-from typing import Any, override
+from typing import override
 from urllib.parse import urlencode
 
 import httpx
@@ -200,7 +200,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
 
     @staticmethod
     def _get_access_token_expiry_date(
-        token_response: dict[str, Any],
+        token_response: dict[str, JsonValue],
         token: str,
     ) -> datetime | None:
         expires_in_raw = token_response.get("expires_in")
