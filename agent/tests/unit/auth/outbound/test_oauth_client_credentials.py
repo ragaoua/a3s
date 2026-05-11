@@ -77,7 +77,7 @@ def test_build_factory_uses_default_auth_when_none_is_provided(
 def test_is_unauthorized_bearer_requires_401_and_bearer_header() -> None:
     auth = _build_auth()
 
-    assert auth.isUnauthorizedBearer(
+    assert auth._is_unauthorized_bearer(
         httpx.Response(
             401,
             headers=[
@@ -86,7 +86,7 @@ def test_is_unauthorized_bearer_requires_401_and_bearer_header() -> None:
             ],
         )
     )
-    assert not auth.isUnauthorizedBearer(
+    assert not auth._is_unauthorized_bearer(
         httpx.Response(200, headers={"WWW-Authenticate": "Bearer realm=test"})
     )
 
@@ -96,7 +96,7 @@ async def test_fetch_access_token_from_auth_server_requires_lock() -> None:
     auth = _build_auth()
 
     with pytest.raises(RuntimeError, match="cache lock must be acquired first"):
-        await auth.fetch_access_token_from_auth_server()
+        await auth._fetch_access_token_from_auth_server()
 
 
 @pytest.mark.asyncio
@@ -122,7 +122,7 @@ async def test_fetch_access_token_from_auth_server_uses_basic_auth_header(
 
     lock = auth._ACCESS_TOKEN_CACHE_LOCKS.setdefault(auth._cache_key, asyncio.Lock())
     async with lock:
-        token_info = await auth.fetch_access_token_from_auth_server()
+        token_info = await auth._fetch_access_token_from_auth_server()
 
     assert captured_request is not None
     assert captured_request.method == "POST"
@@ -162,7 +162,7 @@ async def test_fetch_access_token_from_auth_server_uses_client_secret_post(
 
     lock = auth._ACCESS_TOKEN_CACHE_LOCKS.setdefault(auth._cache_key, asyncio.Lock())
     async with lock:
-        token_info = await auth.fetch_access_token_from_auth_server()
+        token_info = await auth._fetch_access_token_from_auth_server()
 
     assert captured_request is not None
     assert "Authorization" not in captured_request.headers
@@ -193,7 +193,7 @@ async def test_fetch_access_token_from_auth_server_rejects_invalid_access_token(
             ValueError,
             match="missing a valid 'access_token'",
         ):
-            await auth.fetch_access_token_from_auth_server()
+            await auth._fetch_access_token_from_auth_server()
 
 
 @pytest.mark.asyncio
@@ -229,7 +229,7 @@ async def test_async_auth_flow_retries_once_when_cached_token_gets_bearer_401(
 
     monkeypatch.setattr(
         OAuthClientCredentialsAuth,
-        "fetch_access_token_from_auth_server",
+        "_fetch_access_token_from_auth_server",
         fake_fetch,
     )
 
@@ -269,7 +269,7 @@ async def test_async_auth_flow_does_not_retry_after_initial_token_fetch(
 
     monkeypatch.setattr(
         OAuthClientCredentialsAuth,
-        "fetch_access_token_from_auth_server",
+        "_fetch_access_token_from_auth_server",
         fake_fetch,
     )
 
@@ -306,7 +306,7 @@ async def test_async_auth_flow_uses_still_valid_cached_token_when_refresh_fails(
 
     monkeypatch.setattr(
         OAuthClientCredentialsAuth,
-        "fetch_access_token_from_auth_server",
+        "_fetch_access_token_from_auth_server",
         fake_fetch,
     )
 
@@ -342,7 +342,7 @@ async def test_async_auth_flow_raises_when_expired_cached_token_cannot_refresh(
 
     monkeypatch.setattr(
         OAuthClientCredentialsAuth,
-        "fetch_access_token_from_auth_server",
+        "_fetch_access_token_from_auth_server",
         fake_fetch,
     )
 

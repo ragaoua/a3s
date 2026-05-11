@@ -80,7 +80,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
 
             # Token not in cache: fetch fresh one from auth server
             if cached_token_info is None:
-                token_info = await self.fetch_access_token_from_auth_server()
+                token_info = await self._fetch_access_token_from_auth_server()
 
             # Token expired or almost expired: fetch new one.
             # If fetch fails, use cached token if not completely expired.
@@ -93,7 +93,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 <= (datetime.now(timezone.utc) + self._ACCESS_TOKEN_REFRESH_WINDOW)
             ):
                 try:
-                    token_info = await self.fetch_access_token_from_auth_server()
+                    token_info = await self._fetch_access_token_from_auth_server()
                 except Exception:
                     if cached_token_info.expires_at > datetime.now(timezone.utc):
                         token_info = cached_token_info
@@ -108,7 +108,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         request.headers["Authorization"] = "Bearer " + token_info.access_token
         response = yield request
 
-        if self.isUnauthorizedBearer(response):
+        if self._is_unauthorized_bearer(response):
             # If the token we used what in cache, fetch a new one from the auth
             # server and retry (in case the token was revoked/has expired etc
             # since we cached it).
@@ -120,7 +120,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                     if token_info == cached_token_info or cached_token_info is None:
                         try:
                             token_info = (
-                                await self.fetch_access_token_from_auth_server()
+                                await self._fetch_access_token_from_auth_server()
                             )
                         except Exception:
                             _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
@@ -131,7 +131,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 request.headers["Authorization"] = "Bearer " + token_info.access_token
                 response = yield request
 
-                if not self.isUnauthorizedBearer(response):
+                if not self._is_unauthorized_bearer(response):
                     return
 
             async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
@@ -140,13 +140,13 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
                     _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
 
-    def isUnauthorizedBearer(self, response: httpx.Response):
+    def _is_unauthorized_bearer(self, response: httpx.Response):
         return response.status_code == 401 and any(
             "bearer" in header.lower()
             for header in response.headers.get_list("www-authenticate")
         )
 
-    async def fetch_access_token_from_auth_server(self) -> AccessTokenInfo:
+    async def _fetch_access_token_from_auth_server(self) -> AccessTokenInfo:
         lock = self._ACCESS_TOKEN_CACHE_LOCKS.get(self._cache_key)
         if lock is None or not lock.locked():
             raise RuntimeError(
