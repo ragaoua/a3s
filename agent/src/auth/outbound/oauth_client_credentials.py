@@ -154,30 +154,9 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 "The access token cache lock must be acquired first since this method updates the cache upon fetching a fresh token from the authorization server"
             )
 
-        body = {"grant_type": "client_credentials"}
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-
-        if self._server_auth_config.auth_method == "client_secret_basic":
-            client_credentials = f"{self._server_auth_config.client_id}:{self._server_auth_config.client_secret.get_secret_value()}"
-            headers["Authorization"] = "Basic " + base64.b64encode(
-                client_credentials.encode("utf-8")
-            ).decode("ascii")
-        else:
-            body["client_id"] = self._server_auth_config.client_id
-            body["client_secret"] = (
-                self._server_auth_config.client_secret.get_secret_value()
-            )
-
+        request = self._build_token_request(self._server_auth_config)
         token_response = await fetch_json(
-            httpx.Request(
-                method="POST",
-                url=str(self._server_auth_config.token_endpoint),
-                headers=headers,
-                content=urlencode(body).encode("utf-8"),
-            ),
+            request,
             error_message=(
                 f"Failed to fetch OAuth2 access token for server '{self._server_url}'"
             ),
@@ -198,6 +177,31 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         )
         self._ACCESS_TOKEN_CACHE[self._cache_key] = access_token_info
         return access_token_info
+
+    @staticmethod
+    def _build_token_request(
+        server_auth_config: OAuthClientCredentialsAuthConfig,
+    ) -> httpx.Request:
+        body = {"grant_type": "client_credentials"}
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        }
+
+        if server_auth_config.auth_method == "client_secret_basic":
+            client_credentials = f"{server_auth_config.client_id}:{server_auth_config.client_secret.get_secret_value()}"
+            headers["Authorization"] = "Basic " + base64.b64encode(
+                client_credentials.encode("utf-8")
+            ).decode("ascii")
+        else:
+            body["client_id"] = server_auth_config.client_id
+            body["client_secret"] = server_auth_config.client_secret.get_secret_value()
+        return httpx.Request(
+            method="POST",
+            url=str(server_auth_config.token_endpoint),
+            headers=headers,
+            content=urlencode(body).encode("utf-8"),
+        )
 
     @staticmethod
     def _get_access_token_expiry_date(
