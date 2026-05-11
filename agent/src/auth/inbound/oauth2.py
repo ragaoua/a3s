@@ -183,7 +183,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         return Success(introspection_endpoint)
 
     @staticmethod
-    def _get_introspection_request(
+    def _build_introspection_request(
         *,
         token: str,
         endpoint: str,
@@ -242,7 +242,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
         try:
             introspection_response = await self._fetch_json(
-                self._get_introspection_request(
+                self._build_introspection_request(
                     token=token,
                     endpoint=endpoint,
                     auth_method=introspection_config.auth_method,
