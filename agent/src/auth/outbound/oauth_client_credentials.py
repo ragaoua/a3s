@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from typing import override
@@ -20,10 +21,10 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         AccessTokenCacheKey,
         AccessTokenInfo,
     ] = {}
-    _ACCESS_TOKEN_CACHE_LOCKS: dict[
+    _ACCESS_TOKEN_CACHE_LOCKS: defaultdict[
         AccessTokenCacheKey,
         asyncio.Lock,
-    ] = {}
+    ] = defaultdict(asyncio.Lock)
 
     # NOTE: this could be configurable by the client, or it
     # could be more dynamic (percentage of the token's TTL)
@@ -75,9 +76,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
     ) -> AsyncGenerator[httpx.Request, httpx.Response]:
         should_retry = False
 
-        async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
-            self._cache_key, asyncio.Lock()
-        ):
+        async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
             cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
 
             # Token not in cache: fetch fresh one from auth server
@@ -115,9 +114,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
             # fetch a new one from the auth server and retry (in case the token
             # was revoked/has expired etc since we cached it).
             if should_retry:
-                async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
-                    self._cache_key, asyncio.Lock()
-                ):
+                async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
                     cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
                     if token_info == cached_token_info or cached_token_info is None:
                         try:
@@ -136,9 +133,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 if not self._is_unauthorized_bearer(response):
                     return
 
-            async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
-                self._cache_key, asyncio.Lock()
-            ):
+            async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
                 if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
                     _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
 
@@ -150,8 +145,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         )
 
     async def _fetch_access_token_from_auth_server(self) -> AccessTokenInfo:
-        lock = self._ACCESS_TOKEN_CACHE_LOCKS.get(self._cache_key)
-        if lock is None or not lock.locked():
+        if not self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key].locked():
             raise RuntimeError(
                 "The access token cache lock must be acquired first since this method updates the cache upon fetching a fresh token from the authorization server"
             )
