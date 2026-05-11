@@ -1,18 +1,19 @@
 import asyncio
-import base64
+from collections import defaultdict
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from typing import override
-from urllib.parse import urlencode
 
 import httpx
+import jwt
 from mcp.shared._httpx_utils import create_mcp_http_client
+from pydantic import JsonValue
 from pydantic_core import Url
 
 from src.config.types import OAuthClientCredentialsAuthConfig
-from src.auth.outbound.internal.types import AccessTokenCacheKey, AccessTokenInfo
-from src.utils import fetch_json
-from src.auth.outbound.internal.token_helpers import get_access_token_expiry_date
+from src.auth.oauth_client_auth import build_client_authenticated_request
+from src.auth.outbound.types import AccessTokenCacheKey, AccessTokenInfo
+from src.utils import FetchJson, fetch_json
 
 
 class OAuthClientCredentialsAuth(httpx.Auth):
@@ -20,10 +21,10 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         AccessTokenCacheKey,
         AccessTokenInfo,
     ] = {}
-    _ACCESS_TOKEN_CACHE_LOCKS: dict[
+    _ACCESS_TOKEN_CACHE_LOCKS: defaultdict[
         AccessTokenCacheKey,
         asyncio.Lock,
-    ] = {}
+    ] = defaultdict(asyncio.Lock)
 
     # NOTE: this could be configurable by the client, or it
     # could be more dynamic (percentage of the token's TTL)
@@ -33,6 +34,8 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         self,
         server_url: Url,
         server_auth_config: OAuthClientCredentialsAuthConfig,
+        *,
+        fetch_json: FetchJson = fetch_json,
     ):
         self._server_url: Url = server_url
         self._server_auth_config: OAuthClientCredentialsAuthConfig = server_auth_config
@@ -40,6 +43,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
             server_auth_config.token_endpoint,
             server_auth_config.client_id,
         )
+        self._fetch_json: FetchJson = fetch_json
 
     @staticmethod
     def build_factory(
@@ -72,27 +76,25 @@ class OAuthClientCredentialsAuth(httpx.Auth):
     ) -> AsyncGenerator[httpx.Request, httpx.Response]:
         should_retry = False
 
-        async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
-            self._cache_key, asyncio.Lock()
-        ):
+        async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
             cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
 
             # Token not in cache: fetch fresh one from auth server
             if cached_token_info is None:
-                token_info = await self.fetch_access_token_from_auth_server()
+                token_info = await self._fetch_access_token_from_auth_server()
 
             # Token expired or almost expired: fetch new one.
             # If fetch fails, use cached token if not completely expired.
-            # In that case, we don't want to retry if the request fails later,
-            # because even if we are using a cached token, the remote refresh
-            # failed.
+            # In that case, we don't want to retry (should_retry stays False)
+            # if the request fails later, because even if we are using a cached
+            # token, the remote refresh failed.
             elif (
                 cached_token_info.expires_at is not None
                 and cached_token_info.expires_at
                 <= (datetime.now(timezone.utc) + self._ACCESS_TOKEN_REFRESH_WINDOW)
             ):
                 try:
-                    token_info = await self.fetch_access_token_from_auth_server()
+                    token_info = await self._fetch_access_token_from_auth_server()
                 except Exception:
                     if cached_token_info.expires_at > datetime.now(timezone.utc):
                         token_info = cached_token_info
@@ -107,75 +109,56 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         request.headers["Authorization"] = "Bearer " + token_info.access_token
         response = yield request
 
-        if self.isUnauthorizedBearer(response):
-            # If the token we used what in cache, fetch a new one from the auth
-            # server and retry (in case the token was revoked/has expired etc
-            # since we cached it).
-            if should_retry:
-                async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
-                    self._cache_key, asyncio.Lock()
-                ):
-                    cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
-                    if token_info == cached_token_info or cached_token_info is None:
-                        try:
-                            token_info = (
-                                await self.fetch_access_token_from_auth_server()
-                            )
-                        except Exception:
-                            _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
-                            raise
-                    else:
-                        token_info = cached_token_info
+        if not self._is_unauthorized_bearer(response):
+            return
 
-                request.headers["Authorization"] = "Bearer " + token_info.access_token
-                response = yield request
+        # If the token we used was in cache (and not soon expired),
+        # fetch a new one from the auth server and retry (in case the token
+        # was revoked/has expired etc since we cached it).
+        if should_retry:
+            async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
+                cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
+                if token_info == cached_token_info or cached_token_info is None:
+                    try:
+                        token_info = await self._fetch_access_token_from_auth_server()
+                    except Exception:
+                        _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
+                        raise
+                else:
+                    token_info = cached_token_info
 
-                if not self.isUnauthorizedBearer(response):
-                    return
+            request.headers["Authorization"] = "Bearer " + token_info.access_token
+            response = yield request
 
-            async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
-                self._cache_key, asyncio.Lock()
-            ):
-                if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
-                    _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
+            if not self._is_unauthorized_bearer(response):
+                return
 
-    def isUnauthorizedBearer(self, response: httpx.Response):
+        async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
+            if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
+                _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
+
+    @staticmethod
+    def _is_unauthorized_bearer(response: httpx.Response):
         return response.status_code == 401 and any(
             "bearer" in header.lower()
             for header in response.headers.get_list("www-authenticate")
         )
 
-    async def fetch_access_token_from_auth_server(self) -> AccessTokenInfo:
-        lock = self._ACCESS_TOKEN_CACHE_LOCKS.get(self._cache_key)
-        if lock is None or not lock.locked():
+    async def _fetch_access_token_from_auth_server(self) -> AccessTokenInfo:
+        if not self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key].locked():
             raise RuntimeError(
                 "The access token cache lock must be acquired first since this method updates the cache upon fetching a fresh token from the authorization server"
             )
 
-        body = {"grant_type": "client_credentials"}
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-
-        if self._server_auth_config.auth_method == "client_secret_basic":
-            client_credentials = f"{self._server_auth_config.client_id}:{self._server_auth_config.client_secret.get_secret_value()}"
-            headers["Authorization"] = "Basic " + base64.b64encode(
-                client_credentials.encode("utf-8")
-            ).decode("ascii")
-        else:
-            body["client_id"] = self._server_auth_config.client_id
-            body["client_secret"] = (
-                self._server_auth_config.client_secret.get_secret_value()
-            )
-
-        token_response = await fetch_json(
-            httpx.Request(
-                method="POST",
-                url=str(self._server_auth_config.token_endpoint),
-                headers=headers,
-                content=urlencode(body).encode("utf-8"),
-            ),
+        request = build_client_authenticated_request(
+            url=str(self._server_auth_config.token_endpoint),
+            body={"grant_type": "client_credentials"},
+            auth_method=self._server_auth_config.auth_method,
+            client_id=self._server_auth_config.client_id,
+            client_secret=self._server_auth_config.client_secret,
+        )
+        token_response = await self._fetch_json(
+            request,
             error_message=(
                 f"Failed to fetch OAuth2 access token for server '{self._server_url}'"
             ),
@@ -189,10 +172,60 @@ class OAuthClientCredentialsAuth(httpx.Auth):
 
         access_token_info = AccessTokenInfo(
             access_token=access_token,
-            expires_at=get_access_token_expiry_date(
+            expires_at=self._get_access_token_expiry_date(
                 token_response,
                 access_token,
             ),
         )
         self._ACCESS_TOKEN_CACHE[self._cache_key] = access_token_info
         return access_token_info
+
+    @staticmethod
+    def _get_access_token_expiry_date(
+        token_response: dict[str, JsonValue],
+        token: str,
+    ) -> datetime | None:
+        expires_in = token_response.get("expires_in")
+
+        if isinstance(expires_in, (int, float)):
+            if not isinstance(expires_in, bool):
+                return datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        elif isinstance(expires_in, str):
+            try:
+                return datetime.now(timezone.utc) + timedelta(seconds=float(expires_in))
+            except ValueError:
+                pass
+
+        # No expires_in key in the token response. Try and
+        # decode the token as a JWT to fetch the "exp" claim
+        try:
+            payload = jwt.decode(token, options={"verify_signature": False})
+        except jwt.DecodeError:
+            # Not a JWT, we can't know the expiry date.
+            # We'll fall back to reactive token refreshing
+            return None
+
+        return OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload)
+
+    @staticmethod
+    def _get_exp_datetime_from_jwt_payload(
+        payload: dict[str, JsonValue],
+    ) -> datetime | None:
+        exp = payload.get("exp")
+
+        if isinstance(exp, (int, float)):
+            if isinstance(exp, bool):
+                return None
+
+            try:
+                return datetime.fromtimestamp(exp, tz=timezone.utc)
+            except (OverflowError, OSError, ValueError):
+                return None
+
+        if not isinstance(exp, str):
+            return None
+
+        try:
+            return datetime.fromtimestamp(float(exp), tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
