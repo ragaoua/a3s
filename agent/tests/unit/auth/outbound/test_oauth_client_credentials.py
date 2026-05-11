@@ -20,8 +20,6 @@ def clear_access_token_cache():
     OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()
     OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()
     yield
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()
 
 
 def _build_auth(
