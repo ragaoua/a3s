@@ -1,26 +1,22 @@
 import base64
 
 from pydantic import SecretStr
-from pydantic_core import Url
 
-from src.auth.outbound import OAuthClientCredentialsAuth
-from src.config.types import OAuthClientCredentialsAuthConfig
+from src.auth.oauth_client_auth import build_client_authenticated_request
 
 
-def test_fetch_access_token_from_auth_server_basic_auth_percent_encodes_credentials():
+def test_basic_auth_percent_encodes_credentials_before_base64():
     # RFC 6749 §2.3.1 / Appendix B: client_id and client_secret MUST be
     # application/x-www-form-urlencoded before being joined with ":" and
     # base64-encoded into the Basic header. Otherwise meta-characters like
     # "+" and "&" round-trip to the wrong value at the authorization server.
-    server_auth_config = OAuthClientCredentialsAuthConfig(
-        mode="oauth_client_credentials",
-        token_endpoint=Url("https://issuer.example/oauth/token"),
+    request = build_client_authenticated_request(
+        url="https://issuer.example/oauth/token",
+        body={"grant_type": "client_credentials"},
+        auth_method="client_secret_basic",
         client_id="client+id",
         client_secret=SecretStr("secret&value"),
-        auth_method="client_secret_basic",
     )
-
-    request = OAuthClientCredentialsAuth._build_token_request(server_auth_config)  # pyright: ignore[reportPrivateUsage]
 
     assert request.headers["Authorization"] == "Basic " + base64.b64encode(
         b"client%2Bid:secret%26value"

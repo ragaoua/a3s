@@ -1,9 +1,7 @@
 import asyncio
-import base64
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from typing import override
-from urllib.parse import quote_plus, urlencode
 
 import httpx
 import jwt
@@ -12,6 +10,7 @@ from pydantic import JsonValue
 from pydantic_core import Url
 
 from src.config.types import OAuthClientCredentialsAuthConfig
+from src.auth.oauth_client_auth import build_client_authenticated_request
 from src.auth.outbound.types import AccessTokenCacheKey, AccessTokenInfo
 from src.utils import FetchJson, fetch_json
 
@@ -157,7 +156,13 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 "The access token cache lock must be acquired first since this method updates the cache upon fetching a fresh token from the authorization server"
             )
 
-        request = self._build_token_request(self._server_auth_config)
+        request = build_client_authenticated_request(
+            url=str(self._server_auth_config.token_endpoint),
+            body={"grant_type": "client_credentials"},
+            auth_method=self._server_auth_config.auth_method,
+            client_id=self._server_auth_config.client_id,
+            client_secret=self._server_auth_config.client_secret,
+        )
         token_response = await self._fetch_json(
             request,
             error_message=(
@@ -180,37 +185,6 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         )
         self._ACCESS_TOKEN_CACHE[self._cache_key] = access_token_info
         return access_token_info
-
-    @staticmethod
-    def _build_token_request(
-        server_auth_config: OAuthClientCredentialsAuthConfig,
-    ) -> httpx.Request:
-        body = {"grant_type": "client_credentials"}
-        headers = {
-            "Accept": "application/json",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-
-        if server_auth_config.auth_method == "client_secret_basic":
-            # RFC 6749 §2.3.1 / Appendix B: form-urlencode both values
-            # before joining with ":" and base64-encoding.
-            encoded_client_id = quote_plus(server_auth_config.client_id)
-            encoded_client_secret = quote_plus(
-                server_auth_config.client_secret.get_secret_value()
-            )
-            client_credentials = f"{encoded_client_id}:{encoded_client_secret}"
-            headers["Authorization"] = "Basic " + base64.b64encode(
-                client_credentials.encode("utf-8")
-            ).decode("ascii")
-        else:
-            body["client_id"] = server_auth_config.client_id
-            body["client_secret"] = server_auth_config.client_secret.get_secret_value()
-        return httpx.Request(
-            method="POST",
-            url=str(server_auth_config.token_endpoint),
-            headers=headers,
-            content=urlencode(body).encode("utf-8"),
-        )
 
     @staticmethod
     def _get_access_token_expiry_date(
