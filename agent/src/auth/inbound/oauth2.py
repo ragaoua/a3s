@@ -1,12 +1,11 @@
-from typing import Literal, final
+from typing import final
 from returns.result import Failure, Result, Success
 
-import httpx
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
 from authlib.jose.errors import JoseError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
 from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
-from pydantic import JsonValue, SecretStr
+from pydantic import JsonValue
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -180,23 +179,6 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             )
 
         return Success(introspection_endpoint)
-
-    @staticmethod
-    def _build_introspection_request(
-        *,
-        token: str,
-        endpoint: str,
-        auth_method: Literal["client_secret_basic", "client_secret_post"],
-        client_id: str,
-        client_secret: SecretStr,
-    ) -> httpx.Request:
-        return build_client_authenticated_request(
-            url=endpoint,
-            body={"token": token, "token_type_hint": "access_token"},
-            auth_method=auth_method,
-            client_id=client_id,
-            client_secret=client_secret,
-        )
 
     async def _introspect_access_token(
         self,
