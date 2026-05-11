@@ -140,7 +140,8 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
                     _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
 
-    def _is_unauthorized_bearer(self, response: httpx.Response):
+    @staticmethod
+    def _is_unauthorized_bearer(response: httpx.Response):
         return response.status_code == 401 and any(
             "bearer" in header.lower()
             for header in response.headers.get_list("www-authenticate")
