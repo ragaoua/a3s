@@ -109,33 +109,33 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         request.headers["Authorization"] = "Bearer " + token_info.access_token
         response = yield request
 
-        if self._is_unauthorized_bearer(response):
-            # If the token we used was in cache (and not soon expired),
-            # fetch a new one from the auth server and retry (in case the token
-            # was revoked/has expired etc since we cached it).
-            if should_retry:
-                async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
-                    cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
-                    if token_info == cached_token_info or cached_token_info is None:
-                        try:
-                            token_info = (
-                                await self._fetch_access_token_from_auth_server()
-                            )
-                        except Exception:
-                            _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
-                            raise
-                    else:
-                        token_info = cached_token_info
+        if not self._is_unauthorized_bearer(response):
+            return
 
-                request.headers["Authorization"] = "Bearer " + token_info.access_token
-                response = yield request
-
-                if not self._is_unauthorized_bearer(response):
-                    return
-
+        # If the token we used was in cache (and not soon expired),
+        # fetch a new one from the auth server and retry (in case the token
+        # was revoked/has expired etc since we cached it).
+        if should_retry:
             async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
-                if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
-                    _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
+                cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
+                if token_info == cached_token_info or cached_token_info is None:
+                    try:
+                        token_info = await self._fetch_access_token_from_auth_server()
+                    except Exception:
+                        _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
+                        raise
+                else:
+                    token_info = cached_token_info
+
+            request.headers["Authorization"] = "Bearer " + token_info.access_token
+            response = yield request
+
+            if not self._is_unauthorized_bearer(response):
+                return
+
+        async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
+            if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
+                _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
 
     @staticmethod
     def _is_unauthorized_bearer(response: httpx.Response):
