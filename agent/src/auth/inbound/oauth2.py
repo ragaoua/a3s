@@ -1,6 +1,6 @@
 import base64
 from typing import Literal, final
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 from returns.result import Failure, Result, Success
 
 import httpx
@@ -198,7 +198,11 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         }
 
         if auth_method == "client_secret_basic":
-            client_credentials = f"{client_id}:{client_secret.get_secret_value()}"
+            # RFC 6749 §2.3.1 / Appendix B: form-urlencode both values
+            # before joining with ":" and base64-encoding.
+            encoded_client_id = quote_plus(client_id)
+            encoded_client_secret = quote_plus(client_secret.get_secret_value())
+            client_credentials = f"{encoded_client_id}:{encoded_client_secret}"
             headers["Authorization"] = "Basic " + base64.b64encode(
                 client_credentials.encode("utf-8")
             ).decode("ascii")

@@ -3,7 +3,7 @@ import base64
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from typing import override
-from urllib.parse import urlencode
+from urllib.parse import quote_plus, urlencode
 
 import httpx
 import jwt
@@ -192,7 +192,13 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         }
 
         if server_auth_config.auth_method == "client_secret_basic":
-            client_credentials = f"{server_auth_config.client_id}:{server_auth_config.client_secret.get_secret_value()}"
+            # RFC 6749 §2.3.1 / Appendix B: form-urlencode both values
+            # before joining with ":" and base64-encoding.
+            encoded_client_id = quote_plus(server_auth_config.client_id)
+            encoded_client_secret = quote_plus(
+                server_auth_config.client_secret.get_secret_value()
+            )
+            client_credentials = f"{encoded_client_id}:{encoded_client_secret}"
             headers["Authorization"] = "Basic " + base64.b64encode(
                 client_credentials.encode("utf-8")
             ).decode("ascii")
