@@ -113,7 +113,7 @@ async def test_fetch_access_token_from_auth_server_uses_basic_auth_header(
         assert "Failed to fetch OAuth2 access token" in error_message
         return {"access_token": "token-123", "expires_in": 60}
 
-    monkeypatch.setattr(oauth_client_credentials_module, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(auth, "_fetch_json", fake_fetch_json)
     monkeypatch.setattr(
         auth,
         "_get_access_token_expiry_date",
@@ -153,7 +153,7 @@ async def test_fetch_access_token_from_auth_server_uses_client_secret_post(
         captured_request = request
         return {"access_token": "token-123"}
 
-    monkeypatch.setattr(oauth_client_credentials_module, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(auth, "_fetch_json", fake_fetch_json)
     monkeypatch.setattr(
         auth,
         "_get_access_token_expiry_date",
@@ -185,7 +185,7 @@ async def test_fetch_access_token_from_auth_server_rejects_invalid_access_token(
     async def fake_fetch_json(request, *, error_message, error_cls=ValueError):
         return {"access_token": access_token}
 
-    monkeypatch.setattr(oauth_client_credentials_module, "fetch_json", fake_fetch_json)
+    monkeypatch.setattr(auth, "_fetch_json", fake_fetch_json)
 
     lock = auth._ACCESS_TOKEN_CACHE_LOCKS.setdefault(auth._cache_key, asyncio.Lock())
     async with lock:

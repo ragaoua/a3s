@@ -13,7 +13,7 @@ from pydantic_core import Url
 
 from src.config.types import OAuthClientCredentialsAuthConfig
 from src.auth.outbound.types import AccessTokenCacheKey, AccessTokenInfo
-from src.utils import fetch_json
+from src.utils import FetchJson, fetch_json
 
 
 class OAuthClientCredentialsAuth(httpx.Auth):
@@ -34,6 +34,8 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         self,
         server_url: Url,
         server_auth_config: OAuthClientCredentialsAuthConfig,
+        *,
+        fetch_json: FetchJson = fetch_json,
     ):
         self._server_url: Url = server_url
         self._server_auth_config: OAuthClientCredentialsAuthConfig = server_auth_config
@@ -41,6 +43,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
             server_auth_config.token_endpoint,
             server_auth_config.client_id,
         )
+        self._fetch_json: FetchJson = fetch_json
 
     @staticmethod
     def build_factory(
@@ -84,9 +87,9 @@ class OAuthClientCredentialsAuth(httpx.Auth):
 
             # Token expired or almost expired: fetch new one.
             # If fetch fails, use cached token if not completely expired.
-            # In that case, we don't want to retry if the request fails later,
-            # because even if we are using a cached token, the remote refresh
-            # failed.
+            # In that case, we don't want to retry (should_retry stays False)
+            # if the request fails later, because even if we are using a cached
+            # token, the remote refresh failed.
             elif (
                 cached_token_info.expires_at is not None
                 and cached_token_info.expires_at
@@ -109,9 +112,9 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         response = yield request
 
         if self._is_unauthorized_bearer(response):
-            # If the token we used what in cache, fetch a new one from the auth
-            # server and retry (in case the token was revoked/has expired etc
-            # since we cached it).
+            # If the token we used was in cache (and not soon expired),
+            # fetch a new one from the auth server and retry (in case the token
+            # was revoked/has expired etc since we cached it).
             if should_retry:
                 async with self._ACCESS_TOKEN_CACHE_LOCKS.setdefault(
                     self._cache_key, asyncio.Lock()
@@ -155,7 +158,7 @@ class OAuthClientCredentialsAuth(httpx.Auth):
             )
 
         request = self._build_token_request(self._server_auth_config)
-        token_response = await fetch_json(
+        token_response = await self._fetch_json(
             request,
             error_message=(
                 f"Failed to fetch OAuth2 access token for server '{self._server_url}'"
