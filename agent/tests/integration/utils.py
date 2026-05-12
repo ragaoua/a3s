@@ -43,7 +43,7 @@ async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
 
 
 def start_agent_server(config: Config):
-    from src.agent import create_app
+    from src.app import create_app
 
     app = create_app(config)
     server_config = uvicorn.Config(

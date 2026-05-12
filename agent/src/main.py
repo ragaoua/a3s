@@ -5,7 +5,7 @@ import logging
 from pydantic import ValidationError
 import uvicorn
 
-from src.agent import create_app
+from src.app import create_app
 from src.config import load_config
 from src.logging import setup_logging
 from src.telemetry import setup_telemetry

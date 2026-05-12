@@ -1,3 +1,3 @@
-from .agent import create_app
+from .agent import build_agent
 
-__all__ = ["create_app"]
+__all__ = ["build_agent"]
