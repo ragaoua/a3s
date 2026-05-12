@@ -12,8 +12,8 @@ from src.config.types import (
 )
 
 
-def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
-    mcp_tool_set = []
+def get_mcp_toolset(config: list[McpServerConfig]) -> list[ToolUnion]:
+    mcp_toolset = []
 
     for server_config in config:
         header_provider = None
@@ -36,14 +36,14 @@ def get_mcp_tool_set(config: list[McpServerConfig]) -> list[ToolUnion]:
             if isinstance(server_config.auth, OAuthTokenForwardAuthConfig):
                 header_provider = _oauth_token_forward_header_provider
 
-        mcp_tool_set.append(
+        mcp_toolset.append(
             McpToolset(
                 connection_params=connection_params,
                 header_provider=header_provider,
             )
         )
 
-    return mcp_tool_set
+    return mcp_toolset
 
 
 def _oauth_token_forward_header_provider(

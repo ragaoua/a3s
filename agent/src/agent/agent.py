@@ -37,7 +37,7 @@ from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from starlette.applications import Starlette
 
-from src.agent.mcp import get_mcp_tool_set
+from src.agent.mcp import get_mcp_toolset
 from src.agent.skills import get_skills_toolset
 from src.agent.subagents import get_subagents
 from src.auth.inbound import (
@@ -165,7 +165,7 @@ def create_a2a_app(
 
 
 def create_app(config: Config) -> Starlette:
-    mcp_toolset = get_mcp_tool_set(config.mcp_servers)
+    mcp_toolset = get_mcp_toolset(config.mcp_servers)
     skills_toolset = get_skills_toolset(config.agent.skills_dir)
     delegate_subagents, peer_subagents = get_subagents(config.agent.subagents)
 
