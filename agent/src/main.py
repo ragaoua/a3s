@@ -5,7 +5,7 @@ import logging
 from pydantic import ValidationError
 import uvicorn
 
-from src.app import create_app
+from src.app import build_app
 from src.config import load_config
 from src.logging import setup_logging
 from src.telemetry import setup_telemetry
@@ -42,7 +42,8 @@ def main() -> None:
 
     setup_logging(config.logging)
     setup_telemetry(config)
-    app = create_app(config)
+
+    app = build_app(config)
 
     server = uvicorn.Server(
         uvicorn.Config(
