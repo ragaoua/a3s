@@ -35,11 +35,10 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.runners import Runner
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
-from google.adk.skills import list_skills_in_dir, load_skill_from_dir
-from google.adk.tools import skill_toolset
 from starlette.applications import Starlette
 
 from src.agent.mcp import get_mcp_tool_set
+from src.agent.skills import get_skills_toolset
 from src.agent.subagents import get_subagents
 from src.auth.inbound import (
     ApiKeyAuthMiddleware,
@@ -167,11 +166,7 @@ def create_a2a_app(
 
 def create_app(config: Config) -> Starlette:
     mcp_toolset = get_mcp_tool_set(config.mcp_servers)
-    skills = [
-        load_skill_from_dir(f"{config.agent.skills_dir}/{skill_name}")
-        for skill_name in list_skills_in_dir(config.agent.skills_dir)
-    ]
-    skills_toolset = [skill_toolset.SkillToolset(skills=skills)] if skills else []
+    skills_toolset = get_skills_toolset(config.agent.skills_dir)
     delegate_subagents, peer_subagents = get_subagents(config.agent.subagents)
 
     root_agent = LlmAgent(
