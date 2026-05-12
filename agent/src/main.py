@@ -7,8 +7,8 @@ import uvicorn
 
 from src.a2a import build_a2a_server
 from src.config import load_config
-from src.logging import setup_logging
-from src.telemetry import setup_telemetry
+from src.observability.logging import setup_logging
+from src.observability.telemetry import setup_telemetry
 
 
 # We're not using LoggingManager because it

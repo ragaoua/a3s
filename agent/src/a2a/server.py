@@ -11,8 +11,8 @@ from src.config.types import (
     ApiKeyAuthConfig,
     OAuthConfig,
 )
-from src.logging import get_logger
-from src.telemetry import TracingMiddleware
+from src.observability.logging import get_logger
+from src.observability.telemetry import TracingMiddleware
 
 logger = get_logger(__name__)
 

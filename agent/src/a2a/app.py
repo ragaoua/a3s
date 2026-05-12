@@ -45,7 +45,7 @@ from src.config.types import (
     OAuthConfig,
     ServerConfig,
 )
-from src.logging import get_logger
+from src.observability.logging import get_logger
 
 logger = get_logger(__name__)
 
