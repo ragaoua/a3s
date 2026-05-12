@@ -4,7 +4,7 @@ from a2a.types import Message, Part, Role, TextPart
 from google.adk.a2a.agent.config import ParametersConfig
 
 from src.auth.context import bind_current_authorization_header
-from src.subagents.interceptors import token_forward_before_request
+from src.agent.subagents import _token_forward_before_request  # pyright: ignore[reportPrivateUsage]
 
 
 def _message() -> Message:
@@ -20,7 +20,7 @@ async def test_token_forward_no_op_when_no_inbound_authorization_header() -> Non
     request = _message()
     params = ParametersConfig()
 
-    returned_request, returned_params = await token_forward_before_request(
+    returned_request, returned_params = await _token_forward_before_request(
         _=None,  # pyright: ignore[reportArgumentType]
         a2a_request=request,
         params=params,
@@ -36,7 +36,7 @@ async def test_token_forward_initializes_client_call_context_when_missing() -> N
     params = ParametersConfig()
 
     with bind_current_authorization_header("Bearer abc"):
-        _, returned_params = await token_forward_before_request(
+        _, returned_params = await _token_forward_before_request(
             _=None,  # pyright: ignore[reportArgumentType]
             a2a_request=_message(),
             params=params,
@@ -54,7 +54,7 @@ async def test_token_forward_injects_header_into_existing_context() -> None:
     params = ParametersConfig(client_call_context=existing_context)
 
     with bind_current_authorization_header("Bearer xyz"):
-        _, returned_params = await token_forward_before_request(
+        _, returned_params = await _token_forward_before_request(
             _=None,  # pyright: ignore[reportArgumentType]
             a2a_request=_message(),
             params=params,
@@ -76,7 +76,7 @@ async def test_token_forward_preserves_existing_http_kwargs_and_headers() -> Non
     params = ParametersConfig(client_call_context=existing_context)
 
     with bind_current_authorization_header("Bearer xyz"):
-        await token_forward_before_request(
+        await _token_forward_before_request(
             _=None,  # pyright: ignore[reportArgumentType]
             a2a_request=_message(),
             params=params,
@@ -96,7 +96,7 @@ async def test_token_forward_treats_empty_string_header_as_no_op() -> None:
     params = ParametersConfig()
 
     with bind_current_authorization_header(""):
-        returned_request, returned_params = await token_forward_before_request(
+        returned_request, returned_params = await _token_forward_before_request(
             _=None,  # pyright: ignore[reportArgumentType]
             a2a_request=request,
             params=params,

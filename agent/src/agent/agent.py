@@ -39,6 +39,8 @@ from google.adk.skills import list_skills_in_dir, load_skill_from_dir
 from google.adk.tools import skill_toolset
 from starlette.applications import Starlette
 
+from src.agent.mcp import get_mcp_tool_set
+from src.agent.subagents import get_subagents
 from src.auth.inbound import (
     ApiKeyAuthMiddleware,
     OAuth2BearerAuthMiddleware,
@@ -49,8 +51,6 @@ from src.config.types import (
     OAuthConfig,
 )
 from src.logging import get_logger
-from src.mcp import get_mcp_tool_set
-from src.subagents import get_subagents
 from src.telemetry import TracingMiddleware
 
 logger = get_logger(__name__)

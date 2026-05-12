@@ -1,7 +1,7 @@
 import pytest
 from pydantic_core import Url
 
-import src.mcp.core as mcp_core
+import src.agent.mcp as mcp_core
 from src.config.types import (
     McpServerConfig,
     OAuthClientCredentialsAuthConfig,
@@ -87,11 +87,11 @@ def test_get_mcp_tool_set_uses_header_provider_for_token_forward_auth(
                 "kind": "connection_params",
                 "url": "https://mcp.example/server",
             },
-            "header_provider": mcp_core.oauth_token_forward_header_provider,
+            "header_provider": mcp_core._oauth_token_forward_header_provider,
         }
     ]
     assert (
-        toolsets[0]["header_provider"] is mcp_core.oauth_token_forward_header_provider
+        toolsets[0]["header_provider"] is mcp_core._oauth_token_forward_header_provider
     )
 
 
