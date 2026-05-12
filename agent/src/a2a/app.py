@@ -50,7 +50,7 @@ from src.logging import get_logger
 logger = get_logger(__name__)
 
 
-def create_a2a_app(
+def build_agent_a2a_app(
     *,
     agent: LlmAgent,
     server_config: ServerConfig,
