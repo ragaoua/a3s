@@ -27,7 +27,7 @@ from src.config.types.auth import (
     OAuthDiscoveredIntrospectionPolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
 )
-from src.logging import get_logger
+from src.observability.logging import get_logger
 from src.utils import FetchJson, fetch_json
 
 logger = get_logger(__name__)

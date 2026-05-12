@@ -6,7 +6,6 @@ from typing import Any
 from uuid import uuid4
 
 import httpx
-import uvicorn
 from a2a.client import A2ACardResolver, A2AClient
 from a2a.types import (
     GetTaskRequest,
@@ -43,15 +42,9 @@ async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
 
 
 def start_agent_server(config: Config):
-    from src.agent import create_app
+    from src.a2a import build_a2a_server
 
-    app = create_app(config)
-    server_config = uvicorn.Config(
-        app,
-        host=str(config.server.listen_address),
-        port=config.server.listen_port,
-    )
-    server = uvicorn.Server(server_config)
+    server = build_a2a_server(config)
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     return server, thread

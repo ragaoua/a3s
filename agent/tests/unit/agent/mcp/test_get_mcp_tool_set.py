@@ -1,7 +1,7 @@
 import pytest
 from pydantic_core import Url
 
-import src.mcp.core as mcp_core
+import src.agent.mcp as mcp_core
 from src.config.types import (
     McpServerConfig,
     OAuthClientCredentialsAuthConfig,
@@ -32,7 +32,7 @@ def _patch_mcp_builders(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict]
     return captured
 
 
-def test_get_mcp_tool_set_builds_toolset_for_server_without_auth(
+def test_get_mcp_toolset_builds_toolset_for_server_without_auth(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = _patch_mcp_builders(monkeypatch)
@@ -43,7 +43,7 @@ def test_get_mcp_tool_set_builds_toolset_for_server_without_auth(
         )
     ]
 
-    toolsets = mcp_core.get_mcp_tool_set(config)
+    toolsets = mcp_core.get_mcp_toolset(config)
 
     assert captured["connection_params"] == [{"url": "https://mcp.example/server"}]
     assert captured["toolsets"] == [
@@ -67,7 +67,7 @@ def test_get_mcp_tool_set_builds_toolset_for_server_without_auth(
     ]
 
 
-def test_get_mcp_tool_set_uses_header_provider_for_token_forward_auth(
+def test_get_mcp_toolset_uses_header_provider_for_token_forward_auth(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = _patch_mcp_builders(monkeypatch)
@@ -78,7 +78,7 @@ def test_get_mcp_tool_set_uses_header_provider_for_token_forward_auth(
         )
     ]
 
-    toolsets = mcp_core.get_mcp_tool_set(config)
+    toolsets = mcp_core.get_mcp_toolset(config)
 
     assert captured["connection_params"] == [{"url": "https://mcp.example/server"}]
     assert captured["toolsets"] == [
@@ -87,15 +87,15 @@ def test_get_mcp_tool_set_uses_header_provider_for_token_forward_auth(
                 "kind": "connection_params",
                 "url": "https://mcp.example/server",
             },
-            "header_provider": mcp_core.oauth_token_forward_header_provider,
+            "header_provider": mcp_core._oauth_token_forward_header_provider,
         }
     ]
     assert (
-        toolsets[0]["header_provider"] is mcp_core.oauth_token_forward_header_provider
+        toolsets[0]["header_provider"] is mcp_core._oauth_token_forward_header_provider
     )
 
 
-def test_get_mcp_tool_set_uses_client_credentials_httpx_factory(
+def test_get_mcp_toolset_uses_client_credentials_httpx_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured = _patch_mcp_builders(monkeypatch)
@@ -121,7 +121,7 @@ def test_get_mcp_tool_set_uses_client_credentials_httpx_factory(
         fake_build_factory,
     )
 
-    toolsets = mcp_core.get_mcp_tool_set([server_config])
+    toolsets = mcp_core.get_mcp_toolset([server_config])
 
     assert build_factory_calls == [(server_config.url, server_config.auth)]
     assert captured["connection_params"] == [
@@ -143,7 +143,7 @@ def test_get_mcp_tool_set_uses_client_credentials_httpx_factory(
     assert toolsets[0]["connection_params"]["httpx_client_factory"] is factory
 
 
-def test_get_mcp_tool_set_raises_for_token_exchange_auth() -> None:
+def test_get_mcp_toolset_raises_for_token_exchange_auth() -> None:
     config = [
         McpServerConfig(
             url=Url("https://mcp.example/server"),
@@ -156,4 +156,4 @@ def test_get_mcp_tool_set_raises_for_token_exchange_auth() -> None:
     ]
 
     with pytest.raises(NotImplementedError, match="oauth_token_exchange"):
-        mcp_core.get_mcp_tool_set(config)
+        mcp_core.get_mcp_toolset(config)

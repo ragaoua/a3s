@@ -5,10 +5,10 @@ import logging
 from pydantic import ValidationError
 import uvicorn
 
-from src.agent import create_app
+from src.a2a import build_a2a_server
 from src.config import load_config
-from src.logging import setup_logging
-from src.telemetry import setup_telemetry
+from src.observability.logging import setup_logging
+from src.observability.telemetry import setup_telemetry
 
 
 # We're not using LoggingManager because it
@@ -42,15 +42,8 @@ def main() -> None:
 
     setup_logging(config.logging)
     setup_telemetry(config)
-    app = create_app(config)
 
-    server = uvicorn.Server(
-        uvicorn.Config(
-            app,
-            host=str(config.server.listen_address),
-            port=config.server.listen_port,
-        )
-    )
+    server = build_a2a_server(config)
 
     quit_watcher = threading.Thread(
         target=_watch_stdin_for_quit,
