@@ -12,7 +12,7 @@ from src.config.types import (
 )
 
 
-def get_mcp_toolset(config: list[McpServerConfig]) -> list[ToolUnion]:
+def get_mcp_toolsets(config: list[McpServerConfig]) -> list[ToolUnion]:
     mcp_toolset = []
 
     for server_config in config:
