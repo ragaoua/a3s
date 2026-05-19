@@ -19,11 +19,12 @@ async def fetch_json(
     *,
     error_cls: type[Exception] = ValueError,
     error_message: str | None = None,
+    transport: httpx.AsyncBaseTransport | None = None,
 ) -> dict[str, Any]:
     request = url if isinstance(url, httpx.Request) else httpx.Request("GET", url)
 
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
+        async with httpx.AsyncClient(timeout=5, transport=transport) as client:
             response = await client.send(request)
             response.raise_for_status()
 
