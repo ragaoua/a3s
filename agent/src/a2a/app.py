@@ -39,6 +39,7 @@ from starlette.applications import Starlette
 
 from src.auth.inbound import (
     ApiKeyAuthMiddleware,
+    OAuth2BearerAuthMiddleware,
 )
 from src.config.types import (
     ApiKeyAuthConfig,
@@ -85,63 +86,72 @@ def build_agent_a2a_app(
 
     app = Starlette()
 
-    async def setup_a2a():
-        if isinstance(auth_config, ApiKeyAuthConfig):
-            security_schemes = {
-                "APIKeySecurityScheme": SecurityScheme(
-                    APIKeySecurityScheme(
-                        in_=In.header,
-                        name=ApiKeyAuthMiddleware.HEADER_NAME,
-                    )
-                ),
-            }
-        elif isinstance(auth_config, OAuthConfig):
-            security_schemes = {
-                "OAuth2SecurityScheme": SecurityScheme(
-                    OAuth2SecurityScheme(
-                        flows=OAuthFlows(
-                            authorization_code=AuthorizationCodeOAuthFlow(
-                                # TODO
-                                authorization_url="",
-                                refresh_url="",
-                                scopes={},
-                                token_url="",
-                            )
-                        ),
-                        oauth2_metadata_url=get_well_known_url(
-                            str(auth_config.issuer_url), external=True
-                        ),
-                    )
-                ),
-            }
-        else:
-            security = None
-            security_schemes = None
-
-        agent_card = AgentCard(
-            name=agent.name,
-            description=agent.description,
-            url=rpc_url,
-            version="0.0.1",
-            capabilities=AgentCapabilities(streaming=True),
-            skills=[
-                AgentSkill(
-                    id=agent.name,
-                    name="model",
-                    description=agent.description,
-                    tags=["llm"],
-                )
-            ],
-            security_schemes=security_schemes,
-            default_input_modes=["text/plain"],
-            default_output_modes=["text/plain"],
-            # TODO: maybe this is interesting.
-            # We would provide an extended agent card to authorized users
-            # to, for instance, be able to see what MCP tools the agent has
-            # access to
-            supports_authenticated_extended_card=False,
+    if isinstance(auth_config, ApiKeyAuthConfig):
+        app.add_middleware(
+            ApiKeyAuthMiddleware,
+            api_key=auth_config.api_key.get_secret_value(),
         )
+        security_schemes = {
+            "APIKeySecurityScheme": SecurityScheme(
+                APIKeySecurityScheme(
+                    in_=In.header,
+                    name=ApiKeyAuthMiddleware.HEADER_NAME,
+                )
+            ),
+        }
+    elif isinstance(auth_config, OAuthConfig):
+        app.add_middleware(
+            OAuth2BearerAuthMiddleware,
+            issuer_url=str(auth_config.issuer_url),
+            realm=agent.name,
+            config=auth_config.policies,
+        )
+        security_schemes = {
+            "OAuth2SecurityScheme": SecurityScheme(
+                OAuth2SecurityScheme(
+                    flows=OAuthFlows(
+                        authorization_code=AuthorizationCodeOAuthFlow(
+                            # TODO
+                            authorization_url="",
+                            refresh_url="",
+                            scopes={},
+                            token_url="",
+                        )
+                    ),
+                    oauth2_metadata_url=get_well_known_url(
+                        str(auth_config.issuer_url), external=True
+                    ),
+                )
+            ),
+        }
+    else:
+        security_schemes = None
 
+    agent_card = AgentCard(
+        name=agent.name,
+        description=agent.description,
+        url=rpc_url,
+        version="0.0.1",
+        capabilities=AgentCapabilities(streaming=True),
+        skills=[
+            AgentSkill(
+                id=agent.name,
+                name="model",
+                description=agent.description,
+                tags=["llm"],
+            )
+        ],
+        security_schemes=security_schemes,
+        default_input_modes=["text/plain"],
+        default_output_modes=["text/plain"],
+        # TODO: maybe this is interesting.
+        # We would provide an extended agent card to authorized users
+        # to, for instance, be able to see what MCP tools the agent has
+        # access to
+        supports_authenticated_extended_card=False,
+    )
+
+    async def setup_a2a():
         a2a_server = A2AStarletteApplication(
             agent_card=agent_card,
             http_handler=request_handler,
