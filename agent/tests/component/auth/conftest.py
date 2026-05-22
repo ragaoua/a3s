@@ -63,6 +63,15 @@ class IamFixture:
 
 @pytest.fixture(scope="session")
 def iam(iam_server: Any) -> Iterator[IamFixture]:
+    # pytest-iam's iam_configuration sets AUTHLIB_INSECURE_TRANSPORT=1 in the
+    # process env (pytest_iam/__init__.py:186) and never cleans it up. The flag
+    # isn't needed for the default localhost binding (authlib's
+    # is_secure_transport already whitelists http://localhost: and
+    # http://127.0.0.1:), and leaving it set leaks into unrelated tests that
+    # assert on https-only validation. Pop it once so the rest of the session
+    # sees a clean env; tests that want the flag can still set it locally
+    # (e.g. via monkeypatch.setenv).
+    os.environ.pop("AUTHLIB_INSECURE_TRANSPORT", None)
     with iam_server.app.app_context():
         client = iam_server.models.Client(
             client_id=CONFIDENTIAL_CLIENT_ID,
