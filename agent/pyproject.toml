@@ -29,6 +29,7 @@ packages = ["src"]
 dev = [
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
+    "pytest-iam>=0.2.5",
     "testcontainers[keycloak]>=4.9.0",
 ]
 

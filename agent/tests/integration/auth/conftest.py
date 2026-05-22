@@ -1,105 +1,95 @@
+import time
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from typing import Any
 
 import pytest
-from keycloak import KeycloakAdmin, KeycloakOpenID
-from testcontainers.keycloak import KeycloakContainer
+from authlib.jose import jwt
 
-REALM = "a3s-test"
 CONFIDENTIAL_CLIENT_ID = "a3s-test-client"
 CONFIDENTIAL_CLIENT_SECRET = "a3s-test-secret"
-SHORT_LIVED_CLIENT_ID = "a3s-test-short-lived"
-SHORT_LIVED_CLIENT_SECRET = "a3s-test-short-lived-secret"
 SHORT_LIVED_TOKEN_LIFESPAN_SECONDS = 1
 
 
 @dataclass(frozen=True)
-class KeycloakFixture:
+class IamFixture:
     base_url: str
-    realm: str
     issuer_url: str
     jwks_url: str
     confidential_client_id: str
     confidential_client_secret: str
+    _server: Any
+    _client: Any
+    _user: Any
+    _jwk: dict[str, Any]
 
     def mint_access_token(
         self,
         *,
-        client_id: str | None = None,
-        client_secret: str | None = None,
+        lifetime_seconds: int = 3600,
     ) -> str:
-        oid = KeycloakOpenID(
-            server_url=self.base_url,
-            client_id=client_id or self.confidential_client_id,
-            realm_name=self.realm,
-            client_secret_key=client_secret or self.confidential_client_secret,
-        )
-        token = oid.token(grant_type="client_credentials")
-        return token["access_token"]
+        now = int(time.time())
+        header = {"alg": "RS256", "kid": self._jwk["kid"]}
+        payload = {
+            "iss": self.issuer_url,
+            "sub": self._user.user_name,
+            "aud": self.confidential_client_id,
+            "exp": now + lifetime_seconds,
+            "iat": now,
+            "jti": str(uuid.uuid4()),
+            "client_id": self.confidential_client_id,
+            "scope": "openid",
+        }
+        encoded = jwt.encode(header, payload, self._jwk)  # pyright: ignore[reportUnknownMemberType]
+        token_str = encoded.decode("ascii") if isinstance(encoded, bytes) else encoded
+
+        # Persist the token so the introspection endpoint recognises it.
+        with self._server.app.app_context():
+            self._server.random_token(
+                subject=self._user,
+                client=self._client,
+                access_token=token_str,
+                lifetime=lifetime_seconds,
+            )
+
+        return token_str
 
     def mint_short_lived_access_token(self) -> str:
         return self.mint_access_token(
-            client_id=SHORT_LIVED_CLIENT_ID,
-            client_secret=SHORT_LIVED_CLIENT_SECRET,
+            lifetime_seconds=SHORT_LIVED_TOKEN_LIFESPAN_SECONDS,
         )
 
 
 @pytest.fixture(scope="session")
-def keycloak() -> Iterator[KeycloakFixture]:
-    with KeycloakContainer(image="quay.io/keycloak/keycloak:26.5.0") as container:
-        kc = container.get_client()
-        kc.create_realm(
-            payload={"realm": REALM, "enabled": True},
-            skip_exists=True,
-        )
-        kc.change_current_realm(REALM)
-
-        _create_confidential_client(
-            kc,
+def iam(iam_server: Any) -> Iterator[IamFixture]:
+    with iam_server.app.app_context():
+        client = iam_server.models.Client(
             client_id=CONFIDENTIAL_CLIENT_ID,
-            secret=CONFIDENTIAL_CLIENT_SECRET,
+            client_secret=CONFIDENTIAL_CLIENT_SECRET,
+            client_name="a3s-test",
+            grant_types=["client_credentials"],
+            response_types=["token"],
+            token_endpoint_auth_method="client_secret_basic",
+            scope=["openid"],
         )
-        _create_confidential_client(
-            kc,
-            client_id=SHORT_LIVED_CLIENT_ID,
-            secret=SHORT_LIVED_CLIENT_SECRET,
-            access_token_lifespan_seconds=SHORT_LIVED_TOKEN_LIFESPAN_SECONDS,
-        )
+        iam_server.backend.save(client)
+        client.audience = [client]
+        iam_server.backend.save(client)
 
-        base_url = container.get_url()
-        issuer_url = f"{base_url}/realms/{REALM}"
+        user = iam_server.random_user()
 
-        yield KeycloakFixture(
-            base_url=base_url,
-            realm=REALM,
-            issuer_url=issuer_url,
-            jwks_url=f"{issuer_url}/protocol/openid-connect/certs",
-            confidential_client_id=CONFIDENTIAL_CLIENT_ID,
-            confidential_client_secret=CONFIDENTIAL_CLIENT_SECRET,
-        )
+    base_url = iam_server.url.rstrip("/")
+    jwk = iam_server.app.config["CANAILLE_OIDC"]["ACTIVE_JWKS"][0]
 
-
-def _create_confidential_client(
-    kc: KeycloakAdmin,
-    *,
-    client_id: str,
-    secret: str,
-    access_token_lifespan_seconds: int | None = None,
-) -> None:
-    attributes: dict[str, str] = {}
-    if access_token_lifespan_seconds is not None:
-        attributes["access.token.lifespan"] = str(access_token_lifespan_seconds)
-
-    kc.create_client(
-        payload={
-            "clientId": client_id,
-            "secret": secret,
-            "publicClient": False,
-            "serviceAccountsEnabled": True,
-            "standardFlowEnabled": False,
-            "directAccessGrantsEnabled": False,
-            "protocol": "openid-connect",
-            "attributes": attributes,
-        },
-        skip_exists=True,
+    yield IamFixture(
+        base_url=base_url,
+        issuer_url=base_url,
+        jwks_url=f"{base_url}/oauth/jwks.json",
+        confidential_client_id=CONFIDENTIAL_CLIENT_ID,
+        confidential_client_secret=CONFIDENTIAL_CLIENT_SECRET,
+        _server=iam_server,
+        _client=client,
+        _user=user,
+        _jwk=jwk,
     )
