@@ -122,7 +122,7 @@ async def test_oauth2_accepts_valid_jwt(
         )
 
     assert response.status_code == 200
-    body = response.json()
+    body = response.json()  # pyright: ignore[reportAny]
     assert body["ok"] is True
     assert body["auth_header"] == f"Bearer {token}"
 

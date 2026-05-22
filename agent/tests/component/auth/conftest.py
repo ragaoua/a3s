@@ -1,11 +1,15 @@
+import os
 import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
 
+from pydantic import JsonValue
 import pytest
 from authlib.jose import jwt
+from canaille.core.models import User  # pyright: ignore[reportMissingTypeStubs]
+from canaille.oidc.basemodels import Client  # pyright: ignore[reportMissingTypeStubs]
+from pytest_iam import Server  # pyright: ignore[reportMissingTypeStubs]
 
 CONFIDENTIAL_CLIENT_ID = "a3s-test-client"
 CONFIDENTIAL_CLIENT_SECRET = "a3s-test-secret"
@@ -19,10 +23,10 @@ class IamFixture:
     jwks_url: str
     confidential_client_id: str
     confidential_client_secret: str
-    _server: Any
-    _client: Any
-    _user: Any
-    _jwk: dict[str, Any]
+    _server: Server
+    _client: Client
+    _user: User
+    _jwk: dict[str, JsonValue]
 
     def mint_access_token(
         self,
@@ -42,11 +46,11 @@ class IamFixture:
             "scope": "openid",
         }
         encoded = jwt.encode(header, payload, self._jwk)  # pyright: ignore[reportUnknownMemberType]
-        token_str = encoded.decode("ascii") if isinstance(encoded, bytes) else encoded
+        token_str = encoded.decode("ascii")
 
         # Persist the token so the introspection endpoint recognises it.
         with self._server.app.app_context():
-            self._server.random_token(
+            _ = self._server.random_token(  # pyright: ignore[reportUnknownMemberType]
                 subject=self._user,
                 client=self._client,
                 access_token=token_str,
@@ -62,7 +66,7 @@ class IamFixture:
 
 
 @pytest.fixture(scope="session")
-def iam(iam_server: Any) -> Iterator[IamFixture]:
+def iam(iam_server: Server) -> Iterator[IamFixture]:
     # pytest-iam's iam_configuration sets AUTHLIB_INSECURE_TRANSPORT=1 in the
     # process env (pytest_iam/__init__.py:186) and never cleans it up. The flag
     # isn't needed for the default localhost binding (authlib's
@@ -71,9 +75,9 @@ def iam(iam_server: Any) -> Iterator[IamFixture]:
     # assert on https-only validation. Pop it once so the rest of the session
     # sees a clean env; tests that want the flag can still set it locally
     # (e.g. via monkeypatch.setenv).
-    os.environ.pop("AUTHLIB_INSECURE_TRANSPORT", None)
+    _ = os.environ.pop("AUTHLIB_INSECURE_TRANSPORT", None)
     with iam_server.app.app_context():
-        client = iam_server.models.Client(
+        client: Client = iam_server.models.Client(  # pyright: ignore[reportAny]
             client_id=CONFIDENTIAL_CLIENT_ID,
             client_secret=CONFIDENTIAL_CLIENT_SECRET,
             client_name="a3s-test",
@@ -82,14 +86,14 @@ def iam(iam_server: Any) -> Iterator[IamFixture]:
             token_endpoint_auth_method="client_secret_basic",
             scope=["openid"],
         )
-        iam_server.backend.save(client)
+        iam_server.backend.save(client)  # pyright: ignore[reportUnknownMemberType]
         client.audience = [client]
-        iam_server.backend.save(client)
+        iam_server.backend.save(client)  # pyright: ignore[reportUnknownMemberType]
 
-        user = iam_server.random_user()
+        user = iam_server.random_user()  # pyright: ignore[reportUnknownMemberType]
 
     base_url = iam_server.url.rstrip("/")
-    jwk = iam_server.app.config["CANAILLE_OIDC"]["ACTIVE_JWKS"][0]
+    jwk = iam_server.app.config["CANAILLE_OIDC"]["ACTIVE_JWKS"][0]  # pyright: ignore[reportUnknownVariableType]
 
     yield IamFixture(
         base_url=base_url,
@@ -100,5 +104,5 @@ def iam(iam_server: Any) -> Iterator[IamFixture]:
         _server=iam_server,
         _client=client,
         _user=user,
-        _jwk=jwk,
+        _jwk=jwk,  # pyright: ignore[reportUnknownArgumentType]
     )
