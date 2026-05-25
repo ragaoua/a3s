@@ -10,10 +10,23 @@ from starlette.types import Receive, Scope, Send
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 
+from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
+
 ECHO_TOOL_NAME = "echo"
 ADD_TOOL_NAME = "add"
 
 _SERVER_STARTUP_TIMEOUT_SECONDS = 5
+
+
+@pytest.fixture(autouse=True)
+def _clear_outbound_client_credentials_cache() -> Iterator[None]:
+    # OAuthClientCredentialsAuth keeps a class-level token cache keyed by
+    # (token_endpoint, client_id). The iam fixture is session-scoped, so
+    # consecutive tests would otherwise hit the cache and skip the
+    # token-endpoint round trip we're trying to exercise.
+    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()  # pyright: ignore[reportPrivateUsage]
+    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()  # pyright: ignore[reportPrivateUsage]
+    yield
 
 
 @dataclass(frozen=True)

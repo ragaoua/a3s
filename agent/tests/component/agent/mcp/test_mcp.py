@@ -1,13 +1,16 @@
+import httpx
 import pytest
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.mcp_tool import McpToolset
 from mcp.types import TextContent
+from pydantic import SecretStr
 from pydantic_core import Url
 
 from src.agent.mcp import get_mcp_toolsets
 from src.auth.context import bind_current_authorization_header
 from src.config.types import (
     McpServerConfig,
+    OAuthClientCredentialsAuthConfig,
     OAuthTokenForwardAuthConfig,
 )
 from tests.component.agent.mcp.conftest import (
@@ -15,6 +18,7 @@ from tests.component.agent.mcp.conftest import (
     ECHO_TOOL_NAME,
     McpServerFixture,
 )
+from tests.component.conftest import IamFixture
 
 
 @pytest.mark.asyncio
@@ -128,3 +132,51 @@ async def test_oauth_token_forward_sends_no_authorization_header_when_inbound_he
         await toolset.close()
 
     assert not mcp_server.received_authorization_headers
+
+
+@pytest.mark.asyncio
+async def test_oauth_client_credentials_fetches_bearer_from_token_endpoint_and_forwards_to_mcp(
+    iam: IamFixture,
+    mcp_server: McpServerFixture,
+) -> None:
+    toolsets = get_mcp_toolsets(
+        [
+            McpServerConfig(
+                url=Url(mcp_server.url),
+                auth=OAuthClientCredentialsAuthConfig(
+                    mode="oauth_client_credentials",
+                    token_endpoint=Url(f"{iam.base_url}/oauth/token"),
+                    client_id=iam.confidential_client_id,
+                    client_secret=SecretStr(iam.confidential_client_secret),
+                ),
+            )
+        ]
+    )
+    toolset = toolsets[0]
+    assert isinstance(toolset, McpToolset)
+
+    try:
+        session = await toolset._mcp_session_manager.create_session()  # pyright: ignore[reportPrivateUsage]
+        _ = await session.call_tool(ECHO_TOOL_NAME, {"text": "hi"})
+    finally:
+        await toolset.close()
+
+    assert mcp_server.received_authorization_headers
+
+    # Make sure the same token was used each time, meaning the cache works as expected
+    assert len(set(mcp_server.received_authorization_headers)) == 1
+
+    # Confirm the forwarded token was actually issued by iam — i.e. the agent
+    # really hit the configured token endpoint with the configured client
+    # credentials, rather than fabricating something that just happens to look
+    # like a Bearer.
+    forwarded = mcp_server.received_authorization_headers[0]
+    token = forwarded.removeprefix("Bearer ")
+    async with httpx.AsyncClient() as client:
+        introspection = await client.post(
+            f"{iam.base_url}/oauth/introspect",
+            data={"token": token},
+            auth=(iam.confidential_client_id, iam.confidential_client_secret),
+        )
+    assert introspection.status_code == 200
+    assert introspection.json()["active"] is True

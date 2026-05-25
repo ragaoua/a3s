@@ -19,7 +19,7 @@ from src.config.types.auth import (
     OAuthDiscoveredIntrospectionPolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
 )
-from tests.component.auth.conftest import (
+from tests.component.conftest import (
     SHORT_LIVED_TOKEN_LIFESPAN_SECONDS,
     IamFixture,
 )
