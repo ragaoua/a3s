@@ -1,4 +1,3 @@
-import httpx
 import pytest
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.mcp_tool import McpToolset
@@ -16,6 +15,7 @@ from src.config.types import (
 from tests.component.agent.mcp.conftest import (
     ADD_TOOL_NAME,
     ECHO_TOOL_NAME,
+    McpServerFactory,
     McpServerFixture,
 )
 from tests.component.conftest import IamFixture
@@ -135,10 +135,16 @@ async def test_oauth_token_forward_sends_no_authorization_header_when_inbound_he
 
 
 @pytest.mark.asyncio
-async def test_oauth_client_credentials_fetches_bearer_from_token_endpoint_and_forwards_to_mcp(
+async def test_oauth_client_credentials_grants_agent_access_to_iam_protected_mcp_server(
     iam: IamFixture,
-    mcp_server: McpServerFixture,
+    mcp_server_factory: McpServerFactory,
 ) -> None:
+    # Configure the MCP server to validate inbound bearer tokens against iam
+    # via introspection. If the call below succeeds, the agent must have
+    # fetched a real iam-issued token from the configured token endpoint and
+    # forwarded it — no need to introspect ourselves.
+    mcp_server = mcp_server_factory(iam=iam)
+
     toolsets = get_mcp_toolsets(
         [
             McpServerConfig(
@@ -157,26 +163,15 @@ async def test_oauth_client_credentials_fetches_bearer_from_token_endpoint_and_f
 
     try:
         session = await toolset._mcp_session_manager.create_session()  # pyright: ignore[reportPrivateUsage]
-        _ = await session.call_tool(ECHO_TOOL_NAME, {"text": "hi"})
+        result = await session.call_tool(ECHO_TOOL_NAME, {"text": "hi"})
     finally:
         await toolset.close()
+
+    assert result.isError is False
+    assert isinstance(result.content[0], TextContent)
+    assert result.content[0].text == "hi"
 
     assert mcp_server.received_authorization_headers
 
     # Make sure the same token was used each time, meaning the cache works as expected
     assert len(set(mcp_server.received_authorization_headers)) == 1
-
-    # Confirm the forwarded token was actually issued by iam — i.e. the agent
-    # really hit the configured token endpoint with the configured client
-    # credentials, rather than fabricating something that just happens to look
-    # like a Bearer.
-    forwarded = mcp_server.received_authorization_headers[0]
-    token = forwarded.removeprefix("Bearer ")
-    async with httpx.AsyncClient() as client:
-        introspection = await client.post(
-            f"{iam.base_url}/oauth/introspect",
-            data={"token": token},
-            auth=(iam.confidential_client_id, iam.confidential_client_secret),
-        )
-    assert introspection.status_code == 200
-    assert introspection.json()["active"] is True
