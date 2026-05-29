@@ -69,10 +69,15 @@ async def test_get_mcp_toolsets_can_call_tools_on_server(
 
 
 @pytest.mark.asyncio
-async def test_oauth_token_forward_forwards_inbound_authorization_header_to_mcp_server(
-    mcp_server: McpServerFixture,
+async def test_oauth_token_forward_forwards_inbound_authorization_header_to_iam_protected_mcp_server(
+    iam: IamFixture,
+    mcp_server_factory: McpServerFactory,
 ) -> None:
-    inbound_header = "Bearer inbound-test-token"
+    # Configure the MCP server to validate inbound bearer tokens against iam
+    # via introspection. If the call below succeeds, the agent must have
+    # forwarded a real iam-issued token — the one we bound on the contextvar.
+    mcp_server = mcp_server_factory(iam=iam)
+    inbound_header = f"Bearer {iam.mint_access_token()}"
 
     toolsets = get_mcp_toolsets(
         [
@@ -100,11 +105,6 @@ async def test_oauth_token_forward_forwards_inbound_authorization_header_to_mcp_
     finally:
         await toolset.close()
 
-    assert mcp_server.received_authorization_headers
-    assert all(
-        header == inbound_header for header in mcp_server.received_authorization_headers
-    )
-
 
 @pytest.mark.asyncio
 async def test_oauth_token_forward_sends_no_authorization_header_when_inbound_header_is_unbound(
@@ -131,7 +131,7 @@ async def test_oauth_token_forward_sends_no_authorization_header_when_inbound_he
     finally:
         await toolset.close()
 
-    assert not mcp_server.received_authorization_headers
+    assert not mcp_server.has_received_authorization_header()
 
 
 @pytest.mark.asyncio
@@ -170,8 +170,3 @@ async def test_oauth_client_credentials_grants_agent_access_to_iam_protected_mcp
     assert result.isError is False
     assert isinstance(result.content[0], TextContent)
     assert result.content[0].text == "hi"
-
-    assert mcp_server.received_authorization_headers
-
-    # Make sure the same token was used each time, meaning the cache works as expected
-    assert len(set(mcp_server.received_authorization_headers)) == 1

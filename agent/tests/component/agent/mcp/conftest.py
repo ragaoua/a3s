@@ -4,14 +4,13 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 
-import httpx
 import pytest
 from starlette.types import ASGIApp, Receive, Scope, Send
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 
 from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
-from tests.component.conftest import IamFixture
+from tests.component.conftest import IamFixture, build_iam_introspection_guard_app
 
 ECHO_TOOL_NAME = "echo"
 ADD_TOOL_NAME = "add"
@@ -33,7 +32,10 @@ def _clear_outbound_client_credentials_cache() -> Iterator[None]:
 @dataclass(frozen=True)
 class McpServerFixture:
     url: str
-    received_authorization_headers: list[str] = field(default_factory=list)
+    _received_authorization_headers: list[str] = field(default_factory=list)
+
+    def has_received_authorization_header(self):
+        return bool(self._received_authorization_headers)
 
 
 McpServerFactory = Callable[..., McpServerFixture]
@@ -60,12 +62,7 @@ def mcp_server_factory() -> Iterator[McpServerFactory]:
 
         inner_app: ASGIApp = mcp.streamable_http_app()
         if iam is not None:
-            # Validate inbound bearer tokens by hitting iam's introspection
-            # endpoint directly. Deliberately avoids the project's own
-            # OAuth2BearerAuthMiddleware so the test verification stays
-            # independent of the production auth code it's meant to
-            # corroborate.
-            inner_app = _build_iam_introspection_guard_app(inner_app, iam=iam)
+            inner_app = build_iam_introspection_guard_app(inner_app, iam=iam)
 
         received_authorization_headers: list[str] = []
         capturing_app = _build_authorization_capturing_app(
@@ -97,7 +94,7 @@ def mcp_server_factory() -> Iterator[McpServerFactory]:
         started.append((server, thread))
         return McpServerFixture(
             url=f"http://127.0.0.1:{port}/mcp",
-            received_authorization_headers=received_authorization_headers,
+            _received_authorization_headers=received_authorization_headers,
         )
 
     try:
@@ -127,61 +124,3 @@ def _build_authorization_capturing_app(
         await inner(scope, receive, send)
 
     return app
-
-
-def _build_iam_introspection_guard_app(
-    inner: ASGIApp,
-    *,
-    iam: IamFixture,
-) -> ASGIApp:
-    introspection_url = f"{iam.base_url}/oauth/introspect"
-    client_id = iam.confidential_client_id
-    client_secret = iam.confidential_client_secret
-
-    async def app(scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await inner(scope, receive, send)
-            return
-
-        auth_header: str | None = None
-        for key, value in scope.get("headers", []):
-            if key == b"authorization":
-                auth_header = value.decode("ascii")
-                break
-
-        scheme, _, token = (auth_header or "").partition(" ")
-        token = token.strip()
-        if scheme.lower() != "bearer" or not token:
-            await _send_unauthorized(send)
-            return
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                introspection_url,
-                data={"token": token},
-                auth=(client_id, client_secret),
-            )
-
-        if response.status_code != 200 or response.json().get("active") is not True:
-            await _send_unauthorized(send)
-            return
-
-        await inner(scope, receive, send)
-
-    return app
-
-
-async def _send_unauthorized(send: Send) -> None:
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 401,
-            "headers": [(b"content-type", b"application/json")],
-        }
-    )
-    await send(
-        {
-            "type": "http.response.body",
-            "body": b'{"detail":"Unauthorized"}',
-        }
-    )
