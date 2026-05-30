@@ -69,7 +69,7 @@ async def test_get_mcp_toolsets_can_call_tools_on_server(
 
 
 @pytest.mark.asyncio
-async def test_oauth_token_forward_forwards_inbound_authorization_header_to_iam_protected_mcp_server(
+async def test_oauth_token_forward_grants_access_to_iam_protected_mcp_server_when_inbound_header_is_bound(
     iam: IamFixture,
     mcp_server_factory: McpServerFactory,
 ) -> None:
