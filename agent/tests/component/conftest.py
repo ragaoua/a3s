@@ -4,12 +4,14 @@ import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 
+import httpx
 from pydantic import JsonValue
 import pytest
 from authlib.jose import jwt
 from canaille.core.models import User  # pyright: ignore[reportMissingTypeStubs]
 from canaille.oidc.basemodels import Client  # pyright: ignore[reportMissingTypeStubs]
 from pytest_iam import Server  # pyright: ignore[reportMissingTypeStubs]
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 CONFIDENTIAL_CLIENT_ID = "a3s-test-client"
 CONFIDENTIAL_CLIENT_SECRET = "a3s-test-secret"
@@ -105,4 +107,67 @@ def iam(iam_server: Server) -> Iterator[IamFixture]:
         _client=client,
         _user=user,
         _jwk=jwk,  # pyright: ignore[reportUnknownArgumentType]
+    )
+
+
+def build_iam_introspection_guard_app(
+    inner: ASGIApp,
+    *,
+    iam: IamFixture,
+) -> ASGIApp:
+    """Wrap an ASGI app so it only forwards requests with an iam-valid bearer.
+
+    The guard talks to iam's introspection endpoint directly so the test
+    verification stays independent of the project's own OAuth2 middleware.
+    """
+    introspection_url = f"{iam.base_url}/oauth/introspect"
+    client_id = iam.confidential_client_id
+    client_secret = iam.confidential_client_secret
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await inner(scope, receive, send)
+            return
+
+        auth_header: str | None = None
+        for key, value in scope.get("headers", []):
+            if key == b"authorization":
+                auth_header = value.decode("ascii")
+                break
+
+        scheme, _, token = (auth_header or "").partition(" ")
+        token = token.strip()
+        if scheme.lower() != "bearer" or not token:
+            await send_unauthorized(send)
+            return
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                introspection_url,
+                data={"token": token},
+                auth=(client_id, client_secret),
+            )
+
+        if response.status_code != 200 or response.json().get("active") is not True:
+            await send_unauthorized(send)
+            return
+
+        await inner(scope, receive, send)
+
+    return app
+
+
+async def send_unauthorized(send: Send) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 401,
+            "headers": [(b"content-type", b"application/json")],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b'{"detail":"Unauthorized"}',
+        }
     )

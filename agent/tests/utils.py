@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Literal
 from pydantic import SecretStr
 from pydantic_core import Url
@@ -38,4 +39,23 @@ def get_base_test_config(
         auth=auth,
         server=server,
         mcp_servers=mcp_servers,
+    )
+
+
+def write_skill(
+    skills_dir: Path,
+    name: str,
+    *,
+    description: str | None = None,
+    body: str | None = None,
+) -> None:
+    skill_dir = skills_dir / name
+    skill_dir.mkdir()
+
+    body = body or f"Body for {name}"
+    description = description or f"Description for {name}"
+
+    (skill_dir / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: {description}\n---\n{body}",
+        encoding="utf-8",
     )

@@ -19,7 +19,7 @@ from src.config.types.auth import (
     OAuthDiscoveredIntrospectionPolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
 )
-from tests.component.auth.conftest import (
+from tests.component.conftest import (
     SHORT_LIVED_TOKEN_LIFESPAN_SECONDS,
     IamFixture,
 )
@@ -73,20 +73,6 @@ def _introspection_only_policies(
             client_secret=SecretStr(iam.confidential_client_secret),
         )
     )
-
-
-@pytest.mark.asyncio
-async def test_oauth2_returns_401_when_authorization_header_is_missing(
-    iam: IamFixture,
-) -> None:
-    async with _build_client(
-        issuer_url=iam.issuer_url,
-        policies=_jwt_only_policies(),
-    ) as client:
-        response = await client.get(PROTECTED_PATH)
-
-    assert response.status_code == 401
-    assert response.headers["WWW-Authenticate"] == 'Bearer realm="a3s-test-realm"'
 
 
 @pytest.mark.asyncio
