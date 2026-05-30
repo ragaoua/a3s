@@ -24,14 +24,10 @@ But if it has one test file, it's a unit.
 
 ## Component tests
 
-Component tests are focused on one module. Sometimes that module calls on to
-other ones, but that just means I didn't deem it relevant to test those modules
-separately.
-
-Component tests differ from integration tests in that they don't specifically
-aim at testing different modules together. It may happen, but it's a happy
-accident, not a goal. Instead, they try to prove that the code properly
-interacts with external dependencies (APIs, DBs, auth servers, etc.).
+Component tests are focused on modules (one at a time) located at the boundary
+of the system, meaning any module that interacts with / depends on an external
+system. They try and prove that one module properly interacts APIs, DBs, auth
+servers, etc.
 
 To make component tests fast, the general idea is to avoid spinning up real
 instances of a database, API, or IAM server. Instead, I prefer to provide
