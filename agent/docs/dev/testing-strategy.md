@@ -41,6 +41,11 @@ Integration tests exercise multiple modules together. The goal is to prove that
 hot paths are OK, specifically when factoring in what could be real production
 external dependencies.
 
+The LLM is a deliberate exception: I stub it even for integration testing. It's
+non-deterministic, which would make these tests flaky for reasons unrelated to
+the behavior under test, and hitting a real model on every run is expensive.
+Only e2e tests will use a "real" LLM API.
+
 ## End-to-end tests
 
 Few e2e tests, basically just proving that hot paths are OK. They spin up real
