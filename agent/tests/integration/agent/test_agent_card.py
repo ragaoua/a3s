@@ -19,7 +19,7 @@ from tests.integration.utils import (
     start_agent_server,
     wait_for_agent_card,
 )
-from tests.utils import get_base_test_config
+from tests.common.config import get_base_test_config
 
 
 @pytest.mark.asyncio

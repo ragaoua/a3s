@@ -2,7 +2,7 @@ import httpx
 import pytest
 from a2a.client import A2AClient
 
-from tests.utils import get_base_test_config
+from tests.common.config import get_base_test_config
 
 from tests.integration.utils import (
     run_single_turn_test,

@@ -14,7 +14,7 @@ from a2a.types import (
     TaskQueryParams,
 )
 
-from tests.component.a2a.conftest import A2aServerFixture
+from tests.common.a2a import A2aServerFixture
 from tests.integration.utils import create_send_message_payload, wait_for_agent_card
 
 
