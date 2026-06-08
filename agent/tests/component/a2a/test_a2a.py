@@ -5,13 +5,10 @@ import httpx
 import pytest
 from a2a.client import A2AClient
 from a2a.types import (
-    GetTaskRequest,
-    GetTaskSuccessResponse,
     MessageSendParams,
     SendMessageRequest,
     SendMessageSuccessResponse,
     Task,
-    TaskQueryParams,
 )
 
 from tests.common.a2a import A2aServerFixture
@@ -55,21 +52,12 @@ async def test_send_message_surfaces_llm_reply_in_task(
         )
         response = await client.send_message(request)
 
-        assert isinstance(response.root, SendMessageSuccessResponse)
-        assert isinstance(response.root.result, Task)
-
-        task = await client.get_task(
-            GetTaskRequest(
-                id=str(uuid4()),
-                params=TaskQueryParams(id=response.root.result.id),
-            )
-        )
-
-    assert isinstance(task.root, GetTaskSuccessResponse)
-    fetched = task.root.result
-    assert fetched.artifacts is not None
-    assert fetched.artifacts[0].parts[0].root.kind == "text"
-    assert fetched.artifacts[0].parts[0].root.text == expected
+    assert isinstance(response.root, SendMessageSuccessResponse)
+    assert isinstance(response.root.result, Task)
+    task = response.root.result
+    assert task.artifacts is not None
+    assert task.artifacts[0].parts[0].root.kind == "text"
+    assert task.artifacts[0].parts[0].root.text == expected
     assert len(a2a_server.mock_llm.requests) == 1
 
 
@@ -98,18 +86,10 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
             ),
         )
         response = await client.send_message(request)
-        assert isinstance(response.root, SendMessageSuccessResponse)
-        assert isinstance(response.root.result, Task)
 
-        task = await client.get_task(
-            GetTaskRequest(
-                id=str(uuid4()),
-                params=TaskQueryParams(id=response.root.result.id),
-            )
-        )
-
-    assert isinstance(task.root, GetTaskSuccessResponse)
-    fetched = task.root.result
+    assert isinstance(response.root, SendMessageSuccessResponse)
+    assert isinstance(response.root.result, Task)
+    fetched = response.root.result
     assert fetched.artifacts is not None
     text_parts = [
         part.root.text
@@ -142,3 +122,6 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
         load_skill_response["instructions"]
         == "Greet the user warmly and ask how their day is going."
     )
+
+
+# TODO: test send_message_streaming too, not just send_message
