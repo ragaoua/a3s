@@ -19,10 +19,7 @@ from src.config.types.auth import (
     OAuthDiscoveredIntrospectionPolicyConfig,
     OAuthDiscoveredJwksPolicyConfig,
 )
-from tests.component.conftest import (
-    SHORT_LIVED_TOKEN_LIFESPAN_SECONDS,
-    IamFixture,
-)
+from tests.component.common.iam import SHORT_LIVED_TOKEN_LIFESPAN_SECONDS, IamFixture
 
 PROTECTED_PATH = "/protected"
 
