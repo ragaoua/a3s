@@ -9,22 +9,24 @@ alive for manual inspection.
 
 from __future__ import annotations
 
-import io
-import socket
-import tarfile
-import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 import docker
-import httpx
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
 from testcontainers.keycloak import KeycloakContainer
 
 from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
+from tests.integration.common.containers_utilities import (
+    build_image,
+    poll_until_ready,
+    reap_leaked_containers,
+    wait_for_port,
+    with_suite_label,
+)
 
 # ----------------------------------------------------------------------------
 # Constants
@@ -139,109 +141,13 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
 
 # ----------------------------------------------------------------------------
-# Container utilities
-# ----------------------------------------------------------------------------
-
-
-def _build_image(*, context_dir: Path, tag: str) -> None:
-    """Build a docker image from `context_dir`.
-
-    Streams the build context as a tar with ownership normalised to 0:0 —
-    rootless podman can't map the host user's UID/GID into the build
-    container's namespace (the host UID falls outside the configured
-    subuid/subgid range), and an unnormalised context blows up with a
-    `lchown invalid argument` error during the build.
-    """
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w") as tar:
-        for entry in sorted(context_dir.rglob("*")):
-            if not entry.is_file():
-                continue
-            arcname = str(entry.relative_to(context_dir))
-            info = tar.gettarinfo(str(entry), arcname=arcname)
-            info.uid = 0
-            info.gid = 0
-            info.uname = ""
-            info.gname = ""
-            with entry.open("rb") as fp:
-                tar.addfile(info, fp)
-    buffer.seek(0)
-
-    client = docker.from_env()
-    stream = client.api.build(  # pyright: ignore[reportUnknownMemberType]
-        fileobj=buffer,
-        custom_context=True,
-        tag=tag,
-        rm=True,
-        decode=True,
-        labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE},
-    )
-    for chunk in stream:
-        if "error" in chunk:
-            raise RuntimeError(f"image build failed for {tag}: {chunk['error']}")
-
-
-def _reap_leaked_containers() -> None:
-    """Kill any containers left over from a previous run of the suite."""
-    client = docker.from_env()
-    for container in client.containers.list(
-        all=True, filters={"label": _CONTAINER_LABEL_FILTER}
-    ):
-        try:
-            container.remove(force=True)
-        except Exception:
-            pass
-
-
-def _with_suite_label(container: DockerContainer) -> DockerContainer:
-    return container.with_kwargs(labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
-
-
-def _poll_until_ready(
-    url: str,
-    *,
-    timeout_seconds: float,
-    description: str,
-) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            response = httpx.get(url, timeout=5.0)
-            if response.status_code == 200:
-                return
-            last_error = RuntimeError(f"GET {url} returned {response.status_code}")
-        except httpx.HTTPError as exc:
-            last_error = exc
-        time.sleep(1.0)
-    raise TimeoutError(
-        f"{description} not ready at {url} after {timeout_seconds:.0f}s"
-    ) from last_error
-
-
-def _wait_for_port(host: str, port: int, *, timeout_seconds: float) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=1.0):
-                return
-        except OSError as exc:
-            last_error = exc
-            time.sleep(0.5)
-    raise TimeoutError(
-        f"{host}:{port} did not start accepting connections within {timeout_seconds:.0f}s"
-    ) from last_error
-
-
-# ----------------------------------------------------------------------------
 # Fixtures
 # ----------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
 def _integration_network() -> Iterator[Network]:  # pyright: ignore[reportUnusedFunction]
-    _reap_leaked_containers()
+    reap_leaked_containers(label=_CONTAINER_LABEL_FILTER)
     network = Network(
         docker_network_kw={"labels": {_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE}}
     )
@@ -269,7 +175,7 @@ class KeycloakFixture:
 @pytest.fixture(scope="session")
 def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
     container = KeycloakContainer()
-    _with_suite_label(container)
+    with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
     container.with_network(_integration_network)
     container.with_network_aliases(_KEYCLOAK_NETWORK_ALIAS)
     # KC_HOSTNAME pins the issuer Keycloak emits so the MCP server (which
@@ -287,7 +193,7 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
         external_issuer = f"{external_base}/realms/{_KEYCLOAK_REALM}"
         discovery_url = f"{external_issuer}/.well-known/openid-configuration"
 
-        _poll_until_ready(
+        poll_until_ready(
             discovery_url, timeout_seconds=120.0, description="Keycloak OIDC discovery"
         )
 
@@ -317,13 +223,14 @@ class McpServerFixture:
 def mcp_server(
     keycloak: KeycloakFixture, _integration_network: Network
 ) -> Iterator[McpServerFixture]:
-    _build_image(
+    build_image(
         context_dir=_MCP_IMAGE_CONTEXT,
         tag=_MCP_IMAGE_TAG,
+        labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE},
     )
 
     container = DockerContainer(_MCP_IMAGE_TAG)
-    _with_suite_label(container)
+    with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
     container.with_network(_integration_network)
     container.with_network_aliases(_MCP_NETWORK_ALIAS)
     container.with_exposed_ports(_MCP_INTERNAL_PORT)
@@ -340,7 +247,7 @@ def mcp_server(
     try:
         host = container.get_container_host_ip()
         port = int(container.get_exposed_port(_MCP_INTERNAL_PORT))
-        _wait_for_port(host, port, timeout_seconds=60.0)
+        wait_for_port(host, port, timeout_seconds=60.0)
 
         external_url = f"http://{host}:{port}/mcp"
         _record_leaked_endpoint("MCP server (external)", external_url)
