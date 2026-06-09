@@ -18,10 +18,10 @@ from src.config.types import (
     ServerConfig,
 )
 from tests.integration.common.keycloak import KeycloakFixture
-from tests.integration.conftest import McpServerFixture
 from tests.common.llm import LlmFixture
 from tests.common.a2a import A2aServerFixture
 from tests.common.config import get_base_test_config
+from tests.integration.common.mcp import McpServerFixture
 
 
 @pytest.fixture

@@ -28,6 +28,7 @@ from tests.integration.common.containers_utilities import (
     with_suite_label,
 )
 from tests.integration.common.keycloak import KeycloakFixture
+from tests.integration.common.mcp import McpServerFixture
 
 # ----------------------------------------------------------------------------
 # Constants
@@ -198,13 +199,6 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
     finally:
         if not _session_state.has_failures:
             container.stop()
-
-
-@dataclass(frozen=True)
-class McpServerFixture:
-    # URL the agent uses to reach the MCP server (host-side).
-    external_url: str
-    audience: str
 
 
 @pytest.fixture(scope="session")
