@@ -15,9 +15,8 @@ from src.config.types import (
 from tests.component.agent.mcp.conftest import (
     ADD_TOOL_NAME,
     ECHO_TOOL_NAME,
-    McpServerFactory,
-    McpServerFixture,
 )
+from tests.component.agent.mcp.fixture import McpServerFactory, McpServerFixture
 from tests.component.conftest import IamFixture
 
 

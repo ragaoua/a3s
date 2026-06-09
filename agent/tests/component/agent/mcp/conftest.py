@@ -1,8 +1,7 @@
 import socket
 import threading
 import time
-from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from collections.abc import Iterator
 
 import pytest
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -10,6 +9,7 @@ import uvicorn
 from mcp.server.fastmcp import FastMCP
 
 from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
+from tests.component.agent.mcp.fixture import McpServerFactory, McpServerFixture
 from tests.component.conftest import IamFixture, build_iam_introspection_guard_app
 
 ECHO_TOOL_NAME = "echo"
@@ -27,18 +27,6 @@ def _clear_outbound_client_credentials_cache() -> Iterator[None]:
     OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()  # pyright: ignore[reportPrivateUsage]
     OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()  # pyright: ignore[reportPrivateUsage]
     yield
-
-
-@dataclass(frozen=True)
-class McpServerFixture:
-    url: str
-    _received_authorization_headers: list[str] = field(default_factory=list)
-
-    def has_received_authorization_header(self):
-        return bool(self._received_authorization_headers)
-
-
-McpServerFactory = Callable[..., McpServerFixture]
 
 
 @pytest.fixture
