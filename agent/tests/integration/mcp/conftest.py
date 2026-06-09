@@ -17,7 +17,8 @@ from src.config.types import (
     OAuthClientCredentialsAuthConfig,
     ServerConfig,
 )
-from tests.integration.conftest import KeycloakFixture, McpServerFixture
+from tests.integration.common.keycloak import KeycloakFixture
+from tests.integration.conftest import McpServerFixture
 from tests.common.llm import LlmFixture
 from tests.common.a2a import A2aServerFixture
 from tests.common.config import get_base_test_config
