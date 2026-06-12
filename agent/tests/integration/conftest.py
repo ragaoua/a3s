@@ -12,6 +12,7 @@ from __future__ import annotations
 import socket
 from collections.abc import Iterator
 from pathlib import Path
+from typing import override
 
 import docker
 import pytest
@@ -42,6 +43,29 @@ from tests.integration.common.subagent import SubagentServerFixture
 _CONTAINER_LABEL_KEY = "a3s-agent-integration-suite"
 _CONTAINER_LABEL_VALUE = "1"
 _CONTAINER_LABEL_FILTER = f"{_CONTAINER_LABEL_KEY}={_CONTAINER_LABEL_VALUE}"
+
+
+class _RobustKeycloakContainer(KeycloakContainer):
+    """KeycloakContainer whose readiness probe tolerates the transient 404s
+    the management interface serves while it's still wiring up `/health`.
+
+    Upstream's `_readiness_probe` GETs `{management}/health/ready` and calls
+    `raise_for_status()` under `@wait_container_is_ready(ConnectionError,
+    ReadTimeout)` — so it only retries connection/timeout failures. Keycloak's
+    Quarkus management listener starts accepting connections *before* the
+    health endpoints are registered, so a probe landing in that window gets a
+    404, which surfaces as an `HTTPError` that the decorator doesn't retry and
+    fails container startup.
+    """
+
+    @override
+    def _readiness_probe(self) -> None:
+        poll_until_ready(
+            f"{self.get_management_url()}/health/ready",
+            timeout_seconds=20.0,
+            description="Keycloak management health",
+        )
+
 
 _KEYCLOAK_CLIENT_ID = (
     "a3s-agent"  # This needs to correspond to the client id configured in the keycloak
@@ -180,7 +204,7 @@ def _integration_network() -> Iterator[Network]:  # pyright: ignore[reportUnused
 
 @pytest.fixture(scope="session")
 def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
-    container = KeycloakContainer()
+    container = _RobustKeycloakContainer()
     with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
     container.with_network(_integration_network)
     container.with_network_aliases(_KEYCLOAK_NETWORK_ALIAS)
