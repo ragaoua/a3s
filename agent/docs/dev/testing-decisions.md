@@ -57,9 +57,6 @@ Tests are grouped by topic:
   about inbound auth behavior (bad token, expired token, missing scope,
   etc.) rather than the downstream call. The other categories exercise
   `auth.inbound` transitively; this one targets it directly.
-- **skills hot paths** — the agent runtime loading and using skills
-  end-to-end (distinct from the skills module's own unit tests, which test
-  skills in isolation rather than the agent's use of them).
 
 The LLM is stubbed even at integration level — it's non-deterministic and
 hitting a real model on every run is expensive (see
