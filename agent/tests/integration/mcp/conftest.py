@@ -43,7 +43,7 @@ def agent_with_client_credentials_mcp(
         ),
         mcp_servers=[
             McpServerConfig(
-                url=Url(mcp_server.external_url),
+                url=Url(mcp_server.url),
                 auth=OAuthClientCredentialsAuthConfig(
                     mode="oauth_client_credentials",
                     token_endpoint=Url(keycloak.token_endpoint_url),

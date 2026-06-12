@@ -236,7 +236,7 @@ def mcp_server(
         external_url = f"http://{host}:{port}/mcp"
         _record_leaked_endpoint("MCP server (external)", external_url)
 
-        yield McpServerFixture(external_url=external_url, audience=_MCP_AUDIENCE)
+        yield McpServerFixture(url=external_url)
     finally:
         if not _session_state.has_failures:
             container.stop()
