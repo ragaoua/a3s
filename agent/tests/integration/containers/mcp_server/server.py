@@ -7,7 +7,7 @@ test suite can point it at the right issuer / audience.
 
 import os
 import time
-from typing import Any
+from typing import override
 
 import httpx
 import jwt
@@ -19,38 +19,22 @@ from pydantic import AnyHttpUrl
 
 ISSUER = os.environ["ISSUER"]
 AUDIENCE = os.environ["AUDIENCE"]
+JWKS_URI = os.environ["JWKS_URI"]
 RESOURCE_SERVER_URL = os.environ["RESOURCE_SERVER_URL"]
 HOST = os.environ.get("HOST", "0.0.0.0")
 PORT = int(os.environ.get("PORT", "3000"))
 
 
 class KeycloakJwtVerifier(TokenVerifier):
-    def __init__(self, *, issuer: str, audience: str) -> None:
-        self._issuer = issuer
-        self._audience = audience
-        self._jwks_client: PyJWKClient | None = None
+    def __init__(self, *, issuer: str, audience: str, jwks_uri: str) -> None:
+        self._issuer: str = issuer
+        self._audience: str = audience
+        self._jwks_client: PyJWKClient = PyJWKClient(jwks_uri, cache_keys=True)
 
-    def _get_jwks_client(self) -> PyJWKClient:
-        if self._jwks_client is None:
-            jwks_uri = self._discover_jwks_uri()
-            self._jwks_client = PyJWKClient(jwks_uri, cache_keys=True)
-        return self._jwks_client
-
-    def _discover_jwks_uri(self) -> str:
-        discovery_url = self._issuer.rstrip("/") + "/.well-known/openid-configuration"
-        response = httpx.get(discovery_url, timeout=10.0)
-        response.raise_for_status()
-        payload: dict[str, Any] = response.json()
-        jwks_uri = payload.get("jwks_uri")
-        if not isinstance(jwks_uri, str):
-            raise RuntimeError(
-                f"OIDC discovery at {discovery_url} did not return a jwks_uri"
-            )
-        return jwks_uri
-
+    @override
     async def verify_token(self, token: str) -> AccessToken | None:
         try:
-            signing_key = self._get_jwks_client().get_signing_key_from_jwt(token)
+            signing_key = self._jwks_client.get_signing_key_from_jwt(token)
             payload = jwt.decode(
                 token,
                 signing_key.key,
@@ -97,7 +81,7 @@ def _wait_for_issuer_ready(issuer: str, *, timeout_seconds: float = 60.0) -> Non
 def build_app() -> FastMCP:
     _wait_for_issuer_ready(ISSUER)
 
-    verifier = KeycloakJwtVerifier(issuer=ISSUER, audience=AUDIENCE)
+    verifier = KeycloakJwtVerifier(issuer=ISSUER, audience=AUDIENCE, jwks_uri=JWKS_URI)
     auth_settings = AuthSettings(
         issuer_url=AnyHttpUrl(ISSUER),
         resource_server_url=AnyHttpUrl(RESOURCE_SERVER_URL),

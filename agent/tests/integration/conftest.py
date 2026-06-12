@@ -10,7 +10,6 @@ alive for manual inspection.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 from pathlib import Path
 
 import docker
@@ -202,7 +201,8 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
 
 @pytest.fixture(scope="session")
 def mcp_server(
-    keycloak: KeycloakFixture, _integration_network: Network
+    keycloak: KeycloakFixture,
+    _integration_network: Network,
 ) -> Iterator[McpServerFixture]:
     build_image(
         context_dir=_MCP_IMAGE_CONTEXT,
@@ -217,6 +217,9 @@ def mcp_server(
     container.with_exposed_ports(_MCP_INTERNAL_PORT)
     container.with_env("ISSUER", keycloak.internal_issuer_url)
     container.with_env("AUDIENCE", _MCP_AUDIENCE)
+    container.with_env(
+        "JWKS_URI", f"{keycloak.internal_issuer_url}/protocol/openid-connect/certs"
+    )
     container.with_env(
         "RESOURCE_SERVER_URL",
         f"http://{_MCP_NETWORK_ALIAS}:{_MCP_INTERNAL_PORT}/",
