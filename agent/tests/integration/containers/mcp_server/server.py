@@ -27,6 +27,7 @@ PORT = int(os.environ.get("PORT", "3000"))
 
 class KeycloakJwtVerifier(TokenVerifier):
     def __init__(self, *, issuer: str, audience: str, jwks_uri: str) -> None:
+        super().__init__()
         self._issuer: str = issuer
         self._audience: str = audience
         self._jwks_client: PyJWKClient = PyJWKClient(jwks_uri, cache_keys=True)
