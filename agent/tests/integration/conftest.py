@@ -9,6 +9,7 @@ alive for manual inspection.
 
 from __future__ import annotations
 
+import socket
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from tests.integration.common.containers_utilities import (
 )
 from tests.integration.common.keycloak import KeycloakFixture
 from tests.integration.common.mcp import McpServerFixture
+from tests.integration.common.subagent import SubagentServerFixture
 
 # ----------------------------------------------------------------------------
 # Constants
@@ -61,9 +63,16 @@ _MCP_AUDIENCE = (
 )
 _MCP_IMAGE_TAG = "a3s-agent-test-mcp:latest"
 
+_SUBAGENT_NETWORK_ALIAS = "subagent"
+_SUBAGENT_INTERNAL_PORT = 3000
+_SUBAGENT_AUDIENCE = "a3s-subagent"  # This needs to correspond to the audience configured in the keycloak
+_SUBAGENT_IMAGE_TAG = "a3s-agent-test-subagent:latest"
+_SUBAGENT_RESPONSE_TEXT = "Subagent acknowledged the request."
+
 _CONTAINERS_DIR = Path(__file__).parent / "containers"
 _KEYCLOAK_REALM_FILE = _CONTAINERS_DIR / "keycloak" / "realm.json"
 _MCP_IMAGE_CONTEXT = _CONTAINERS_DIR / "mcp_server"
+_SUBAGENT_IMAGE_CONTEXT = _CONTAINERS_DIR / "subagent_server"
 
 
 # ----------------------------------------------------------------------------
@@ -246,6 +255,62 @@ def mcp_server(
         _record_leaked_endpoint("MCP server (external)", external_url)
 
         yield McpServerFixture(url=external_url)
+    finally:
+        if not _session_state.has_failures:
+            container.stop()
+
+
+@pytest.fixture(scope="session")
+def subagent_server(
+    keycloak: KeycloakFixture,
+    _integration_network: Network,
+) -> Iterator[SubagentServerFixture]:
+    build_image(
+        context_dir=_SUBAGENT_IMAGE_CONTEXT,
+        tag=_SUBAGENT_IMAGE_TAG,
+        labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE},
+    )
+
+    # The subagent embeds its own URL in the AgentCard. Pointing it at the
+    # in-network alias is fine — the parent agent only reaches it from the
+    # host side, but it dereferences the URL in the card to issue requests,
+    # so a network-internal address would break the client. We pre-bind a
+    # host port and feed it back in via PUBLIC_URL.
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        host_port: int = s.getsockname()[1]
+
+    container = DockerContainer(_SUBAGENT_IMAGE_TAG)
+    with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
+    container.with_network(_integration_network)
+    container.with_network_aliases(_SUBAGENT_NETWORK_ALIAS)
+    container.with_bind_ports(_SUBAGENT_INTERNAL_PORT, host_port)
+    container.with_env("ISSUER", keycloak.internal_issuer_url)
+    container.with_env("AUDIENCE", _SUBAGENT_AUDIENCE)
+    container.with_env(
+        "JWKS_URI", f"{keycloak.internal_issuer_url}/protocol/openid-connect/certs"
+    )
+    container.with_env("PORT", str(_SUBAGENT_INTERNAL_PORT))
+    container.with_env("HOST", "0.0.0.0")
+    container.with_env("PUBLIC_URL", f"http://127.0.0.1:{host_port}")
+    container.with_env("RESPONSE_TEXT", _SUBAGENT_RESPONSE_TEXT)
+
+    container.start()
+    try:
+        # Poll the agent card endpoint, not just port-open: with `with_bind_ports`
+        # Podman's userland proxy starts listening on the host port immediately,
+        # before the container's Python process is up. A port-open check would
+        # race and pass too early.
+        external_url = f"http://127.0.0.1:{host_port}"
+        poll_until_ready(
+            f"{external_url}/.well-known/agent-card.json",
+            timeout_seconds=60.0,
+            description="subagent agent card",
+        )
+
+        _record_leaked_endpoint("Subagent server (external)", external_url)
+
+        yield SubagentServerFixture(url=external_url)
     finally:
         if not _session_state.has_failures:
             container.stop()

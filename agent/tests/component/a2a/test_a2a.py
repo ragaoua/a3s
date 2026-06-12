@@ -1,4 +1,3 @@
-from typing import Any
 from uuid import uuid4
 
 import httpx
@@ -11,19 +10,8 @@ from a2a.types import (
     Task,
 )
 
-from tests.common.a2a import A2aServerFixture
+from tests.common.a2a import A2aServerFixture, get_adk_data_parts
 from tests.integration.utils import create_send_message_payload, wait_for_agent_card
-
-
-def _adk_data_parts(task: Task, adk_type: str) -> list[dict[str, Any]]:
-    return [
-        part.root.data  # pyright: ignore[reportUnknownMemberType]
-        for artifact in (task.artifacts or [])
-        for part in artifact.parts
-        if part.root.kind == "data"
-        and part.root.metadata is not None
-        and part.root.metadata.get("adk_type") == adk_type
-    ]
 
 
 @pytest.mark.asyncio
@@ -99,8 +87,8 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
     ]
     assert "Greetings from Cody!" in text_parts
 
-    function_calls = _adk_data_parts(fetched, "function_call")
-    function_responses = _adk_data_parts(fetched, "function_response")
+    function_calls = get_adk_data_parts(fetched, "function_call")
+    function_responses = get_adk_data_parts(fetched, "function_response")
 
     list_skills_call = next(c for c in function_calls if c["name"] == "list_skills")
     assert list_skills_call["args"] == {}
