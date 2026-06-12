@@ -231,6 +231,8 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
         yield KeycloakFixture(
             internal_issuer_url=_KEYCLOAK_ISSUER_INTERNAL,
             token_endpoint_url=f"{external_issuer}/protocol/openid-connect/token",
+            external_jwks_url=f"{external_issuer}/protocol/openid-connect/certs",
+            external_introspection_url=f"{external_issuer}/protocol/openid-connect/token/introspect",
             confidential_client_id=_KEYCLOAK_CLIENT_ID,
             confidential_client_secret=_KEYCLOAK_CLIENT_SECRET,
         )
