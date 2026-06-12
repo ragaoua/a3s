@@ -41,6 +41,13 @@ _CONTAINER_LABEL_KEY = "a3s-agent-integration-suite"
 _CONTAINER_LABEL_VALUE = "1"
 _CONTAINER_LABEL_FILTER = f"{_CONTAINER_LABEL_KEY}={_CONTAINER_LABEL_VALUE}"
 
+_KEYCLOAK_CLIENT_ID = (
+    "a3s-agent"  # This needs to correspond to the client id configured in the keycloak
+)
+
+
+_KEYCLOAK_CLIENT_SECRET = "a3s-agent-secret"  # This needs to correspond to the client secret configured in the keycloak
+
 _KEYCLOAK_REALM = "a3s-realm"
 _KEYCLOAK_NETWORK_ALIAS = "keycloak"
 _KEYCLOAK_INTERNAL_PORT = 8080
@@ -49,7 +56,9 @@ _KEYCLOAK_ISSUER_INTERNAL = f"{_KEYCLOAK_INTERNAL_URL}/realms/{_KEYCLOAK_REALM}"
 
 _MCP_NETWORK_ALIAS = "mcp"
 _MCP_INTERNAL_PORT = 3000
-_MCP_AUDIENCE = "a3s-mcp"
+_MCP_AUDIENCE = (
+    "a3s-mcp"  # This needs to correspond to the audience configured in the keycloak
+)
 _MCP_IMAGE_TAG = "a3s-agent-test-mcp:latest"
 
 _CONTAINERS_DIR = Path(__file__).parent / "containers"
@@ -191,8 +200,8 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
             realm=_KEYCLOAK_REALM,
             internal_issuer_url=_KEYCLOAK_ISSUER_INTERNAL,
             token_endpoint_url=f"{external_issuer}/protocol/openid-connect/token",
-            confidential_client_id="a3s-agent",
-            confidential_client_secret="a3s-agent-secret",
+            confidential_client_id=_KEYCLOAK_CLIENT_ID,
+            confidential_client_secret=_KEYCLOAK_CLIENT_SECRET,
         )
     finally:
         if not _session_state.has_failures:
