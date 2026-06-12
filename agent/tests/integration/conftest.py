@@ -190,7 +190,6 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
 
         yield KeycloakFixture(
             realm=_KEYCLOAK_REALM,
-            external_issuer_url=external_issuer,
             internal_issuer_url=_KEYCLOAK_ISSUER_INTERNAL,
             token_endpoint_url=f"{external_issuer}/protocol/openid-connect/token",
             confidential_client_id="a3s-agent",
