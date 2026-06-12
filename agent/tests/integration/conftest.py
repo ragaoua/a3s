@@ -206,7 +206,6 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
         _record_leaked_endpoint("Keycloak (external)", external_base)
 
         yield KeycloakFixture(
-            realm=_KEYCLOAK_REALM,
             internal_issuer_url=_KEYCLOAK_ISSUER_INTERNAL,
             token_endpoint_url=f"{external_issuer}/protocol/openid-connect/token",
             confidential_client_id=_KEYCLOAK_CLIENT_ID,
