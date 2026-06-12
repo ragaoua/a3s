@@ -25,7 +25,6 @@ from tests.integration.common.containers_utilities import (
     build_image,
     poll_until_ready,
     reap_leaked_containers,
-    wait_for_port,
     with_suite_label,
 )
 from tests.integration.common.keycloak import KeycloakFixture
@@ -62,7 +61,7 @@ class _RobustKeycloakContainer(KeycloakContainer):
     def _readiness_probe(self) -> None:
         poll_until_ready(
             f"{self.get_management_url()}/health/ready",
-            timeout_seconds=20.0,
+            timeout_seconds=60.0,
             description="Keycloak management health",
         )
 
@@ -224,7 +223,7 @@ def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
         discovery_url = f"{external_issuer}/.well-known/openid-configuration"
 
         poll_until_ready(
-            discovery_url, timeout_seconds=120.0, description="Keycloak OIDC discovery"
+            discovery_url, timeout_seconds=60.0, description="Keycloak OIDC discovery"
         )
 
         _record_leaked_endpoint("Keycloak (external)", external_base)
@@ -272,11 +271,14 @@ def mcp_server(
     try:
         host = container.get_container_host_ip()
         port = int(container.get_exposed_port(_MCP_INTERNAL_PORT))
-        wait_for_port(host, port, timeout_seconds=60.0)
-
         external_url = f"http://{host}:{port}/mcp"
         _record_leaked_endpoint("MCP server (external)", external_url)
 
+        poll_until_ready(
+            f"http://{host}:{port}/.well-known/oauth-protected-resource",
+            timeout_seconds=60.0,
+            description="MCP server protected-resource metadata",
+        )
         yield McpServerFixture(url=external_url)
     finally:
         if not _session_state.has_failures:

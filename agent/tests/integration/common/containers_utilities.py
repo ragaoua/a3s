@@ -1,5 +1,4 @@
 import io
-import socket
 import tarfile
 import time
 from pathlib import Path
@@ -82,19 +81,4 @@ def poll_until_ready(
         time.sleep(1.0)
     raise TimeoutError(
         f"{description} not ready at {url} after {timeout_seconds:.0f}s"
-    ) from last_error
-
-
-def wait_for_port(host: str, port: int, *, timeout_seconds: float) -> None:
-    deadline = time.monotonic() + timeout_seconds
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=1.0):
-                return
-        except OSError as exc:
-            last_error = exc
-            time.sleep(0.5)
-    raise TimeoutError(
-        f"{host}:{port} did not start accepting connections within {timeout_seconds:.0f}s"
     ) from last_error
