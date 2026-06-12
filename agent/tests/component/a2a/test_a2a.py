@@ -1,32 +1,17 @@
-from typing import Any
 from uuid import uuid4
 
 import httpx
 import pytest
 from a2a.client import A2AClient
 from a2a.types import (
-    GetTaskRequest,
-    GetTaskSuccessResponse,
     MessageSendParams,
     SendMessageRequest,
     SendMessageSuccessResponse,
     Task,
-    TaskQueryParams,
 )
 
-from tests.component.a2a.conftest import A2aServerFixture
+from tests.common.a2a import A2aServerFixture, get_adk_data_parts
 from tests.integration.utils import create_send_message_payload, wait_for_agent_card
-
-
-def _adk_data_parts(task: Task, adk_type: str) -> list[dict[str, Any]]:
-    return [
-        part.root.data  # pyright: ignore[reportUnknownMemberType]
-        for artifact in (task.artifacts or [])
-        for part in artifact.parts
-        if part.root.kind == "data"
-        and part.root.metadata is not None
-        and part.root.metadata.get("adk_type") == adk_type
-    ]
 
 
 @pytest.mark.asyncio
@@ -55,21 +40,12 @@ async def test_send_message_surfaces_llm_reply_in_task(
         )
         response = await client.send_message(request)
 
-        assert isinstance(response.root, SendMessageSuccessResponse)
-        assert isinstance(response.root.result, Task)
-
-        task = await client.get_task(
-            GetTaskRequest(
-                id=str(uuid4()),
-                params=TaskQueryParams(id=response.root.result.id),
-            )
-        )
-
-    assert isinstance(task.root, GetTaskSuccessResponse)
-    fetched = task.root.result
-    assert fetched.artifacts is not None
-    assert fetched.artifacts[0].parts[0].root.kind == "text"
-    assert fetched.artifacts[0].parts[0].root.text == expected
+    assert isinstance(response.root, SendMessageSuccessResponse)
+    assert isinstance(response.root.result, Task)
+    task = response.root.result
+    assert task.artifacts is not None
+    assert task.artifacts[0].parts[0].root.kind == "text"
+    assert task.artifacts[0].parts[0].root.text == expected
     assert len(a2a_server.mock_llm.requests) == 1
 
 
@@ -98,18 +74,10 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
             ),
         )
         response = await client.send_message(request)
-        assert isinstance(response.root, SendMessageSuccessResponse)
-        assert isinstance(response.root.result, Task)
 
-        task = await client.get_task(
-            GetTaskRequest(
-                id=str(uuid4()),
-                params=TaskQueryParams(id=response.root.result.id),
-            )
-        )
-
-    assert isinstance(task.root, GetTaskSuccessResponse)
-    fetched = task.root.result
+    assert isinstance(response.root, SendMessageSuccessResponse)
+    assert isinstance(response.root.result, Task)
+    fetched = response.root.result
     assert fetched.artifacts is not None
     text_parts = [
         part.root.text
@@ -119,8 +87,8 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
     ]
     assert "Greetings from Cody!" in text_parts
 
-    function_calls = _adk_data_parts(fetched, "function_call")
-    function_responses = _adk_data_parts(fetched, "function_response")
+    function_calls = get_adk_data_parts(fetched, "function_call")
+    function_responses = get_adk_data_parts(fetched, "function_response")
 
     list_skills_call = next(c for c in function_calls if c["name"] == "list_skills")
     assert list_skills_call["args"] == {}
@@ -142,3 +110,6 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
         load_skill_response["instructions"]
         == "Greet the user warmly and ask how their day is going."
     )
+
+
+# TODO: test send_message_streaming too, not just send_message

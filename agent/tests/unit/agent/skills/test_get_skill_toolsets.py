@@ -4,7 +4,7 @@ from google.adk.skills import Skill
 from google.adk.tools.skill_toolset import SkillToolset
 
 from src.agent.skills import get_skill_toolsets
-from tests.utils import write_skill
+from tests.common.config import write_skill
 
 
 def _get_registered_skills(toolset: SkillToolset) -> dict[str, Skill]:

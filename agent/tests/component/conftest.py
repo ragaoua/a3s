@@ -1,70 +1,16 @@
 import os
-import time
-import uuid
 from collections.abc import Iterator
-from dataclasses import dataclass
 
 import httpx
-from pydantic import JsonValue
 import pytest
-from authlib.jose import jwt
-from canaille.core.models import User  # pyright: ignore[reportMissingTypeStubs]
 from canaille.oidc.basemodels import Client  # pyright: ignore[reportMissingTypeStubs]
 from pytest_iam import Server  # pyright: ignore[reportMissingTypeStubs]
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-CONFIDENTIAL_CLIENT_ID = "a3s-test-client"
-CONFIDENTIAL_CLIENT_SECRET = "a3s-test-secret"
-SHORT_LIVED_TOKEN_LIFESPAN_SECONDS = 1
+from tests.component.common.iam import IamFixture
 
-
-@dataclass(frozen=True)
-class IamFixture:
-    base_url: str
-    issuer_url: str
-    jwks_url: str
-    confidential_client_id: str
-    confidential_client_secret: str
-    _server: Server
-    _client: Client
-    _user: User
-    _jwk: dict[str, JsonValue]
-
-    def mint_access_token(
-        self,
-        *,
-        lifetime_seconds: int = 3600,
-    ) -> str:
-        now = int(time.time())
-        header = {"alg": "RS256", "kid": self._jwk["kid"]}
-        payload = {
-            "iss": self.issuer_url,
-            "sub": self._user.user_name,
-            "aud": self.confidential_client_id,
-            "exp": now + lifetime_seconds,
-            "iat": now,
-            "jti": str(uuid.uuid4()),
-            "client_id": self.confidential_client_id,
-            "scope": "openid",
-        }
-        encoded = jwt.encode(header, payload, self._jwk)  # pyright: ignore[reportUnknownMemberType]
-        token_str = encoded.decode("ascii")
-
-        # Persist the token so the introspection endpoint recognises it.
-        with self._server.app.app_context():
-            _ = self._server.random_token(  # pyright: ignore[reportUnknownMemberType]
-                subject=self._user,
-                client=self._client,
-                access_token=token_str,
-                lifetime=lifetime_seconds,
-            )
-
-        return token_str
-
-    def mint_short_lived_access_token(self) -> str:
-        return self.mint_access_token(
-            lifetime_seconds=SHORT_LIVED_TOKEN_LIFESPAN_SECONDS,
-        )
+_CONFIDENTIAL_CLIENT_ID = "a3s-test-client"
+_CONFIDENTIAL_CLIENT_SECRET = "a3s-test-secret"
 
 
 @pytest.fixture(scope="session")
@@ -80,8 +26,8 @@ def iam(iam_server: Server) -> Iterator[IamFixture]:
     _ = os.environ.pop("AUTHLIB_INSECURE_TRANSPORT", None)
     with iam_server.app.app_context():
         client: Client = iam_server.models.Client(  # pyright: ignore[reportAny]
-            client_id=CONFIDENTIAL_CLIENT_ID,
-            client_secret=CONFIDENTIAL_CLIENT_SECRET,
+            client_id=_CONFIDENTIAL_CLIENT_ID,
+            client_secret=_CONFIDENTIAL_CLIENT_SECRET,
             client_name="a3s-test",
             grant_types=["client_credentials"],
             response_types=["token"],
@@ -101,8 +47,8 @@ def iam(iam_server: Server) -> Iterator[IamFixture]:
         base_url=base_url,
         issuer_url=base_url,
         jwks_url=f"{base_url}/oauth/jwks.json",
-        confidential_client_id=CONFIDENTIAL_CLIENT_ID,
-        confidential_client_secret=CONFIDENTIAL_CLIENT_SECRET,
+        confidential_client_id=_CONFIDENTIAL_CLIENT_ID,
+        confidential_client_secret=_CONFIDENTIAL_CLIENT_SECRET,
         _server=iam_server,
         _client=client,
         _user=user,
