@@ -241,6 +241,22 @@ not on response content; they exist to catch breakage in the engine glue
 that no other test layer exercises. Without the env vars set, every test in
 the suite skips.
 
+The `test_container_round_trip` test runs the agent inside a container, so a
+local LLM listening on `127.0.0.1` won't be reachable by default. Use
+`A3S_E2E_CONTAINER_NETWORK` to set a name for the network that the local LLM
+runs on, so that the test agent runs on it too.
+If the network already exists (which it should), the tests won't recreate it
+nor remove it after it's done. If it doesn't exist, it will be created and
+cleaned up after the test is finished
+
+If running the LLM in a container inside the same network, make sure to set
+the LLM API base URL to the network's internal address for the LLM API (which
+is probabaly `http://<container_name>:<port>`). Also, that means one can't run
+both `test_local_round_trip` and `test_container_round_trip` together because
+one accesses the local LLM from outside a container and the other from within,
+which means they need to access it via 2 different entrypoints (e.g `localhost`
+for the first one and `<container_name>` for the second).
+
 ## MCP configuration
 
 Define the MCP servers an agent has access to with `mcp_servers` as a YAML list

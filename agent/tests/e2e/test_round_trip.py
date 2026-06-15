@@ -27,12 +27,10 @@ from a2a.types import (
 from tests.common.a2a import create_send_message_payload, wait_for_agent_card
 from tests.common.containers_utilities import poll_until_ready
 from tests.common.keycloak import KeycloakFixture
+from tests.e2e.conftest import AgentContainer
+from tests.e2e.utils import PROJECT_DIR, make_agent_config
 
 pytestmark = pytest.mark.e2e
-
-# tests/e2e/test_round_trip.py → agent/. The agent dir is what `uv run`
-# needs as its cwd so it picks up the project's pyproject.toml.
-_PROJECT_DIR = Path(__file__).resolve().parents[2]
 
 
 def _fetch_bearer_token(keycloak: KeycloakFixture) -> str:
@@ -50,49 +48,6 @@ def _fetch_bearer_token(keycloak: KeycloakFixture) -> str:
     return response.json()["access_token"]
 
 
-def _make_config(
-    *,
-    path: Path,
-    listen_address: str,
-    listen_port: int,
-    issuer_url: str,
-    jwks_url: str,
-) -> Path:
-    """Write a minimal `agent.yaml` referencing the A3S_LLM_* env vars and
-    configuring OAuth2 inbound auth. No MCP, no subagents, no skills.
-    """
-    config_path = path / "agent.yaml"
-    config_path.write_text(
-        f"""\
-llm:
-  api_url: ${{A3S_LLM_API_URL}}
-  api_key: ${{A3S_LLM_API_KEY}}
-  model: ${{A3S_LLM_MODEL}}
-
-agent:
-  name: E2EAgent
-  description: e2e-test agent
-  instructions: |
-    You are an e2e-test agent. Respond briefly to the user's message.
-
-server:
-  listen_address: {listen_address}
-  listen_port: {listen_port}
-
-auth:
-  mode: oauth2
-  issuer_url: {issuer_url}
-  policies:
-    jwt:
-      jwks:
-        discovered: false
-        url: {jwks_url}""",
-        encoding="utf-8",
-    )
-
-    return config_path
-
-
 async def _send_and_assert_text(
     *,
     base_url: str,
@@ -102,7 +57,7 @@ async def _send_and_assert_text(
 ):
     """Fetch the agent card, send `prompt` over A2A with the bearer token, and
     assert at least one non-empty text part comes back within `timeout`
-    seconds. Returns the concatenated text for inspection."""
+    seconds."""
     async with httpx.AsyncClient(
         timeout=httpx.Timeout(timeout, connect=5)
     ) as httpx_client:
@@ -149,7 +104,7 @@ async def test_local_round_trip(
         s.bind((listen_address, 0))
         port: int = s.getsockname()[1]
 
-    config_path = _make_config(
+    config_path = make_agent_config(
         path=tmp_path,
         listen_address=listen_address,
         listen_port=port,
@@ -166,7 +121,7 @@ async def test_local_round_trip(
 
     proc = subprocess.Popen(
         ["uv", "run", "a3s-agent"],
-        cwd=str(_PROJECT_DIR),
+        cwd=str(PROJECT_DIR),
         env=env,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -209,4 +164,32 @@ async def test_local_round_trip(
             f"local e2e round-trip failed: {exc}\n"
             f"--- agent stdout ---\n{stdout}"
             f"--- agent stderr ---\n{stderr}"
+        ) from exc
+
+
+@pytest.mark.asyncio
+async def test_container_round_trip(
+    agent_container: AgentContainer,
+    keycloak: KeycloakFixture,
+) -> None:
+    """Drive an A2A round trip against the agent running in its docker
+    container. The `agent_container` fixture builds the image, starts the
+    container on the e2e network with OAuth2 wired to Keycloak, waits for
+    the agent card, and tears the container down at end-of-test."""
+    token = _fetch_bearer_token(keycloak)
+    try:
+        await _send_and_assert_text(
+            base_url=agent_container.base_url,
+            prompt="say hi",
+            token=token,
+            timeout=60.0,
+        )
+    except BaseException as exc:
+        stdout, stderr = agent_container.container.get_logs()
+        raise AssertionError(
+            f"containerised e2e round-trip failed: {exc}\n"
+            f"--- agent stdout ---\n"
+            f"{stdout.decode('utf-8', errors='replace')}"
+            f"--- agent stderr ---\n"
+            f"{stderr.decode('utf-8', errors='replace')}"
         ) from exc

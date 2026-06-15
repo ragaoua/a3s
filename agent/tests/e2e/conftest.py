@@ -9,19 +9,44 @@ if any of the env vars are missing, every test in the suite skips.
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import Iterator
+from dataclasses import dataclass
+from pathlib import Path
 
+import docker
 import pytest
+from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
 
-from tests.common.containers_utilities import reap_leaked_containers
+from tests.common.containers_utilities import (
+    build_image,
+    poll_until_ready,
+    reap_leaked_containers,
+    with_suite_label,
+)
 from tests.common.keycloak import KeycloakFixture, build_keycloak_container
+from tests.e2e.utils import PROJECT_DIR, make_agent_config
 
 _CONTAINER_LABEL_KEY = "a3s-agent-e2e-suite"
 _CONTAINER_LABEL_VALUE = "1"
 _CONTAINER_LABEL_FILTER = f"{_CONTAINER_LABEL_KEY}={_CONTAINER_LABEL_VALUE}"
 
 _LLM_ENV_VAR_NAMES = ("A3S_LLM_API_URL", "A3S_LLM_API_KEY", "A3S_LLM_MODEL")
+
+_AGENT_IMAGE_TAG = "a3s-agent-e2e:latest"
+
+_CONTAINER_NETWORK_ENV_VAR_NAME = "A3S_E2E_CONTAINER_NETWORK"
+
+
+@dataclass(frozen=True)
+class AgentContainer:
+    """A running e2e agent container with OAuth2 inbound auth wired to the
+    suite Keycloak. `base_url` is host-reachable; `container` is exposed so a
+    failing test can dump its logs."""
+
+    base_url: str
+    container: DockerContainer
 
 
 @pytest.fixture(scope="session")
@@ -49,7 +74,7 @@ def e2e_llm_env() -> dict[str, str]:
 
 
 @pytest.fixture(scope="session")
-def _e2e_network() -> Iterator[Network]:  # pyright: ignore[reportUnusedFunction]
+def _e2e_network() -> Iterator[Network]:
     """Docker network the e2e suite's Keycloak runs on.
 
     Labelled so leaked containers from a killed run get reaped at the start
@@ -58,11 +83,28 @@ def _e2e_network() -> Iterator[Network]:  # pyright: ignore[reportUnusedFunction
     cheap to rerun manually.
     """
     reap_leaked_containers(label=_CONTAINER_LABEL_FILTER)
+
     network = Network(
         docker_network_kw={"labels": {_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE}}
     )
+
+    network_name = existing_name = os.environ.get(
+        _CONTAINER_NETWORK_ENV_VAR_NAME, ""
+    ).strip()
+
+    if network_name:
+        network.name = network_name
+
+        existing = docker.from_env().networks.list(names=[network_name])
+        if existing:
+            network._network = existing[0]  # pyright: ignore[reportPrivateUsage]
+            yield network
+            return
+
+    network.create()
+
     try:
-        yield network.create()
+        yield network
     finally:
         network.remove()
 
@@ -77,5 +119,57 @@ def keycloak(_e2e_network: Network) -> Iterator[KeycloakFixture]:
     )
     try:
         yield fixture
+    finally:
+        container.stop()
+
+
+@pytest.fixture
+def agent_container(
+    _e2e_network: Network,
+    e2e_llm_env: dict[str, str],
+    keycloak: KeycloakFixture,
+    tmp_path: Path,
+) -> Iterator[AgentContainer]:
+    """Run the agent image on the e2e docker network with OAuth2 inbound
+    auth pointing at the suite Keycloak, and wait for its agent card before
+    yielding. Container is torn down at end-of-test."""
+    # Pre-bind a host port and use it as the container's listen port too:
+    # the agent inside the container binds 0.0.0.0:port and the host port
+    # maps to the same number, so the YAML and host-side requests agree.
+    build_image(
+        context_dir=PROJECT_DIR,
+        tag=_AGENT_IMAGE_TAG,
+        labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE},
+    )
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port: int = s.getsockname()[1]
+
+    config_path = make_agent_config(
+        path=tmp_path,
+        listen_address="0.0.0.0",
+        listen_port=port,
+        issuer_url=keycloak.internal_issuer_url,
+        jwks_url=f"{keycloak.internal_issuer_url}/protocol/openid-connect/certs",
+    )
+
+    container = DockerContainer(_AGENT_IMAGE_TAG)
+    with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
+    container.with_network(_e2e_network)
+    container.with_bind_ports(port, port)
+    container.with_volume_mapping(str(config_path), "/app/config/agent.yaml", mode="ro")
+    for name, value in e2e_llm_env.items():
+        container.with_env(name, value)
+
+    container.start()
+    try:
+        base_url = f"http://127.0.0.1:{port}"
+        poll_until_ready(
+            f"{base_url}/.well-known/agent-card.json",
+            timeout_seconds=60.0,
+            description="containerised agent card",
+        )
+        yield AgentContainer(base_url=base_url, container=container)
     finally:
         container.stop()
