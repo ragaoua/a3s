@@ -1,24 +1,11 @@
 import asyncio
 import json
-import threading
 import time
 from typing import Any
 from uuid import uuid4
 
 import httpx
-from a2a.client import A2ACardResolver, A2AClient
-from a2a.types import (
-    GetTaskRequest,
-    GetTaskResponse,
-    MessageSendParams,
-    SendMessageRequest,
-    SendMessageResponse,
-    SendMessageSuccessResponse,
-    Task,
-    TaskQueryParams,
-)
-
-from src.config import Config
+from a2a.client import A2ACardResolver
 
 
 async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
@@ -39,15 +26,6 @@ async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
     raise TimeoutError(
         f"Agent card not available at {base_url} after {STARTUP_TIMEOUT_SECONDS}s"
     ) from last_error
-
-
-def start_agent_server(config: Config):
-    from src.a2a import build_a2a_server
-
-    server = build_a2a_server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    return server, thread
 
 
 def create_send_message_payload(
@@ -81,31 +59,3 @@ def print_json_response(response: Any, description: str) -> None:
         pretty_print_json(response.root.model_dump_json(exclude_none=True))
     else:
         pretty_print_json(response.model_dump(mode="json", exclude_none=True))
-
-
-async def run_single_turn_test(client: A2AClient) -> None:
-    """Runs a single-turn non-streaming test."""
-
-    send_message_payload = create_send_message_payload(
-        text="Write a simple python cli to compute a 2-operator math operation"
-    )
-    request = SendMessageRequest(
-        id=str(uuid4()), params=MessageSendParams(**send_message_payload)
-    )
-
-    print("--- ✉️  Single Turn Request ---")
-    # Send Message
-    response: SendMessageResponse = await client.send_message(request)
-    print_json_response(response, "📥 Single Turn Request Response")
-    if not isinstance(response.root, SendMessageSuccessResponse):
-        raise RuntimeError("received non-success response")
-
-    if not isinstance(response.root.result, Task):
-        raise RuntimeError("received non-task response")
-
-    task_id: str = response.root.result.id
-    print("--- ❔ Query Task ---")
-    # query the task
-    get_request = GetTaskRequest(id=str(uuid4()), params=TaskQueryParams(id=task_id))
-    get_response: GetTaskResponse = await client.get_task(get_request)
-    print_json_response(get_response, "📥 Query Task Response")
