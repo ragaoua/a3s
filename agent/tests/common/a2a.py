@@ -1,6 +1,11 @@
+import asyncio
+import time
 from dataclasses import dataclass
 from typing import Any
+from uuid import uuid4
 
+import httpx
+from a2a.client import A2ACardResolver
 from a2a.types import Task
 
 from tests.common.llm import LlmFixture
@@ -21,3 +26,43 @@ def get_adk_data_parts(task: Task, adk_type: str) -> list[dict[str, Any]]:
         and part.root.metadata is not None
         and part.root.metadata.get("adk_type") == adk_type
     ]
+
+
+async def wait_for_agent_card(base_url: str, httpx_client: httpx.AsyncClient):
+    STARTUP_TIMEOUT_SECONDS = 10
+    RETRY_DELAY_SECONDS = 1
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
+    last_error: Exception | None = None
+
+    resolver = A2ACardResolver(httpx_client, base_url)
+    while time.monotonic() < deadline:
+        try:
+            agent_card = await resolver.get_agent_card()
+            return agent_card
+        except Exception as exc:  # pragma: no cover - exercised on startup delay
+            last_error = exc
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+
+    raise TimeoutError(
+        f"Agent card not available at {base_url} after {STARTUP_TIMEOUT_SECONDS}s"
+    ) from last_error
+
+
+def create_send_message_payload(
+    text: str, task_id: str | None = None, context_id: str | None = None
+) -> dict[str, Any]:
+    """Helper function to create the payload for sending a message."""
+    payload: dict[str, Any] = {
+        "message": {
+            "role": "user",
+            "parts": [{"kind": "text", "text": text}],
+            "messageId": uuid4().hex,
+        },
+    }
+
+    if task_id:
+        payload["message"]["taskId"] = task_id
+
+    if context_id:
+        payload["message"]["contextId"] = context_id
+    return payload

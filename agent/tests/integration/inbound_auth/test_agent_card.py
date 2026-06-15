@@ -4,9 +4,8 @@ from a2a.types import APIKeySecurityScheme, In, OAuth2SecurityScheme
 from authlib.oauth2.rfc8414 import get_well_known_url
 
 from src.auth.inbound import ApiKeyAuthMiddleware
-from tests.common.a2a import A2aServerFixture
+from tests.common.a2a import A2aServerFixture, wait_for_agent_card
 from tests.integration.inbound_auth.conftest import FAKE_OAUTH2_ISSUER
-from tests.integration.utils import wait_for_agent_card
 
 
 @pytest.mark.asyncio
