@@ -11,8 +11,8 @@ from __future__ import annotations
 import os
 import socket
 from collections.abc import Iterator
-from dataclasses import dataclass
 from pathlib import Path
+import subprocess
 
 import docker
 import pytest
@@ -26,7 +26,12 @@ from tests.common.containers_utilities import (
     with_suite_label,
 )
 from tests.common.keycloak import KeycloakFixture, build_keycloak_container
-from tests.e2e.utils import PROJECT_DIR, make_agent_config
+from tests.e2e.utils import (
+    PROJECT_DIR,
+    LocalAgent,
+    LocalAgentInContainer,
+    make_agent_config,
+)
 
 _CONTAINER_LABEL_KEY = "a3s-agent-e2e-suite"
 _CONTAINER_LABEL_VALUE = "1"
@@ -37,16 +42,6 @@ _LLM_ENV_VAR_NAMES = ("A3S_LLM_API_URL", "A3S_LLM_API_KEY", "A3S_LLM_MODEL")
 _AGENT_IMAGE_TAG = "a3s-agent-e2e:latest"
 
 _CONTAINER_NETWORK_ENV_VAR_NAME = "A3S_E2E_CONTAINER_NETWORK"
-
-
-@dataclass(frozen=True)
-class AgentContainer:
-    """A running e2e agent container with OAuth2 inbound auth wired to the
-    suite Keycloak. `base_url` is host-reachable; `container` is exposed so a
-    failing test can dump its logs."""
-
-    base_url: str
-    container: DockerContainer
 
 
 @pytest.fixture(scope="session")
@@ -124,12 +119,61 @@ def keycloak(_e2e_network: Network) -> Iterator[KeycloakFixture]:
 
 
 @pytest.fixture
-def agent_container(
+def local_agent(
+    e2e_llm_env: dict[str, str],
+    tmp_path: Path,
+    keycloak: KeycloakFixture,
+) -> Iterator[LocalAgent]:
+    """Spawn the real `a3s-agent` console script against a real LLM under
+    OAuth2 inbound auth, do an A2A round trip, then shut the server down via
+    the stdin `"q"` quit path and assert it exits cleanly."""
+    listen_address = "127.0.0.1"
+    with socket.socket() as s:
+        s.bind((listen_address, 0))
+        port: int = s.getsockname()[1]
+
+    config_path = make_agent_config(
+        path=tmp_path,
+        listen_address=listen_address,
+        listen_port=port,
+        issuer_url=keycloak.internal_issuer_url,
+        jwks_url=keycloak.external_jwks_url,
+    )
+    base_url = f"http://{listen_address}:{port}"
+
+    env = {
+        **os.environ,
+        **e2e_llm_env,
+        "A3S_CONFIG_FILE": str(config_path),
+    }
+
+    proc = subprocess.Popen(
+        ["uv", "run", "a3s-agent"],
+        cwd=str(PROJECT_DIR),
+        env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+
+    poll_until_ready(
+        f"{base_url}/.well-known/agent-card.json",
+        timeout_seconds=30.0,
+        description="agent card",
+    )
+
+    yield LocalAgent(base_url=base_url, proc=proc)
+
+
+@pytest.fixture
+def local_agent_in_container(
     _e2e_network: Network,
     e2e_llm_env: dict[str, str],
     keycloak: KeycloakFixture,
     tmp_path: Path,
-) -> Iterator[AgentContainer]:
+) -> Iterator[LocalAgentInContainer]:
     """Run the agent image on the e2e docker network with OAuth2 inbound
     auth pointing at the suite Keycloak, and wait for its agent card before
     yielding. Container is torn down at end-of-test."""
@@ -170,6 +214,6 @@ def agent_container(
             timeout_seconds=60.0,
             description="containerised agent card",
         )
-        yield AgentContainer(base_url=base_url, container=container)
+        yield LocalAgentInContainer(base_url=base_url, container=container)
     finally:
         container.stop()

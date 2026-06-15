@@ -1,11 +1,31 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
+from subprocess import Popen
+
+from testcontainers.core.container import DockerContainer
 
 # tests/e2e/utils.py → agent/. The `agent/` dir is what `uv run` needs as its
 # cwd for `test_local_round_trip` to pick up the project's pyproject.toml,
 # and is also the docker build context the `agent_image` fixture builds from.
 PROJECT_DIR = Path(__file__).resolve().parents[2]
+
+
+@dataclass(frozen=True)
+class LocalAgent:
+    base_url: str
+    proc: Popen[str]
+
+
+@dataclass(frozen=True)
+class LocalAgentInContainer:
+    """A running e2e agent container with OAuth2 inbound auth wired to the
+    suite Keycloak. `base_url` is host-reachable; `container` is exposed so a
+    failing test can dump its logs."""
+
+    base_url: str
+    container: DockerContainer
 
 
 def make_agent_config(
