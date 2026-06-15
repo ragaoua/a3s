@@ -12,22 +12,24 @@ from __future__ import annotations
 import socket
 from collections.abc import Iterator
 from pathlib import Path
-from typing import override
 
 import docker
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
-from testcontainers.keycloak import KeycloakContainer
 
 from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
-from tests.integration.common.containers_utilities import (
+from tests.common.containers_utilities import (
     build_image,
     poll_until_ready,
     reap_leaked_containers,
     with_suite_label,
 )
-from tests.integration.common.keycloak import KeycloakFixture
+from tests.common.keycloak import (
+    KEYCLOAK_INTERNAL_PORT,
+    KeycloakFixture,
+    build_keycloak_container,
+)
 from tests.integration.common.mcp import McpServerFixture
 from tests.integration.common.subagent import SubagentServerFixture
 
@@ -44,41 +46,6 @@ _CONTAINER_LABEL_VALUE = "1"
 _CONTAINER_LABEL_FILTER = f"{_CONTAINER_LABEL_KEY}={_CONTAINER_LABEL_VALUE}"
 
 
-class _RobustKeycloakContainer(KeycloakContainer):
-    """KeycloakContainer whose readiness probe tolerates the transient 404s
-    the management interface serves while it's still wiring up `/health`.
-
-    Upstream's `_readiness_probe` GETs `{management}/health/ready` and calls
-    `raise_for_status()` under `@wait_container_is_ready(ConnectionError,
-    ReadTimeout)` — so it only retries connection/timeout failures. Keycloak's
-    Quarkus management listener starts accepting connections *before* the
-    health endpoints are registered, so a probe landing in that window gets a
-    404, which surfaces as an `HTTPError` that the decorator doesn't retry and
-    fails container startup.
-    """
-
-    @override
-    def _readiness_probe(self) -> None:
-        poll_until_ready(
-            f"{self.get_management_url()}/health/ready",
-            timeout_seconds=60.0,
-            description="Keycloak management health",
-        )
-
-
-_KEYCLOAK_CLIENT_ID = (
-    "a3s-agent"  # This needs to correspond to the client id configured in the keycloak
-)
-
-
-_KEYCLOAK_CLIENT_SECRET = "a3s-agent-secret"  # This needs to correspond to the client secret configured in the keycloak
-
-_KEYCLOAK_REALM = "a3s-realm"
-_KEYCLOAK_NETWORK_ALIAS = "keycloak"
-_KEYCLOAK_INTERNAL_PORT = 8080
-_KEYCLOAK_INTERNAL_URL = f"http://{_KEYCLOAK_NETWORK_ALIAS}:{_KEYCLOAK_INTERNAL_PORT}"
-_KEYCLOAK_ISSUER_INTERNAL = f"{_KEYCLOAK_INTERNAL_URL}/realms/{_KEYCLOAK_REALM}"
-
 _MCP_NETWORK_ALIAS = "mcp"
 _MCP_INTERNAL_PORT = 3000
 _MCP_AUDIENCE = (
@@ -93,7 +60,6 @@ _SUBAGENT_IMAGE_TAG = "a3s-agent-test-subagent:latest"
 _SUBAGENT_RESPONSE_TEXT = "Subagent acknowledged the request."
 
 _CONTAINERS_DIR = Path(__file__).parent / "containers"
-_KEYCLOAK_REALM_FILE = _CONTAINERS_DIR / "keycloak" / "realm.json"
 _MCP_IMAGE_CONTEXT = _CONTAINERS_DIR / "mcp_server"
 _SUBAGENT_IMAGE_CONTEXT = _CONTAINERS_DIR / "subagent_server"
 
@@ -203,39 +169,17 @@ def _integration_network() -> Iterator[Network]:  # pyright: ignore[reportUnused
 
 @pytest.fixture(scope="session")
 def keycloak(_integration_network: Network) -> Iterator[KeycloakFixture]:
-    container = _RobustKeycloakContainer()
-    with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
-    container.with_network(_integration_network)
-    container.with_network_aliases(_KEYCLOAK_NETWORK_ALIAS)
-    # KC_HOSTNAME pins the issuer Keycloak emits so the MCP server (which
-    # validates iss) and the agent (which can talk to any URL) agree.
-    container.with_env("KC_HOSTNAME", _KEYCLOAK_INTERNAL_URL)
-    container.with_env("KC_HOSTNAME_STRICT", "false")
-    container.with_env("KC_HTTP_ENABLED", "true")
-    container.with_realm_import_file(str(_KEYCLOAK_REALM_FILE))
-
-    container.start()
+    container, fixture = next(
+        build_keycloak_container(
+            network=_integration_network,
+            labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE},
+        )
+    )
     try:
         host = container.get_container_host_ip()
-        port = container.get_exposed_port(_KEYCLOAK_INTERNAL_PORT)
-        external_base = f"http://{host}:{port}"
-        external_issuer = f"{external_base}/realms/{_KEYCLOAK_REALM}"
-        discovery_url = f"{external_issuer}/.well-known/openid-configuration"
-
-        poll_until_ready(
-            discovery_url, timeout_seconds=60.0, description="Keycloak OIDC discovery"
-        )
-
-        _record_leaked_endpoint("Keycloak (external)", external_base)
-
-        yield KeycloakFixture(
-            internal_issuer_url=_KEYCLOAK_ISSUER_INTERNAL,
-            token_endpoint_url=f"{external_issuer}/protocol/openid-connect/token",
-            external_jwks_url=f"{external_issuer}/protocol/openid-connect/certs",
-            external_introspection_url=f"{external_issuer}/protocol/openid-connect/token/introspect",
-            confidential_client_id=_KEYCLOAK_CLIENT_ID,
-            confidential_client_secret=_KEYCLOAK_CLIENT_SECRET,
-        )
+        port = container.get_exposed_port(KEYCLOAK_INTERNAL_PORT)
+        _record_leaked_endpoint("Keycloak (external)", f"http://{host}:{port}")
+        yield fixture
     finally:
         if not _session_state.has_failures:
             container.stop()

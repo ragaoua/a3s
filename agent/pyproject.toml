@@ -35,5 +35,8 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--disable-warnings"
+addopts = "--disable-warnings -m 'not e2e'"
 pythonpath = ["."]
+markers = [
+    "e2e: end-to-end tests against a real LLM (manual only; opt in with `-m e2e`)",
+]
