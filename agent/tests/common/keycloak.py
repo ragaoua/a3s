@@ -78,7 +78,7 @@ def build_keycloak_container(
     to return 200, then yield the running container and a populated
     `KeycloakFixture`. Single-shot generator: the caller is responsible for
     stopping the container in its own teardown."""
-    container = _RobustKeycloakContainer()
+    container = _RobustKeycloakContainer("quay.io/keycloak/keycloak:26.5.0")
     with_suite_label(container, labels=labels)
     container.with_network(network)
     container.with_network_aliases(_KEYCLOAK_NETWORK_ALIAS)
