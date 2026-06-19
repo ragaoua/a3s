@@ -7,7 +7,11 @@ from a2a.types import (
     MessageSendParams,
     SendMessageRequest,
     SendMessageSuccessResponse,
+    SendStreamingMessageRequest,
+    SendStreamingMessageSuccessResponse,
     Task,
+    TaskState,
+    TaskStatusUpdateEvent,
 )
 
 from tests.common.a2a import (
@@ -27,6 +31,7 @@ async def test_agent_card_is_served(a2a_server: A2aServerFixture) -> None:
     assert agent_card.description == "A helpful coding assistant"
 
 
+# TODO: test send_message_streaming too, not just send_message
 @pytest.mark.asyncio
 async def test_send_message_surfaces_llm_reply_in_task(
     a2a_server: A2aServerFixture,
@@ -53,6 +58,7 @@ async def test_send_message_surfaces_llm_reply_in_task(
     assert len(a2a_server.mock_llm.requests) == 1
 
 
+# TODO: test send_message_streaming too, not just send_message
 @pytest.mark.asyncio
 async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
     a2a_server: A2aServerFixture,
@@ -116,4 +122,60 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
     )
 
 
-# TODO: test send_message_streaming too, not just send_message
+@pytest.mark.asyncio
+async def test_send_message_returns_failed_task_when_llm_call_fails(
+    a2a_server: A2aServerFixture,
+) -> None:
+    a2a_server.mock_llm.stub_error(
+        status=500, message="OpenAIException - Connection error."
+    )
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
+        agent_card = await wait_for_agent_card(a2a_server.base_url, httpx_client)
+        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
+
+        request = SendMessageRequest(
+            id=str(uuid4()),
+            params=MessageSendParams(**create_send_message_payload(text="hi")),
+        )
+        response = await client.send_message(request)
+
+    assert isinstance(response.root, SendMessageSuccessResponse)
+    assert isinstance(response.root.result, Task)
+    task = response.root.result
+    assert task.status.state == TaskState.failed
+
+
+@pytest.mark.asyncio
+async def test_send_message_streaming_returns_failed_task_status_update_when_llm_call_fails(
+    a2a_server: A2aServerFixture,
+) -> None:
+    a2a_server.mock_llm.stub_error(
+        status=500, message="OpenAIException - Connection error."
+    )
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
+        agent_card = await wait_for_agent_card(a2a_server.base_url, httpx_client)
+        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
+
+        request = SendStreamingMessageRequest(
+            id=str(uuid4()),
+            params=MessageSendParams(**create_send_message_payload(text="hi")),
+        )
+
+        chunks = [c async for c in client.send_message_streaming(request)]
+
+    assert len(chunks) == 3
+    first_chunk, second_chunk, third_chunk = chunks
+
+    assert isinstance(first_chunk.root, SendStreamingMessageSuccessResponse)
+    assert isinstance(first_chunk.root.result, Task)
+    assert first_chunk.root.result.status.state == TaskState.submitted
+
+    assert isinstance(second_chunk.root, SendStreamingMessageSuccessResponse)
+    assert isinstance(second_chunk.root.result, TaskStatusUpdateEvent)
+    assert second_chunk.root.result.status.state == TaskState.working
+
+    assert isinstance(third_chunk.root, SendStreamingMessageSuccessResponse)
+    assert isinstance(third_chunk.root.result, TaskStatusUpdateEvent)
+    assert third_chunk.root.result.status.state == TaskState.failed
