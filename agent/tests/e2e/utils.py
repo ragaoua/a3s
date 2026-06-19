@@ -40,7 +40,7 @@ def make_agent_config(
     configuring OAuth2 inbound auth. No MCP, no subagents, no skills.
     """
     config_path = path / "agent.yaml"
-    config_path.write_text(
+    _ = config_path.write_text(
         f"""\
 llm:
   api_url: ${{A3S_LLM_API_URL}}
