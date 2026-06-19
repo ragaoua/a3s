@@ -10,9 +10,12 @@ from a2a.types import (
     Task,
 )
 
-from tests.common.a2a import A2aServerFixture
-from tests.integration.common.keycloak import KeycloakFixture
-from tests.integration.utils import create_send_message_payload, wait_for_agent_card
+from tests.common.a2a import (
+    A2aServerFixture,
+    create_send_message_payload,
+    wait_for_agent_card,
+)
+from tests.common.keycloak import KeycloakFixture
 
 
 async def _mint_client_credentials_access_token(keycloak: KeycloakFixture) -> str:

@@ -11,9 +11,12 @@ from a2a.types import (
 )
 
 from src.auth.inbound import ApiKeyAuthMiddleware
-from tests.common.a2a import A2aServerFixture
+from tests.common.a2a import (
+    A2aServerFixture,
+    create_send_message_payload,
+    wait_for_agent_card,
+)
 from tests.integration.inbound_auth.conftest import API_KEY
-from tests.integration.utils import create_send_message_payload, wait_for_agent_card
 
 
 @pytest.mark.asyncio

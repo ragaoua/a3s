@@ -38,7 +38,7 @@ from src.config.types.auth import OAuthDiscoveredJwksPolicyConfig
 from tests.common.a2a import A2aServerFixture
 from tests.common.config import get_base_test_config
 from tests.common.llm import LlmFixture
-from tests.integration.common.keycloak import KeycloakFixture
+from tests.common.keycloak import KeycloakFixture
 
 
 # The API key value used by `agent_with_api_key_inbound_auth`. Tests import

@@ -35,6 +35,26 @@ class LlmFixture:
             finish_reason="stop",
         )
 
+    def stub_error(self, *, status: int = 500, message: str = "boom") -> None:
+        """Stub a one-shot chat-completion that fails with an HTTP error.
+
+        Mirrors an unreachable / failing LLM provider: litellm raises an
+        ``InternalServerError`` which the agent surfaces as a failed task.
+        """
+
+        def _dispatch(request: Request) -> Response:
+            return Response(
+                response=json.dumps({"error": {"message": message}}),
+                status=status,
+                content_type="application/json",
+            )
+
+        # Permanent (not one-shot): litellm may retry, and every attempt must
+        # fail the same way rather than fall through to an unmatched handler.
+        _ = self._server.expect_request(
+            CHAT_COMPLETIONS_PATH, method="POST"
+        ).respond_with_handler(_dispatch)
+
     def stub_tool_call(
         self,
         *,

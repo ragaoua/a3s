@@ -1,3 +1,4 @@
+import fnmatch
 import io
 import tarfile
 import time
@@ -16,14 +17,23 @@ def build_image(*, context_dir: Path, tag: str, labels: dict[str, str]) -> None:
     container's namespace (the host UID falls outside the configured
     subuid/subgid range), and an unnormalised context blows up with a
     `lchown invalid argument` error during the build.
+
+    Honours `<context_dir>/.dockerignore` (simple subset — comments, blank
+    lines, fnmatch-style patterns; no negation, no `**`, no path-rooted
+    patterns). Without this, dragging `.venv`/build caches into the tar
+    would balloon the context for projects with a real virtualenv.
     """
+    ignore_patterns = _read_dockerignore(context_dir)
+
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w") as tar:
         for entry in sorted(context_dir.rglob("*")):
             if not entry.is_file():
                 continue
-            arcname = str(entry.relative_to(context_dir))
-            info = tar.gettarinfo(str(entry), arcname=arcname)
+            rel_path = entry.relative_to(context_dir)
+            if _matches_any(rel_path, ignore_patterns):
+                continue
+            info = tar.gettarinfo(str(entry), arcname=str(rel_path))
             info.uid = 0
             info.gid = 0
             info.uname = ""
@@ -44,6 +54,30 @@ def build_image(*, context_dir: Path, tag: str, labels: dict[str, str]) -> None:
     for chunk in stream:
         if "error" in chunk:
             raise RuntimeError(f"image build failed for {tag}: {chunk['error']}")
+
+
+def _read_dockerignore(context_dir: Path) -> list[str]:
+    dockerignore = context_dir / ".dockerignore"
+    if not dockerignore.exists():
+        return []
+    patterns: list[str] = []
+    for raw_line in dockerignore.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line and not line.startswith("#"):
+            patterns.append(line)
+    return patterns
+
+
+def _matches_any(rel_path: Path, patterns: list[str]) -> bool:
+    """Return True if any component of `rel_path` matches any of the
+    fnmatch-style patterns. Permissive vs the real .dockerignore spec
+    (which is path-rooted) but a superset for the simple bare-name and
+    `*.ext` patterns the suite's .dockerignores use today."""
+    for pattern in patterns:
+        for component in rel_path.parts:
+            if fnmatch.fnmatch(component, pattern):
+                return True
+    return False
 
 
 def reap_leaked_containers(label: str) -> None:

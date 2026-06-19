@@ -10,9 +10,13 @@ from a2a.types import (
     Task,
 )
 
-from tests.common.a2a import A2aServerFixture, get_adk_data_parts
+from tests.common.a2a import (
+    A2aServerFixture,
+    create_send_message_payload,
+    get_adk_data_parts,
+    wait_for_agent_card,
+)
 from tests.integration.subagents.conftest import PEER_SUBAGENT_NAME
-from tests.integration.utils import create_send_message_payload, wait_for_agent_card
 
 
 @pytest.mark.asyncio
