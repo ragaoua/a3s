@@ -222,40 +222,50 @@ For more information about how tokens are validated, check out
 
 ## End-to-end tests
 
-A manual end-to-end suite under `tests/e2e/` drives the engine through its
-real `a3s-agent` entrypoint against a real LLM under OAuth2 inbound auth. The
-suite is gated behind the `e2e` pytest marker so it's excluded from the
-default `pytest` run, and behind three env vars that point at the LLM endpoint.
-Run it with `-m e2e` after exporting them:
+A manual end-to-end suite under `tests/e2e/` drives the engine through its real
+`a3s-agent` entrypoint against a real LLM under OAuth2 inbound auth. The suite
+is gated behind the `e2e` pytest marker so it's excluded from the default
+`pytest` run.
+
+The two tests run in different network topologies, so each has its own LLM URL
+env var:
+
+- `A3S_LLM_API_URL`: used by `test_local_round_trip`. Must be reachable from
+  the host (the agent runs as a host-side subprocess).
+- `A3S_LLM_API_URL_CONTAINER`: used by `test_container_round_trip`. Must be
+  reachable from inside the docker network the agent container joins.
+
+`A3S_LLM_API_KEY` and `A3S_LLM_MODEL` are shared between both. Each test skips
+independently when its own URL is missing: setting only one of the two URL vars
+runs only the matching test.
 
 ```bash
+# Both tests against a local LLM listening on the host:
 A3S_LLM_API_URL=http://localhost:11434/v1 \
+    A3S_LLM_API_URL_CONTAINER=http://host.containers.internal:11434/v1 \
     A3S_LLM_API_KEY=ollama \
-    A3S_LLM_MODEL=llama3 \
+    A3S_LLM_MODEL="qwen2.5:7b" \
+    uv run pytest -m e2e
+
+# Local test only
+A3S_LLM_API_URL=http://localhost:11434/v1 \
+    A3S_LLM_API_KEY=fake \
+    A3S_LLM_MODEL="qwen2.5:7b" \
+    uv run pytest -m e2e
+
+# Container test only
+A3S_LLM_API_URL_CONTAINER=http://host.containers.internal:11434/v1 \
+    A3S_LLM_API_KEY=fake \
+    A3S_LLM_MODEL="qwen2.5:7b" \
     uv run pytest -m e2e
 ```
+
+LLM API URL can be pointed out at a remote LLM provider in either case.
 
 E2E tests assert only that some non-empty text comes back within the timeout,
 not on response content; they exist to catch breakage in the engine glue
 (config loading, env-var substitution, OAuth2 middleware, CLI shutdown path)
-that no other test layer exercises. Without the env vars set, every test in
-the suite skips.
-
-The `test_container_round_trip` test runs the agent inside a container, so a
-local LLM listening on `127.0.0.1` won't be reachable by default. Use
-`A3S_E2E_CONTAINER_NETWORK` to set a name for the network that the local LLM
-runs on, so that the test agent runs on it too.
-If the network already exists (which it should), the tests won't recreate it
-nor remove it after it's done. If it doesn't exist, it will be created and
-cleaned up after the test is finished
-
-If running the LLM in a container inside the same network, make sure to set
-the LLM API base URL to the network's internal address for the LLM API (which
-is probabaly `http://<container_name>:<port>`). Also, that means one can't run
-both `test_local_round_trip` and `test_container_round_trip` together because
-one accesses the local LLM from outside a container and the other from within,
-which means they need to access it via 2 different entrypoints (e.g `localhost`
-for the first one and `<container_name>` for the second).
+that no other test layer exercises.
 
 ## MCP configuration
 

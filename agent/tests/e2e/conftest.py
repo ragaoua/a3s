@@ -2,8 +2,14 @@
 
 These tests drive the engine through its real `a3s-agent` console entrypoint
 against a real LLM endpoint under OAuth2 inbound auth. They are gated behind
-the `e2e` pytest marker (opt in with `-m e2e`) and the `A3S_LLM_*` env vars;
-if any of the env vars are missing, every test in the suite skips.
+the `e2e` pytest marker (opt in with `-m e2e`) and the `A3S_LLM_*` env vars.
+
+The local-subprocess test and the containerised test live in different network
+topologies, so they each have their own LLM URL env var — `A3S_LLM_API_URL`
+must be reachable from the host, `A3S_LLM_API_URL_CONTAINER` must be reachable
+from inside the docker network the agent container joins. The other two env
+vars (key, model) are shared. Each test skips independently when its own URL
+is missing, so setting only one runs only the matching test.
 """
 
 from __future__ import annotations
@@ -14,7 +20,6 @@ from collections.abc import Iterator
 from pathlib import Path
 import subprocess
 
-import docker
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
@@ -37,35 +42,86 @@ _CONTAINER_LABEL_KEY = "a3s-agent-e2e-suite"
 _CONTAINER_LABEL_VALUE = "1"
 _CONTAINER_LABEL_FILTER = f"{_CONTAINER_LABEL_KEY}={_CONTAINER_LABEL_VALUE}"
 
-_LLM_ENV_VAR_NAMES = ("A3S_LLM_API_URL", "A3S_LLM_API_KEY", "A3S_LLM_MODEL")
+_LOCAL_LLM_API_URL_ENV_VAR = "A3S_LLM_API_URL"
+_CONTAINER_LLM_API_URL_ENV_VAR = "A3S_LLM_API_URL_CONTAINER"
+_LLM_API_KEY_ENV_VAR = "A3S_LLM_API_KEY"
+_LLM_MODEL_ENV_VAR = "A3S_LLM_MODEL"
 
 _AGENT_IMAGE_TAG = "a3s-agent-e2e:latest"
 
-_CONTAINER_NETWORK_ENV_VAR_NAME = "A3S_E2E_CONTAINER_NETWORK"
+
+def _is_env_var_set(name: str) -> bool:
+    return bool(os.environ.get(name, "").strip())
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config,  # noqa: ARG001
+    items: list[pytest.Item],
+) -> None:
+    """Skip e2e items at collection time when their required LLM env vars are
+    missing — per-test granular based on whether the item uses `local_agent`
+    or `local_agent_in_container`.
+
+    Done at collection time so the skip fires before pytest resolves any
+    session-scoped fixtures, in particular the docker-touching keycloak /
+    `_e2e_network` ones. Pure fixture-level skips would still bring those up
+    even when the test will skip, because session-scoped fixtures resolve
+    before function-scoped ones in a test's setup chain.
+    """
+    for item in items:
+        if "e2e" not in item.keywords:
+            continue
+        fixtures = getattr(item, "fixturenames", ())
+        needs_local = "local_agent" in fixtures
+        needs_container = "local_agent_in_container" in fixtures
+        if not (needs_local or needs_container):
+            continue
+
+        missing: list[str] = []
+        if needs_local and not _is_env_var_set(_LOCAL_LLM_API_URL_ENV_VAR):
+            missing.append(_LOCAL_LLM_API_URL_ENV_VAR)
+        if needs_container and not _is_env_var_set(_CONTAINER_LLM_API_URL_ENV_VAR):
+            missing.append(_CONTAINER_LLM_API_URL_ENV_VAR)
+        for shared in (_LLM_API_KEY_ENV_VAR, _LLM_MODEL_ENV_VAR):
+            if not _is_env_var_set(shared):
+                missing.append(shared)
+
+        if missing:
+            item.add_marker(
+                pytest.mark.skip(
+                    reason="this e2e test requires these env vars to be set: "
+                    + ", ".join(missing)
+                )
+            )
+
+
+def _read_llm_env(api_url_env_var: str) -> dict[str, str]:
+    """Return the three LLM env vars keyed by the canonical
+    `A3S_LLM_API_URL` / `A3S_LLM_API_KEY` / `A3S_LLM_MODEL` names — that's
+    what the YAML's `${A3S_LLM_API_URL}` substitution looks for regardless
+    of which URL var the caller read from.
+
+    Presence is enforced at collection time by `pytest_collection_modifyitems`.
+    """
+    return {
+        _LOCAL_LLM_API_URL_ENV_VAR: os.environ[api_url_env_var],
+        _LLM_API_KEY_ENV_VAR: os.environ[_LLM_API_KEY_ENV_VAR],
+        _LLM_MODEL_ENV_VAR: os.environ[_LLM_MODEL_ENV_VAR],
+    }
 
 
 @pytest.fixture(scope="session")
-def e2e_llm_env() -> dict[str, str]:
-    """Read + validate A3S_LLM_API_URL / A3S_LLM_API_KEY / A3S_LLM_MODEL.
+def _local_llm_env() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
+    """LLM env for the host-side subprocess. `A3S_LLM_API_URL` must be
+    reachable from the host."""
+    return _read_llm_env(_LOCAL_LLM_API_URL_ENV_VAR)
 
-    Skips every dependent test if any of the three are unset — these are the
-    env-var substitutions exercised end-to-end by the e2e YAML config.
-    """
-    values: dict[str, str] = {}
-    missing: list[str] = []
-    for name in _LLM_ENV_VAR_NAMES:
-        value = os.environ.get(name, "").strip()
-        if not value:
-            missing.append(name)
-        else:
-            values[name] = value
 
-    if missing:
-        pytest.skip(
-            "e2e tests require these env vars to be set against a real LLM: "
-            + ", ".join(missing)
-        )
-    return values
+@pytest.fixture(scope="session")
+def _container_llm_env() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
+    """LLM env for the agent container. `A3S_LLM_API_URL_CONTAINER` must be
+    reachable from inside the e2e docker network."""
+    return _read_llm_env(_CONTAINER_LLM_API_URL_ENV_VAR)
 
 
 @pytest.fixture(scope="session")
@@ -83,23 +139,8 @@ def _e2e_network() -> Iterator[Network]:
         docker_network_kw={"labels": {_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE}}
     )
 
-    network_name = existing_name = os.environ.get(
-        _CONTAINER_NETWORK_ENV_VAR_NAME, ""
-    ).strip()
-
-    if network_name:
-        network.name = network_name
-
-        existing = docker.from_env().networks.list(names=[network_name])
-        if existing:
-            network._network = existing[0]  # pyright: ignore[reportPrivateUsage]
-            yield network
-            return
-
-    network.create()
-
     try:
-        yield network
+        yield network.create()
     finally:
         network.remove()
 
@@ -120,7 +161,7 @@ def keycloak(_e2e_network: Network) -> Iterator[KeycloakFixture]:
 
 @pytest.fixture
 def local_agent(
-    e2e_llm_env: dict[str, str],
+    _local_llm_env: dict[str, str],
     tmp_path: Path,
     keycloak: KeycloakFixture,
 ) -> Iterator[LocalAgent]:
@@ -143,7 +184,7 @@ def local_agent(
 
     env = {
         **os.environ,
-        **e2e_llm_env,
+        **_local_llm_env,
         "A3S_CONFIG_FILE": str(config_path),
     }
 
@@ -170,7 +211,7 @@ def local_agent(
 @pytest.fixture
 def local_agent_in_container(
     _e2e_network: Network,
-    e2e_llm_env: dict[str, str],
+    _container_llm_env: dict[str, str],
     keycloak: KeycloakFixture,
     tmp_path: Path,
 ) -> Iterator[LocalAgentInContainer]:
@@ -203,7 +244,7 @@ def local_agent_in_container(
     container.with_network(_e2e_network)
     container.with_bind_ports(port, port)
     container.with_volume_mapping(str(config_path), "/app/config/agent.yaml", mode="ro")
-    for name, value in e2e_llm_env.items():
+    for name, value in _container_llm_env.items():
         container.with_env(name, value)
 
     container.start()
