@@ -2,14 +2,13 @@
 
 These tests drive the engine through its real `a3s-agent` console entrypoint
 against a real LLM endpoint under OAuth2 inbound auth. They are gated behind
-the `e2e` pytest marker (opt in with `-m e2e`) and the `A3S_LLM_*` env vars.
+the `e2e` pytest marker (opt in with `-m e2e`) and the `A3S_LLM_*` env vars;
+if any are missing, every test in the suite skips.
 
-The local-subprocess test and the containerised test live in different network
-topologies, so they each have their own LLM URL env var — `A3S_LLM_API_URL`
-must be reachable from the host, `A3S_LLM_API_URL_CONTAINER` must be reachable
-from inside the docker network the agent container joins. The other two env
-vars (key, model) are shared. Each test skips independently when its own URL
-is missing, so setting only one runs only the matching test.
+The local-subprocess test uses `A3S_LLM_API_URL` as-is. The containerised test
+rewrites `localhost`/`127.0.0.1` in that URL to `host.containers.internal` so
+the agent inside the container can still reach an LLM that the user is running
+on the host. Remote LLM URLs pass through unchanged.
 """
 
 from __future__ import annotations
@@ -19,6 +18,7 @@ import socket
 from collections.abc import Iterator
 from pathlib import Path
 import subprocess
+from urllib.parse import urlparse, urlunparse
 
 import pytest
 from testcontainers.core.container import DockerContainer
@@ -42,25 +42,19 @@ _CONTAINER_LABEL_KEY = "a3s-agent-e2e-suite"
 _CONTAINER_LABEL_VALUE = "1"
 _CONTAINER_LABEL_FILTER = f"{_CONTAINER_LABEL_KEY}={_CONTAINER_LABEL_VALUE}"
 
-_LOCAL_LLM_API_URL_ENV_VAR = "A3S_LLM_API_URL"
-_CONTAINER_LLM_API_URL_ENV_VAR = "A3S_LLM_API_URL_CONTAINER"
-_LLM_API_KEY_ENV_VAR = "A3S_LLM_API_KEY"
-_LLM_MODEL_ENV_VAR = "A3S_LLM_MODEL"
+_LLM_ENV_VAR_NAMES = ("A3S_LLM_API_URL", "A3S_LLM_API_KEY", "A3S_LLM_MODEL")
 
 _AGENT_IMAGE_TAG = "a3s-agent-e2e:latest"
 
-
-def _is_env_var_set(name: str) -> bool:
-    return bool(os.environ.get(name, "").strip())
+_HOST_LOOPBACK_HOSTNAMES = frozenset({"localhost", "127.0.0.1"})
 
 
 def pytest_collection_modifyitems(
     config: pytest.Config,  # noqa: ARG001
     items: list[pytest.Item],
 ) -> None:
-    """Skip e2e items at collection time when their required LLM env vars are
-    missing — per-test granular based on whether the item uses `local_agent`
-    or `local_agent_in_container`.
+    """Skip every e2e item at collection time when any `A3S_LLM_*` env var is
+    missing.
 
     Done at collection time so the skip fires before pytest resolves any
     session-scoped fixtures, in particular the docker-touching keycloak /
@@ -68,60 +62,71 @@ def pytest_collection_modifyitems(
     even when the test will skip, because session-scoped fixtures resolve
     before function-scoped ones in a test's setup chain.
     """
+    missing = [n for n in _LLM_ENV_VAR_NAMES if not os.environ.get(n, "").strip()]
+    if not missing:
+        return
+
+    marker = pytest.mark.skip(
+        reason="e2e tests require these env vars to be set against a real LLM: "
+        + ", ".join(missing)
+    )
+
     for item in items:
-        if "e2e" not in item.keywords:
-            continue
-        fixtures = getattr(item, "fixturenames", ())
-        needs_local = "local_agent" in fixtures
-        needs_container = "local_agent_in_container" in fixtures
-        if not (needs_local or needs_container):
-            continue
-
-        missing: list[str] = []
-        if needs_local and not _is_env_var_set(_LOCAL_LLM_API_URL_ENV_VAR):
-            missing.append(_LOCAL_LLM_API_URL_ENV_VAR)
-        if needs_container and not _is_env_var_set(_CONTAINER_LLM_API_URL_ENV_VAR):
-            missing.append(_CONTAINER_LLM_API_URL_ENV_VAR)
-        for shared in (_LLM_API_KEY_ENV_VAR, _LLM_MODEL_ENV_VAR):
-            if not _is_env_var_set(shared):
-                missing.append(shared)
-
-        if missing:
-            item.add_marker(
-                pytest.mark.skip(
-                    reason="this e2e test requires these env vars to be set: "
-                    + ", ".join(missing)
-                )
-            )
+        if "e2e" in item.keywords:
+            item.add_marker(marker)
 
 
-def _read_llm_env(api_url_env_var: str) -> dict[str, str]:
-    """Return the three LLM env vars keyed by the canonical
-    `A3S_LLM_API_URL` / `A3S_LLM_API_KEY` / `A3S_LLM_MODEL` names — that's
-    what the YAML's `${A3S_LLM_API_URL}` substitution looks for regardless
-    of which URL var the caller read from.
+def _rewrite_host_loopback_for_container(url: str) -> str:
+    """Rewrite a host-reachable `localhost`/`127.0.0.1` URL to the
+    docker host-gateway alias so the agent container can reach an
+    LLM the user is running on the host. Anything else passes through
+    unchanged (remote provider URLs, sibling-container hostnames)."""
+    parsed = urlparse(url)
+
+    if parsed.hostname not in _HOST_LOOPBACK_HOSTNAMES:
+        return url
+
+    netloc = "host.docker.internal"
+    if parsed.port is not None:
+        netloc = f"{netloc}:{parsed.port}"
+
+    return urlunparse(parsed._replace(netloc=netloc))
+
+
+@pytest.fixture(scope="session")
+def e2e_llm_env() -> dict[str, str]:
+    """The three LLM env vars, used verbatim by the host-side subprocess.
 
     Presence is enforced at collection time by `pytest_collection_modifyitems`.
     """
+    return {name: os.environ[name] for name in _LLM_ENV_VAR_NAMES}
+
+
+@pytest.fixture(scope="session")
+def e2e_llm_env_for_container(e2e_llm_env: dict[str, str]) -> dict[str, str]:
+    """Same env, with `A3S_LLM_API_URL` rewritten so the agent container can
+    reach a host-side LLM via the podman host-gateway alias."""
+
+    # Rewrite a host-reachable `localhost`/`127.0.0.1` URL to the
+    # docker host-gateway alias so the agent container can reach an
+    # LLM the user is running on the host. Anything else passes through
+    # unchanged (remote provider URLs, sibling-container hostnames).
+    url = e2e_llm_env["A3S_LLM_API_URL"]
+    parsed = urlparse(url)
+
+    if parsed.hostname not in _HOST_LOOPBACK_HOSTNAMES:
+        api_url = url
+    else:
+        netloc = "host.docker.internal"
+        if parsed.port is not None:
+            netloc = f"{netloc}:{parsed.port}"
+
+        api_url = urlunparse(parsed._replace(netloc=netloc))
+
     return {
-        _LOCAL_LLM_API_URL_ENV_VAR: os.environ[api_url_env_var],
-        _LLM_API_KEY_ENV_VAR: os.environ[_LLM_API_KEY_ENV_VAR],
-        _LLM_MODEL_ENV_VAR: os.environ[_LLM_MODEL_ENV_VAR],
+        **e2e_llm_env,
+        "A3S_LLM_API_URL": api_url,
     }
-
-
-@pytest.fixture(scope="session")
-def _local_llm_env() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
-    """LLM env for the host-side subprocess. `A3S_LLM_API_URL` must be
-    reachable from the host."""
-    return _read_llm_env(_LOCAL_LLM_API_URL_ENV_VAR)
-
-
-@pytest.fixture(scope="session")
-def _container_llm_env() -> dict[str, str]:  # pyright: ignore[reportUnusedFunction]
-    """LLM env for the agent container. `A3S_LLM_API_URL_CONTAINER` must be
-    reachable from inside the e2e docker network."""
-    return _read_llm_env(_CONTAINER_LLM_API_URL_ENV_VAR)
 
 
 @pytest.fixture(scope="session")
@@ -161,7 +166,7 @@ def keycloak(_e2e_network: Network) -> Iterator[KeycloakFixture]:
 
 @pytest.fixture
 def local_agent(
-    _local_llm_env: dict[str, str],
+    e2e_llm_env: dict[str, str],
     tmp_path: Path,
     keycloak: KeycloakFixture,
 ) -> Iterator[LocalAgent]:
@@ -184,7 +189,7 @@ def local_agent(
 
     env = {
         **os.environ,
-        **_local_llm_env,
+        **e2e_llm_env,
         "A3S_CONFIG_FILE": str(config_path),
     }
 
@@ -211,7 +216,7 @@ def local_agent(
 @pytest.fixture
 def local_agent_in_container(
     _e2e_network: Network,
-    _container_llm_env: dict[str, str],
+    e2e_llm_env_for_container: dict[str, str],
     keycloak: KeycloakFixture,
     tmp_path: Path,
 ) -> Iterator[LocalAgentInContainer]:
@@ -244,7 +249,7 @@ def local_agent_in_container(
     container.with_network(_e2e_network)
     container.with_bind_ports(port, port)
     container.with_volume_mapping(str(config_path), "/app/config/agent.yaml", mode="ro")
-    for name, value in _container_llm_env.items():
+    for name, value in e2e_llm_env_for_container.items():
         container.with_env(name, value)
 
     container.start()
