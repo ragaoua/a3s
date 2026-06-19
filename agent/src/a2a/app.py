@@ -151,14 +151,11 @@ def build_agent_a2a_app(
         supports_authenticated_extended_card=False,
     )
 
-    async def setup_a2a():
-        a2a_server = A2AStarletteApplication(
-            agent_card=agent_card,
-            http_handler=request_handler,
-        )
-        a2a_server.add_routes_to_app(app)
-
-    app.add_event_handler("startup", setup_a2a)
+    a2a_server = A2AStarletteApplication(
+        agent_card=agent_card,
+        http_handler=request_handler,
+    )
+    a2a_server.add_routes_to_app(app)
     return app
 
 
