@@ -32,6 +32,7 @@ dev = [
     "pytest-httpserver>=1.1.5",
     "pytest-iam>=0.2.5",
     "testcontainers[keycloak]>=4.9.0",
+    "deptry>=0.25.1"
 ]
 
 [tool.pytest.ini_options]
@@ -40,3 +41,9 @@ pythonpath = ["."]
 markers = [
     "e2e: end-to-end tests against a real LLM (manual only; opt in with `-m e2e`)",
 ]
+
+[tool.deptry]
+known_first_party = ["src"]
+
+[tool.deptry.package_module_name_map]
+pydantic = ["pydantic", "pydantic_core"] # pydantic_core ships separately but is guaranteed by pydantic;
