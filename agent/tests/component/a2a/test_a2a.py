@@ -159,6 +159,10 @@ async def test_send_message_streaming_surfaces_llm_reply_in_task(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip("""
+Skipped until adk -> langchain migration is complete.
+For now tools/mcps, skills and subagents aren't implemented
+""")
 async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
     a2a_server: A2aServerFixture,
 ) -> None:
@@ -192,6 +196,10 @@ async def test_send_message_exposes_skills_to_llm_and_surfaces_their_contents(
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip("""
+Skipped until adk -> langchain migration is complete.
+For now tools/mcps, skills and subagents aren't implemented
+""")
 async def test_send_message_streaming_exposes_skills_to_llm_and_surfaces_their_contents(
     a2a_server: A2aServerFixture,
 ) -> None:

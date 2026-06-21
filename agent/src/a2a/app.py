@@ -1,7 +1,5 @@
-import logging
 from typing import Literal
 
-from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import (
@@ -20,62 +18,30 @@ from a2a.types import (
     SecurityScheme,
 )
 from authlib.oauth2.rfc8414 import get_well_known_url
-from google.adk.a2a.converters.request_converter import (
-    AgentRunRequest,
-    convert_a2a_request_to_agent_run_request,
-)
-from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
-from google.adk.a2a.executor.config import A2aAgentExecutorConfig
-from google.adk.agents import LlmAgent
-from google.adk.agents.run_config import StreamingMode
-from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
-from google.adk.auth.credential_service.in_memory_credential_service import (
-    InMemoryCredentialService,
-)
-from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
-from google.adk.runners import Runner
-from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from starlette.applications import Starlette
 
+from src.a2a.executor import LangGraphAgentExecutor
+from src.agent import LangChainAgent
 from src.auth.inbound import (
     ApiKeyAuthMiddleware,
     OAuth2BearerAuthMiddleware,
 )
 from src.config.types import (
+    AgentConfig,
     ApiKeyAuthConfig,
     OAuthConfig,
     ServerConfig,
 )
-from src.observability.logging import get_logger
-
-logger = get_logger(__name__)
 
 
 def build_agent_a2a_app(
     *,
-    agent: LlmAgent,
+    agent: LangChainAgent,
+    agent_config: AgentConfig,
     server_config: ServerConfig,
     auth_config: OAuthConfig | ApiKeyAuthConfig | Literal["none"],
 ) -> Starlette:
-    adk_logger = logging.getLogger("google_adk")
-    adk_logger.setLevel(logging.INFO)
-
-    async def create_runner() -> Runner:
-        return Runner(
-            app_name=agent.name,
-            agent=agent,
-            artifact_service=InMemoryArtifactService(),
-            session_service=InMemorySessionService(),
-            memory_service=InMemoryMemoryService(),
-            credential_service=InMemoryCredentialService(),
-        )
-
-    agent_executor = A2aAgentExecutor(
-        runner=create_runner,
-        config=A2aAgentExecutorConfig(request_converter=_request_converter),
-        use_legacy=False,
-        force_new_version=True,
-    )
+    agent_executor = LangGraphAgentExecutor(agent)
     request_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
         task_store=InMemoryTaskStore(),
@@ -103,7 +69,7 @@ def build_agent_a2a_app(
         app.add_middleware(
             OAuth2BearerAuthMiddleware,
             issuer_url=str(auth_config.issuer_url),
-            realm=agent.name,
+            realm=agent_config.name,
             config=auth_config.policies,
         )
         security_schemes = {
@@ -128,16 +94,16 @@ def build_agent_a2a_app(
         security_schemes = None
 
     agent_card = AgentCard(
-        name=agent.name,
-        description=agent.description,
+        name=agent_config.name,
+        description=agent_config.description,
         url=rpc_url,
         version="0.0.1",
         capabilities=AgentCapabilities(streaming=True),
         skills=[
             AgentSkill(
-                id=agent.name,
+                id=agent_config.name,
                 name="model",
-                description=agent.description,
+                description=agent_config.description,
                 tags=["llm"],
             )
         ],
@@ -157,12 +123,3 @@ def build_agent_a2a_app(
     )
     a2a_server.add_routes_to_app(app)
     return app
-
-
-def _request_converter(
-    request: RequestContext,
-    part_converter,
-) -> AgentRunRequest:
-    run_request = convert_a2a_request_to_agent_run_request(request, part_converter)
-    run_request.run_config.streaming_mode = StreamingMode.SSE
-    return run_request

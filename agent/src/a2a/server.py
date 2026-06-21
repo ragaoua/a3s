@@ -21,6 +21,7 @@ def build_a2a_server(config: Config) -> uvicorn.Server:
     )
     app = build_agent_a2a_app(
         agent=agent,
+        agent_config=config.agent,
         server_config=config.server,
         auth_config=config.auth,
     )

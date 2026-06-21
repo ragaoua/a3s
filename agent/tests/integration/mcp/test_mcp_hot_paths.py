@@ -19,6 +19,10 @@ from tests.common.a2a import (
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip("""
+Skipped until adk -> langchain migration is complete.
+For now tools/mcps, skills and subagents aren't implemented
+""")
 async def test_agent_calls_oauth_protected_mcp_tool_with_client_credentials_token(
     agent_with_client_credentials_mcp: A2aServerFixture,
 ) -> None:

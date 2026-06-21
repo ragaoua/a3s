@@ -1,10 +1,19 @@
-from google.adk.agents import LlmAgent
-from google.adk.models.lite_llm import LiteLlm
+from langchain.agents import AgentState, create_agent
+from langchain.agents.middleware.types import (
+    InputAgentState,
+    OutputAgentState,
+    ResponseT,
+)
+from langchain_openai import ChatOpenAI
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.typing import ContextT
 
-from src.agent.mcp import get_mcp_toolsets
-from src.agent.skills import get_skill_toolsets
-from src.agent.subagents import get_subagents
 from src.config.types import AgentConfig, LlmConfig, McpServerConfig
+
+LangChainAgent = CompiledStateGraph[
+    AgentState[ResponseT], ContextT, InputAgentState, OutputAgentState[ResponseT]
+]
 
 
 def build_agent(
@@ -12,20 +21,22 @@ def build_agent(
     llm_config: LlmConfig,
     agent_config: AgentConfig,
     mcp_servers_config: list[McpServerConfig],
-):
-    mcp_toolsets = get_mcp_toolsets(mcp_servers_config)
-    skills_toolsets = get_skill_toolsets(agent_config.skills_dir)
-    delegate_subagents, peer_subagents = get_subagents(agent_config.subagents)
+) -> LangChainAgent:
+    model = ChatOpenAI(
+        model=llm_config.model,
+        base_url=str(llm_config.api_url),
+        api_key=llm_config.api_key,
+    )
 
-    return LlmAgent(
-        model=LiteLlm(
-            model=f"openai/{llm_config.model}",
-            api_base=str(llm_config.api_url),
-            api_key=llm_config.api_key.get_secret_value(),
-        ),
+    # TODO: langchain-migration - wire MCP, skills, and subagent tools. These
+    # remain ADK-coupled and are handled in a follow-up; the core loop runs
+    # tool-less for now.
+    tools = []
+
+    return create_agent(
+        model,
+        tools,
+        system_prompt=agent_config.instructions,
         name=agent_config.name,
-        description=agent_config.description,
-        instruction=agent_config.instructions,
-        sub_agents=delegate_subagents,
-        tools=mcp_toolsets + skills_toolsets + peer_subagents,
+        checkpointer=InMemorySaver(),
     )

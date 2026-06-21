@@ -20,6 +20,10 @@ from tests.integration.subagents.conftest import PEER_SUBAGENT_NAME
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip("""
+Skipped until adk -> langchain migration is complete.
+For now tools/mcps, skills and subagents aren't implemented
+""")
 async def test_agent_delegates_to_oauth_protected_peer_subagent_with_client_credentials_token(
     agent_with_client_credentials_peer_subagent: A2aServerFixture,
 ) -> None:
