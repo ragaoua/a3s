@@ -2,8 +2,6 @@
 
 ## Option 1: Configure a kind cluster, then deploy the app on the cluster
 
-k
-
 ```bash
 ./deploy_app_in_kind.sh
 ```
@@ -51,3 +49,9 @@ Here :
 - 8000 is the internal port on which the agent is running inside its pod ;
 - 30081 is the port that's configured in [kind.yaml](kind.yaml) to be mapped to
   kind's host's 8000 port.
+
+# Deleting the cluster
+
+```bash
+KIND_EXPERIMENTAL_PROVIDER="podman" kind delete cluster --name a3s-kind
+```
