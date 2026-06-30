@@ -20,6 +20,8 @@ dependencies = [
     "opentelemetry-sdk>=1.38.0",
     "pyyaml>=6.0",
     "returns>=0.27.0",
+    "opentelemetry-instrumentation-starlette>=0.59b0",
+    "openinference-instrumentation-google-adk>=0.1.16",
 ]
 
 [build-system]

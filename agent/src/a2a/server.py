@@ -8,7 +8,6 @@ from src.config.types import (
     OAuthConfig,
 )
 from src.observability.logging import get_logger
-from src.observability.telemetry import TracingMiddleware
 
 logger = get_logger(__name__)
 
@@ -27,19 +26,10 @@ def build_a2a_server(config: Config) -> uvicorn.Server:
 
     if isinstance(config.auth, ApiKeyAuthConfig):
         logger.info("Auth mode: API Key")
-        auth_mode = "api_key"
     elif isinstance(config.auth, OAuthConfig):
         logger.info("Auth mode: OAuth2")
-        auth_mode = "oauth2"
     else:
         logger.info("Auth disabled.")
-        auth_mode = "none"
-
-    app.add_middleware(
-        TracingMiddleware,
-        agent_name=config.agent.name,
-        auth_mode=auth_mode,
-    )
 
     server = uvicorn.Server(
         uvicorn.Config(

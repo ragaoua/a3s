@@ -5,7 +5,6 @@ import logging
 from pydantic import ValidationError
 import uvicorn
 
-from src.a2a import build_a2a_server
 from src.config import load_config
 from src.observability.logging import setup_logging
 from src.observability.telemetry import setup_telemetry
@@ -42,6 +41,17 @@ def main() -> None:
 
     setup_logging(config.logging)
     setup_telemetry(config)
+
+    # NOTE: Lazily import build_a2a_server, after setup_telemetry().
+    # The StarletteInstrumentor used in setup_telemetry()
+    # patches in inbound-request tracing by swapping the class that
+    # `starlette.applications.Starlette` points to. `src.a2a.app`
+    # (which is imported by `src.a2a.server`) binds that name
+    # at import time via `from starlette.applications import Starlette`, so it
+    # only picks up the instrumented class if it's imported *after* the swap.
+    # Hoisting this to a top-level import would bind the un-instrumented class
+    # and silently drop all server-side request spans.
+    from src.a2a import build_a2a_server
 
     server = build_a2a_server(config)
 
