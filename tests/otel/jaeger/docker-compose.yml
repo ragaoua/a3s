@@ -1,0 +1,10 @@
+services:
+  jaeger:
+    container_name: a3s-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - 16686:16686
+      - 4317:4317
+      - 4318:4318
+    image: jaegertracing/jaeger:2.19.0

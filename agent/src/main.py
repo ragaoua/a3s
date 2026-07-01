@@ -5,10 +5,9 @@ import logging
 from pydantic import ValidationError
 import uvicorn
 
-from src.a2a import build_a2a_server
 from src.config import load_config
 from src.observability.logging import setup_logging
-from src.observability.telemetry import setup_telemetry
+from src.observability.telemetry import telemetry_instrumentation
 
 
 # We're not using LoggingManager because it
@@ -41,22 +40,34 @@ def main() -> None:
         raise SystemExit(1)
 
     setup_logging(config.logging)
-    setup_telemetry(config)
 
-    server = build_a2a_server(config)
+    with telemetry_instrumentation(config):
+        # NOTE: Lazily import build_a2a_server, inside the telemetry context.
+        # The StarletteInstrumentor set up by telemetry_instrumentation()
+        # patches in inbound-request tracing by swapping the class that
+        # `starlette.applications.Starlette` points to.
+        # `src.a2a.app` (which is imported by `src.a2a.server`) binds that name
+        # at import time via `from starlette.applications import Starlette`, so
+        # it only picks up the instrumented class if it's imported AFTER the
+        # swap.
+        # Hoisting this to a top-level import would bind the un-instrumented
+        # class and silently drop all server-side request spans.
+        from src.a2a import build_a2a_server
 
-    quit_watcher = threading.Thread(
-        target=_watch_stdin_for_quit,
-        args=(server,),
-        daemon=True,
-    )
-    quit_watcher.start()
+        server = build_a2a_server(config)
 
-    try:
-        logger.info('Type "q" and press Enter to quit the server.')
-        server.run()
-    except KeyboardInterrupt:
-        server.should_exit = True
+        quit_watcher = threading.Thread(
+            target=_watch_stdin_for_quit,
+            args=(server,),
+            daemon=True,
+        )
+        quit_watcher.start()
+
+        try:
+            logger.info('Type "q" and press Enter to quit the server.')
+            server.run()
+        except KeyboardInterrupt:
+            server.should_exit = True
 
 
 if __name__ == "__main__":

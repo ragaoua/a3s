@@ -1,9 +1,9 @@
 """End-to-end tests for the engine's real CLI entrypoint.
 
 Covers: console-script registration, `load_config()` reading YAML from disk,
-`${ENV_VAR}` substitution, `setup_logging` / `setup_telemetry`, OAuth2 inbound
-middleware under real Keycloak, an LLM round-trip against a real model, and
-the stdin `"q"` quit-watcher shutdown path in `src/main.py`.
+`${ENV_VAR}` substitution, OAuth2 inbound middleware under real Keycloak, an
+LLM round-trip against a real model, and the stdin `"q"` quit-watcher shutdown
+path in `src/main.py`.
 """
 
 from __future__ import annotations
