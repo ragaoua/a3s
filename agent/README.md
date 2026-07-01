@@ -50,15 +50,19 @@ unchanged.
 Set `A3S_OTEL_ENABLED=true` to enable OpenTelemetry tracing. When enabled,
 spans are batch-exported over OTLP/HTTP.
 
-The exporter honors the standard OpenTelemetry environment variables. It sends
-spans to `http://localhost:4318` by default; set `OTEL_EXPORTER_OTLP_ENDPOINT`
-to point at your OTLP backend:
+The runtime is agnostic to the telemetry backend. It emits standard OTLP and
+honors the standard OpenTelemetry environment variables, so it works with any
+OTLP-compatible backend (Jaeger, Langfuse, Honeycomb, Grafana, an OpenTelemetry
+collector, ...). Spans are sent to `http://localhost:4318` by default; set
+`OTEL_EXPORTER_OTLP_ENDPOINT` to point at your backend or collector:
 
 ```bash
 A3S_OTEL_ENABLED=true \
-    OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3002 \
+    OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:3002 \
     uv run a3s-agent
 ```
+
+The credential lives in the agent's environment with this option.
 
 With tracing enabled, the runtime relies on OpenTelemetry auto-instrumentation
 to emit:
@@ -67,6 +71,30 @@ to emit:
 - outbound HTTP spans for auth, MCP, and other `httpx` calls
 - ADK spans such as `invocation`, `invoke_agent`, `call_llm`, and
   `execute_tool`
+
+### Authenticated telemetry backends
+
+The agent holds no backend credentials of its own. If your backend requires
+authentication (Langfuse, for example), you have two options.
+
+**1. Delegate authentication to an OpenTelemetry collector (recommended for
+production).** Run a collector alongside the agent (e.g. a sidecar in the same
+Kubernetes pod) and point the agent at it. The collector then holds the backend
+credentials and authenticates on the agent's behalf.
+
+**2. Authenticate from the agent.** Set the standard
+`OTEL_EXPORTER_OTLP_HEADERS` variable and the exporter attaches it to every
+request. For example, Langfuse expects HTTP Basic auth derived from its public
+and secret keys:
+
+```bash
+A3S_OTEL_ENABLED=true \
+    OTEL_EXPORTER_OTLP_ENDPOINT="https://cloud.langfuse.com/api/public/otel" \
+    OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64)" \
+    uv run a3s-agent
+```
+
+**Note**: the same thing applies for self-hosted langfuse deployments.
 
 ## Basic Configuration
 
