@@ -47,14 +47,26 @@ unchanged.
 
 ## Telemetry
 
-Set `A3S_OTEL_ENABLED=true` to enable basic OpenTelemetry tracing. Traces are
-emitted to `stderr` with the console exporter.
+Set `A3S_OTEL_ENABLED=true` to enable OpenTelemetry tracing. When enabled,
+spans are batch-exported over OTLP/HTTP.
 
-With tracing enabled, the runtime emits:
+The exporter honors the standard OpenTelemetry environment variables. It sends
+spans to `http://localhost:4318` by default; set `OTEL_EXPORTER_OTLP_ENDPOINT`
+to point at your OTLP backend:
+
+```bash
+A3S_OTEL_ENABLED=true \
+    OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:3002 \
+    uv run a3s-agent
+```
+
+With tracing enabled, the runtime relies on OpenTelemetry auto-instrumentation
+to emit:
 
 - request spans for incoming HTTP traffic
 - outbound HTTP spans for auth, MCP, and other `httpx` calls
-- ADK spans such as `invocation`, `invoke_agent`, `call_llm`, and `execute_tool`
+- ADK spans such as `invocation`, `invoke_agent`, `call_llm`, and
+  `execute_tool`
 
 ## Basic Configuration
 
