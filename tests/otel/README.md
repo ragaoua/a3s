@@ -1,6 +1,9 @@
-# Run Jaeger to collect traces
+# Run open telemetry backend
+
+## Run Jaeger
 
 ```bash
+cd jaeger
 podman-compose up
 ```
 

@@ -1,5 +1,5 @@
 services:
-  all-in-one:
+  jaeger:
     container_name: a3s-jaeger
     environment:
       - COLLECTOR_OTLP_ENABLED=true
