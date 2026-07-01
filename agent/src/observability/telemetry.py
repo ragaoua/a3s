@@ -1,5 +1,7 @@
+from contextlib import contextmanager
 import logging
 import os
+from collections.abc import Generator
 from typing import Any
 
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
@@ -23,11 +25,13 @@ def _is_truthy(value: str | None) -> bool:
     return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def setup_telemetry(config: Config) -> None:
+@contextmanager
+def telemetry_instrumentation(config: Config) -> Generator[None]:
     if not _is_truthy(os.environ.get(_TELEMETRY_ENABLED_ENV_VAR)):
         logger.debug(
             f"OpenTelemetry disabled. Set {_TELEMETRY_ENABLED_ENV_VAR}=true to enable tracing.",
         )
+        yield
         return
 
     tracer_provider = TracerProvider(
@@ -55,3 +59,12 @@ def setup_telemetry(config: Config) -> None:
     StarletteInstrumentor().instrument(server_request_hook=server_request_hook)
 
     logger.info("OpenTelemetry tracing enabled (exporter: OTLP)")
+
+    try:
+        yield
+    finally:
+        # Flush and shut down the BatchSpanProcessor before the process
+        # exits. It queues spans and exports them asynchronously, so any
+        # spans still in the buffer are lost unless the provider is shut
+        # down cleanly.
+        tracer_provider.shutdown()
