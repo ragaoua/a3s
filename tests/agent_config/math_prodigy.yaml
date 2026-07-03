@@ -13,6 +13,6 @@ agent:
 
 server:
   listen_address: 127.0.0.1
-  listen_port: 8001
+  listen_port: 8002
 
 auth: none
