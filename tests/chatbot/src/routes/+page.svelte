@@ -2,9 +2,10 @@
 	import { enhance } from '$app/forms';
 	import type { Message } from '$lib/types/message.js';
 
-	const { form } = $props();
+	const { data, form } = $props();
 	let messages = $state<Message[]>([]);
 	let messageInput = $state('');
+	let agentUrl = $state(data.defaultAgentUrl);
 	let isSubmitting = $state(false);
 	$effect(() => {
 		if (form?.success && form.messages) {
@@ -15,6 +16,18 @@
 
 <div class="mx-auto flex h-screen max-w-3xl flex-col p-4">
 	<h1 class="mb-4 text-2xl font-bold">Chatbot</h1>
+
+	<!-- Agent URL -->
+	<label class="mb-4 flex items-center gap-2 text-sm text-gray-600">
+		<span class="whitespace-nowrap">Agent URL</span>
+		<input
+			type="url"
+			bind:value={agentUrl}
+			placeholder={data.defaultAgentUrl}
+			required
+			class="flex-1 rounded-lg border border-gray-300 px-3 py-1 focus:border-blue-500 focus:outline-none"
+		/>
+	</label>
 
 	<!-- Chat History -->
 	<div
@@ -55,6 +68,7 @@
 		class="flex gap-2"
 	>
 		<input type="hidden" name="chatHistory" value={JSON.stringify(messages)} />
+		<input type="hidden" name="agentUrl" value={agentUrl} />
 		<input
 			type="text"
 			name="message"
@@ -66,7 +80,7 @@
 		/>
 		<button
 			type="submit"
-			disabled={isSubmitting || messageInput.trim() === ''}
+			disabled={isSubmitting || messageInput.trim() === '' || agentUrl.trim() === ''}
 			class="rounded-lg bg-blue-500 px-6 py-2 text-white hover:bg-blue-600 disabled:bg-gray-300"
 		>
 			{isSubmitting ? 'Sending...' : 'Send'}

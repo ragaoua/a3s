@@ -1,15 +1,26 @@
-import { fail, type Actions } from '@sveltejs/kit';
-import { chatbotService } from '$lib/server/service/chatbotService';
+import { fail, type Actions, type Load } from '@sveltejs/kit';
+import { chatbotService, DEFAULT_AGENT_URL } from '$lib/server/service/chatbotService';
 import type { Message } from '$lib/types/message';
+
+export const load: Load = () => {
+	return {
+		defaultAgentUrl: DEFAULT_AGENT_URL
+	};
+};
 
 export const actions = {
 	sendMessage: async ({ request }) => {
 		const data = await request.formData();
 		const message = data.get('message')?.toString();
 		const chatHistoryJson = data.get('chatHistory')?.toString();
+		const agentUrl = data.get('agentUrl')?.toString().trim();
 
 		if (!message || message.trim() === '') {
 			return fail(400, { error: 'Message cannot be empty' });
+		}
+
+		if (!agentUrl) {
+			return fail(400, { error: 'Agent URL cannot be empty' });
 		}
 
 		try {
@@ -19,7 +30,7 @@ export const actions = {
 				chatbotService.newChat();
 			}
 
-			const assistantMessage = await chatbotService.chat(message);
+			const assistantMessage = await chatbotService.chat(message, agentUrl);
 
 			chatHistory.push(
 				...([

@@ -1,7 +1,8 @@
-import { env } from '$env/dynamic/private';
 import type { Message, MessageSendParams, Task } from '@a2a-js/sdk';
 import { ClientFactory } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
+
+export const DEFAULT_AGENT_URL = 'http://localhost:8000';
 
 function getMessageResponse(message: Message) {
 	return message.parts
@@ -30,10 +31,9 @@ class ChatbotService {
 		this.contextId = undefined;
 	}
 
-	async chat(userMessage: string): Promise<string> {
-		const port = env.AGENT_PORT ?? '8000';
+	async chat(userMessage: string, agentUrl: string): Promise<string> {
 		const factory = new ClientFactory();
-		const client = await factory.createFromUrl(`http://localhost:${port}`);
+		const client = await factory.createFromUrl(agentUrl);
 
 		const sendParams: MessageSendParams = {
 			message: {
