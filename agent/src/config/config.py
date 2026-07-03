@@ -2,7 +2,7 @@ import os
 import re
 from collections.abc import Mapping
 from pathlib import Path
-from typing import ClassVar, Literal, cast
+from typing import ClassVar, cast
 
 import yaml
 from pydantic import (
@@ -15,7 +15,7 @@ from pydantic_core import InitErrorDetails
 
 from src.config.types import (
     AgentConfig,
-    ApiKeyAuthConfig,
+    AuthConfig,
     LlmConfig,
     LoggingConfig,
     McpServerConfig,
@@ -39,7 +39,7 @@ class Config(StrictModel):
     llm: LlmConfig
     agent: AgentConfig
     server: ServerConfig = ServerConfig()
-    auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"]
+    auth: AuthConfig
     mcp_servers: list[McpServerConfig] = list()
     logging: LoggingConfig = LoggingConfig()
 

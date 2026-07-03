@@ -1,15 +1,13 @@
 from pathlib import Path
-from typing import Literal
 from pydantic import SecretStr
 from pydantic_core import Url
 from ipaddress import IPv4Address
 from src.config import Config
 from src.config.types import (
     AgentConfig,
-    ApiKeyAuthConfig,
+    AuthConfig,
     LlmConfig,
     McpServerConfig,
-    OAuthConfig,
     ServerConfig,
 )
 
@@ -26,7 +24,7 @@ def get_base_test_config(
         description="A helpful coding assistant",
         instructions="You are a coding agent. Use the tools provided to access the user's requests regarding coding tasks",
     ),
-    auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"] = "none",
+    auth: AuthConfig,
     server: ServerConfig = ServerConfig(
         listen_port=12345,
         listen_address=IPv4Address("127.0.0.1"),

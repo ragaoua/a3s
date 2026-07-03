@@ -1,6 +1,7 @@
 from .llm import LlmConfig
 from .agent import AgentConfig, SubagentConfig
 from .auth import (
+    AuthConfig,
     ApiKeyAuthConfig,
     OAuthConfig,
     OAuthPoliciesConfig,
@@ -23,6 +24,7 @@ __all__ = [
     "LlmConfig",
     "AgentConfig",
     "SubagentConfig",
+    "AuthConfig",
     "ApiKeyAuthConfig",
     "OAuthConfig",
     "OAuthPoliciesConfig",

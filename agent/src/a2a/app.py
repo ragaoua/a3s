@@ -1,5 +1,4 @@
 import logging
-from typing import Literal
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
@@ -43,6 +42,7 @@ from src.auth.inbound import (
 )
 from src.config.types import (
     ApiKeyAuthConfig,
+    AuthConfig,
     OAuthConfig,
     ServerConfig,
 )
@@ -55,7 +55,7 @@ def build_agent_a2a_app(
     *,
     agent: LlmAgent,
     server_config: ServerConfig,
-    auth_config: OAuthConfig | ApiKeyAuthConfig | Literal["none"],
+    auth_config: AuthConfig,
 ) -> Starlette:
     adk_logger = logging.getLogger("google_adk")
     adk_logger.setLevel(logging.INFO)

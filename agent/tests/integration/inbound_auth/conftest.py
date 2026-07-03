@@ -18,7 +18,6 @@ import socket
 import threading
 from collections.abc import Iterator
 from ipaddress import IPv4Address
-from typing import Literal
 
 import pytest
 from pydantic import SecretStr
@@ -27,6 +26,7 @@ from pydantic_core import Url
 from src.a2a.server import build_a2a_server
 from src.config.types import (
     ApiKeyAuthConfig,
+    AuthConfig,
     OAuthConfig,
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
@@ -53,7 +53,7 @@ FAKE_OAUTH2_ISSUER = Url("https://issuer.example")
 
 def _start_agent_server(
     *,
-    auth: OAuthConfig | ApiKeyAuthConfig | Literal["none"],
+    auth: AuthConfig,
     mock_llm: LlmFixture,
 ) -> Iterator[A2aServerFixture]:
     with socket.socket() as s:

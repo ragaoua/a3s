@@ -85,3 +85,6 @@ class OAuthConfig(StrictModel):
 class ApiKeyAuthConfig(StrictModel):
     mode: Literal["api_key"]
     api_key: SecretStr = Field(min_length=1)
+
+
+AuthConfig = OAuthConfig | ApiKeyAuthConfig | Literal["none"]
