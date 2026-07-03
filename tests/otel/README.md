@@ -38,7 +38,7 @@ LANGFUSE_INIT_ORG_ID=my-org \
 wget https://raw.githubusercontent.com/langfuse/langfuse/refs/heads/main/docker-compose.yml
 ```
 
-Access `localhost:3000` and register a new user.
+Access `localhost:3000` and log in with `john@doe.com`:`password$1`
 
 Run the agent :
 
