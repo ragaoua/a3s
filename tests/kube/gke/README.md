@@ -45,9 +45,9 @@ terraform init
 terraform apply -target=google_artifact_registry_repository.a3s
 
 # Build and push the images
-podman build --arch amd64 -t "${REGISTRY}/agent:latest" ../../agent/
-podman build --arch amd64 -t "${REGISTRY}/app:latest"   ../../app/
-podman build --arch amd64 -t "${REGISTRY}/mcp:latest"   ../../tests/mcp/
+podman build --arch amd64 -t "${REGISTRY}/agent:latest" ../../../agent/
+podman build --arch amd64 -t "${REGISTRY}/app:latest"   ../../../app/
+podman build --arch amd64 -t "${REGISTRY}/mcp:latest"   ../../../tests/mcp/
 podman push "${REGISTRY}/agent:latest"
 podman push "${REGISTRY}/app:latest"
 podman push "${REGISTRY}/mcp:latest"

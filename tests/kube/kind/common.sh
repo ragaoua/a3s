@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-KIND_DIR="${ROOT_DIR}/tests/kind"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+KIND_DIR="${ROOT_DIR}/tests/kube/kind"
 APP_DIR="${ROOT_DIR}/app"
 AGENT_DIR="${ROOT_DIR}/agent"
 MCP_DIR="${ROOT_DIR}/tests/mcp"
