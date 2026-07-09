@@ -2,9 +2,6 @@
 
 set -euo pipefail
 
-# Project grooming
-uv run --directory agent deptry src tests
-
 # Tests
 staged_files="$(git diff --cached --name-only --diff-filter=ACMRD)"
 
@@ -12,5 +9,6 @@ if ! printf '%s\n' "$staged_files" | grep -Eq '^agent/(src|tests)/'; then
   exit 0
 fi
 
-echo "Detected staged changes in agent/src or agent/tests. Running agent tests..."
+echo "Detected staged changes in agent/src or agent/tests. Running tests..."
+uv run --directory agent deptry src tests
 uv run --directory agent pytest -s
