@@ -41,6 +41,8 @@ deployment:
   serviceAccount: app-sa
   serviceAccountNamespace: app-ns
   agentsNamespace: agents-ns
+auth:
+  enabled: false
 EOF
 
 log "Running app..."
