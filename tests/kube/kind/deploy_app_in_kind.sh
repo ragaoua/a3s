@@ -16,7 +16,7 @@ metadata:
   namespace: app-ns
 data:
   config.yaml: |
-    agentImage: localhost/a3s-agent
+    agentImage: ${AGENT_IMAGE}
     deployment:
       mode: inCluster
       agentsNamespace: agents-ns
@@ -39,7 +39,7 @@ spec:
   containers:
     - name: app
       image: ${APP_IMAGE}
-      imagePullPolicy: Never
+      imagePullPolicy: Always
       env:
         - name: ORIGIN
           value: http://localhost:8080

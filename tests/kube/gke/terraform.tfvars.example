@@ -1,0 +1,19 @@
+project_id = "prj-a3s"
+region     = "europe-west1"
+zone       = "europe-west1-b"
+
+cluster_name = "a3s-gke"
+machine_type = "e2-medium"
+node_count   = 1
+
+# Push images to Artifact Registry first:
+#   REGISTRY="europe-west1-docker.pkg.dev/prj-a3s/a3s"
+#   podman build -t $REGISTRY/agent:latest agent/
+#   podman build -t $REGISTRY/app:latest   app/
+#   podman build -t $REGISTRY/mcp:latest   tests/mcp/
+#   podman push $REGISTRY/agent:latest
+#   podman push $REGISTRY/app:latest
+#   podman push $REGISTRY/mcp:latest
+app_image   = "europe-west1-docker.pkg.dev/prj-a3s/a3s/app:latest"
+agent_image = "europe-west1-docker.pkg.dev/prj-a3s/a3s/agent:latest"
+mcp_image   = "europe-west1-docker.pkg.dev/prj-a3s/a3s/mcp:latest"

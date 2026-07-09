@@ -54,4 +54,5 @@ Here :
 
 ```bash
 KIND_EXPERIMENTAL_PROVIDER="podman" kind delete cluster --name a3s-kind
+podman rm -f a3s-kind-registry
 ```

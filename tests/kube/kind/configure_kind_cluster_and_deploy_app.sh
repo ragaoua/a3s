@@ -32,7 +32,7 @@ k8s_ca_data="$(
 config_path="${APP_DIR}/build/config.yaml"
 log "Writing app config to ${config_path}..."
 cat >"${config_path}" <<EOF
-agentImage: ${A3S_AGENT_IMAGE}
+agentImage: ${AGENT_IMAGE}
 deployment:
   mode: remote
   clusterName: a3s-kind
@@ -41,6 +41,8 @@ deployment:
   serviceAccount: app-sa
   serviceAccountNamespace: app-ns
   agentsNamespace: agents-ns
+auth:
+  enabled: false
 EOF
 
 log "Running app..."

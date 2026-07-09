@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-KIND_DIR="${ROOT_DIR}/tests/kind"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+KIND_DIR="${ROOT_DIR}/tests/kube/kind"
 APP_DIR="${ROOT_DIR}/app"
 AGENT_DIR="${ROOT_DIR}/agent"
 MCP_DIR="${ROOT_DIR}/tests/mcp"
@@ -10,9 +10,12 @@ MCP_DIR="${ROOT_DIR}/tests/mcp"
 KIND_CLUSTER_NAME="${KIND_CLUSTER_NAME-a3s-kind}"
 KUBE_CONTEXT="kind-${KIND_CLUSTER_NAME}"
 
-AGENT_IMAGE="localhost/a3s-agent"
-APP_IMAGE="localhost/a3s-app"
-MCP_IMAGE="localhost/a3s-mcp"
+REGISTRY_NAME="a3s-kind-registry"
+REGISTRY_PORT=5001
+
+AGENT_IMAGE="localhost:${REGISTRY_PORT}/a3s-agent"
+APP_IMAGE="localhost:${REGISTRY_PORT}/a3s-app"
+MCP_IMAGE="localhost:${REGISTRY_PORT}/a3s-mcp"
 
 log() {
   # shellcheck disable=SC2059
@@ -31,9 +34,38 @@ require_cmd() {
   fi
 }
 
-load_image_to_kind() {
-  local image="$1"
-  kind load image-archive --name "${KIND_CLUSTER_NAME}" <(podman save "${image}" --format oci-archive)
+ensure_registry() {
+  if podman inspect "${REGISTRY_NAME}" &>/dev/null; then
+    if [ "$(podman inspect -f '{{.State.Running}}' "${REGISTRY_NAME}")" != "true" ]; then
+      log "Starting existing registry container..."
+      podman start "${REGISTRY_NAME}"
+    else
+      log "Registry already running."
+    fi
+  else
+    log "Creating registry container..."
+    podman run -d --restart=always \
+      -p "127.0.0.1:${REGISTRY_PORT}:5000" \
+      --name "${REGISTRY_NAME}" \
+      registry:2
+  fi
+}
+
+configure_registry_for_kind() {
+  local node="${KIND_CLUSTER_NAME}-control-plane"
+  local registry_dir="/etc/containerd/certs.d/localhost:${REGISTRY_PORT}"
+
+  log "Configuring registry for kind node ${node}..."
+  podman exec "${node}" mkdir -p "${registry_dir}"
+  podman exec -i "${node}" cp /dev/stdin "${registry_dir}/hosts.toml" <<EOF
+[host."http://${REGISTRY_NAME}:5000"]
+  capabilities = ["pull", "resolve"]
+EOF
+
+  if ! podman inspect -f '{{json .NetworkSettings.Networks.kind}}' "${REGISTRY_NAME}" 2>/dev/null | grep -q 'kind'; then
+    log "Connecting registry to kind network..."
+    podman network connect kind "${REGISTRY_NAME}"
+  fi
 }
 
 ensure_dependencies() {
@@ -63,11 +95,11 @@ build_images() {
   podman build -t "${MCP_IMAGE}" "${MCP_DIR}"
 }
 
-load_images() {
-  log "Loading images into kind cluster..."
-  load_image_to_kind "${AGENT_IMAGE}"
-  load_image_to_kind "${APP_IMAGE}"
-  load_image_to_kind "${MCP_IMAGE}"
+push_images() {
+  log "Pushing images to local registry..."
+  podman push --tls-verify=false "${AGENT_IMAGE}"
+  podman push --tls-verify=false "${APP_IMAGE}"
+  podman push --tls-verify=false "${MCP_IMAGE}"
 }
 
 apply_rbac_and_namespaces() {
@@ -95,7 +127,7 @@ spec:
   containers:
     - name: mcp
       image: ${MCP_IMAGE}
-      imagePullPolicy: Never
+      imagePullPolicy: Always
       args:
         - --no-auth
         - --stateless
@@ -129,9 +161,11 @@ get_mcp_node_internal_ip() {
 
 prepare_kind_cluster() {
   ensure_dependencies
+  ensure_registry
   ensure_kind_cluster
+  configure_registry_for_kind
   build_images
-  load_images
+  push_images
   apply_rbac_and_namespaces
   apply_mcp
 }

@@ -91,7 +91,7 @@ export abstract class AgentService {
 								{
 									name: kubernetesAgentName,
 									image: this.a3sAgentImage,
-									imagePullPolicy: 'Never',
+									imagePullPolicy: 'Always',
 									stdin: true,
 									tty: true,
 									ports: [{ containerPort: runtimeConfig.server.listen_port }],

@@ -17,4 +17,5 @@ const authorize: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
-export const handle = authEnabled ? sequence(authHandle, authorize) : authHandle;
+export const handle: Handle = (input) =>
+	(authEnabled() ? sequence(authHandle, authorize) : authHandle)(input);
