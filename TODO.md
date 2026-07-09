@@ -25,7 +25,6 @@ Non-exhaustive list of features and enablers to implement; subject to change.
   - AG-UI support ?
   - Add builtin code execution tool (with opt-in/out configuration)
 - Technical enablers:
-  - Test deploying to GKE/EKS
   - monkeypatch the llm call. Right now, test_no_auth.py::test_agent_is_reachable_in_no_auth_mode
     passes but the agent actually throws an error since llm.api_url is fake
 
