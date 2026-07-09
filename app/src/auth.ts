@@ -2,41 +2,50 @@ import { SvelteKitAuth } from '@auth/sveltekit';
 import type { Handle } from '@sveltejs/kit';
 import { getConfig } from '$lib/server/config';
 
-const auth = getConfig().auth;
-
 function buildAuth() {
+	const auth = getConfig().auth;
 	if (!auth.enabled) {
-		const passthroughHandle: Handle = ({ event, resolve }) => {
-			event.locals.auth = async () => null;
-			return resolve(event);
-		};
-		const noopAction = async () => {};
 		return {
-			handle: passthroughHandle,
-			signIn: noopAction,
-			signOut: noopAction
+			handle: (({ event, resolve }) => {
+				event.locals.auth = async () => null;
+				return resolve(event);
+			}) satisfies Handle,
+			signIn: async () => {},
+			signOut: async () => {},
+			enabled: false
 		};
 	}
 
-	return SvelteKitAuth({
-		secret: auth.secret,
-		trustHost: true,
-		providers: [
-			{
-				id: 'oidc',
-				name: 'OIDC',
-				type: 'oidc',
-				issuer: auth.issuerUrl,
-				clientId: auth.clientId,
-				clientSecret: auth.clientSecret,
-				...(auth.publicClient && { client: { token_endpoint_auth_method: 'none' } })
+	return {
+		...SvelteKitAuth({
+			secret: auth.secret,
+			trustHost: true,
+			providers: [
+				{
+					id: 'oidc',
+					name: 'OIDC',
+					type: 'oidc',
+					issuer: auth.issuerUrl,
+					clientId: auth.clientId,
+					clientSecret: auth.clientSecret,
+					...(auth.publicClient && { client: { token_endpoint_auth_method: 'none' } })
+				}
+			],
+			pages: {
+				signIn: '/signin'
 			}
-		],
-		pages: {
-			signIn: '/signin'
-		}
-	});
+		}),
+		enabled: true
+	};
 }
 
-export const authEnabled = auth.enabled;
-export const { handle, signIn, signOut } = buildAuth();
+let auth: ReturnType<typeof buildAuth>;
+function getAuth() {
+	if (!auth) auth = buildAuth();
+	return auth;
+}
+
+export const handle: Handle = (input) => getAuth().handle(input);
+export const authEnabled = () => getAuth().enabled;
+export const signIn: typeof auth.signIn = (...args) => getAuth().signIn(...args);
+export const signOut: typeof auth.signOut = (...args) => getAuth().signOut(...args);
