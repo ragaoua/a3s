@@ -6,7 +6,6 @@ from typing import override
 
 import httpx
 import jwt
-from mcp.shared._httpx_utils import create_mcp_http_client
 from pydantic import JsonValue
 from pydantic_core import Url
 
@@ -44,31 +43,6 @@ class OAuthClientCredentialsAuth(httpx.Auth):
             server_auth_config.client_id,
         )
         self._fetch_json: FetchJson = fetch_json
-
-    @staticmethod
-    def build_factory(
-        server_url: Url,
-        server_auth_config: OAuthClientCredentialsAuthConfig,
-    ):
-        def factory(
-            headers: dict[str, str] | None = None,
-            timeout: httpx.Timeout | None = None,
-            auth: httpx.Auth | None = None,
-        ) -> httpx.AsyncClient:
-            return create_mcp_http_client(
-                headers=headers,
-                timeout=timeout,
-                auth=(
-                    auth
-                    if auth is not None
-                    else OAuthClientCredentialsAuth(
-                        server_url,
-                        server_auth_config,
-                    )
-                ),
-            )
-
-        return factory
 
     @override
     async def async_auth_flow(

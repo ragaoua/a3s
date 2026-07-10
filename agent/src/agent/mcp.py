@@ -1,6 +1,9 @@
+import httpx
 from google.adk.agents.llm_agent import ToolUnion
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
+from mcp.shared._httpx_utils import create_mcp_http_client
+from pydantic_core import Url
 
 from src.auth.context import get_current_authorization_header
 from src.auth.outbound import OAuthClientCredentialsAuth
@@ -20,7 +23,7 @@ def get_mcp_toolsets(config: list[McpServerConfig]) -> list[ToolUnion]:
         if isinstance(server_config.auth, OAuthClientCredentialsAuthConfig):
             connection_params = StreamableHTTPConnectionParams(
                 url=str(server_config.url),
-                httpx_client_factory=OAuthClientCredentialsAuth.build_factory(
+                httpx_client_factory=_build_mcp_http_client_factory(
                     server_config.url,
                     server_config.auth,
                 ),
@@ -54,3 +57,28 @@ def _oauth_token_forward_header_provider(
         return {}
 
     return {"Authorization": authorization_header}
+
+
+def _build_mcp_http_client_factory(
+    server_url: Url,
+    server_auth_config: OAuthClientCredentialsAuthConfig,
+):
+    def factory(
+        headers: dict[str, str] | None = None,
+        timeout: httpx.Timeout | None = None,
+        auth: httpx.Auth | None = None,
+    ) -> httpx.AsyncClient:
+        return create_mcp_http_client(
+            headers=headers,
+            timeout=timeout,
+            auth=(
+                auth
+                if auth is not None
+                else OAuthClientCredentialsAuth(
+                    server_url,
+                    server_auth_config,
+                )
+            ),
+        )
+
+    return factory
