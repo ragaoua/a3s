@@ -33,6 +33,7 @@ from google.adk.auth.credential_service.in_memory_credential_service import (
 )
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
+from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
 from starlette.applications import Starlette
 
@@ -45,10 +46,17 @@ from src.config.types import (
     AuthConfig,
     OAuthConfig,
     ServerConfig,
+    SessionsConfig,
 )
 from src.observability.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _sqlalchemy_db_url(sessions_config: SessionsConfig) -> str:
+    """The connect string normalized to the asyncpg SQLAlchemy driver."""
+    _, _, rest = str(sessions_config.connect_string.get_secret_value()).partition("://")
+    return f"postgresql+asyncpg://{rest}"
 
 
 def build_agent_a2a_app(
@@ -56,16 +64,23 @@ def build_agent_a2a_app(
     agent: LlmAgent,
     server_config: ServerConfig,
     auth_config: AuthConfig,
+    sessions_config: SessionsConfig | None = None,
 ) -> Starlette:
     adk_logger = logging.getLogger("google_adk")
     adk_logger.setLevel(logging.INFO)
+
+    session_service = (
+        DatabaseSessionService(db_url=_sqlalchemy_db_url(sessions_config))
+        if sessions_config is not None
+        else InMemorySessionService()
+    )
 
     async def create_runner() -> Runner:
         return Runner(
             app_name=agent.name,
             agent=agent,
             artifact_service=InMemoryArtifactService(),
-            session_service=InMemorySessionService(),
+            session_service=session_service,
             memory_service=InMemoryMemoryService(),
             credential_service=InMemoryCredentialService(),
         )

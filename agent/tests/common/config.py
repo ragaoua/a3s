@@ -9,6 +9,7 @@ from src.config.types import (
     LlmConfig,
     McpServerConfig,
     ServerConfig,
+    SessionsConfig,
 )
 
 
@@ -30,6 +31,7 @@ def get_base_test_config(
         listen_address=IPv4Address("127.0.0.1"),
     ),
     mcp_servers: list[McpServerConfig] = list(),
+    sessions: SessionsConfig | None = None,
 ) -> Config:
     return Config(
         llm=llm,
@@ -37,6 +39,7 @@ def get_base_test_config(
         auth=auth,
         server=server,
         mcp_servers=mcp_servers,
+        sessions=sessions,
     )
 
 

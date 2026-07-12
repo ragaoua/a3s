@@ -21,6 +21,7 @@ from src.config.types import (
     McpServerConfig,
     OAuthConfig,
     ServerConfig,
+    SessionsConfig,
 )
 from src.config.types.common import StrictModel
 
@@ -40,6 +41,7 @@ class Config(StrictModel):
     agent: AgentConfig
     server: ServerConfig = ServerConfig()
     auth: AuthConfig
+    sessions: SessionsConfig | None = None
     mcp_servers: list[McpServerConfig] = list()
     logging: LoggingConfig = LoggingConfig()
 

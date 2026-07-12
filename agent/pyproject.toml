@@ -5,6 +5,7 @@ description = "a2s configurable agent server"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "asyncpg>=0.31.0", # Postgres driver, loaded by sqlalchemy through the sessions connect string
     "authlib>=1.3.0",
     "google-adk[a2a,extensions]>=1.31.0", # extensions provides litellm
     "a2a-sdk>=0.3.4,<0.4", # Forced by google-adk[a2a]
@@ -41,7 +42,7 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-httpserver>=1.1.5",
     "pytest-iam>=0.2.5",
-    "testcontainers[keycloak]>=4.9.0",
+    "testcontainers[keycloak,postgres]>=4.9.0",
     "deptry>=0.25.1"
 ]
 
@@ -54,6 +55,9 @@ markers = [
 
 [tool.deptry]
 known_first_party = ["src"]
+
+[tool.deptry.per_rule_ignores]
+DEP002 = ["asyncpg"] # never imported directly; sqlalchemy loads it from the connect string
 
 [tool.deptry.package_module_name_map]
 pydantic = ["pydantic", "pydantic_core"] # pydantic_core ships separately but is guaranteed by pydantic;
