@@ -96,7 +96,9 @@ A3S_OTEL_ENABLED=true \
 
 **Note**: the same thing applies for self-hosted langfuse deployments.
 
-## Basic Configuration
+## Configuration
+
+### Basic settings
 
 Basic configuration settings are:
 
@@ -112,7 +114,7 @@ Basic configuration settings are:
   - "DEBUG"
 - `logging.format`: `json` or `plain`. Defaults to `plain`
 
-## Skills
+### Skills
 
 The engine loads all skills found under the directory pointed by
 `agent.skills_dir`. skills under this directory are expected to comply with the
@@ -126,7 +128,7 @@ so scripts provided to an agent as part of a skill (under the skill's
 missing, not a directory, or empty, the agent starts without loading any
 skills.
 
-## Subagents
+### Subagents
 
 Configure subagents with the `agent.subagents` parameter as a mapping where the
 key is the subagent's name and the value is an object with `url`, `type`, and
@@ -183,7 +185,7 @@ Supported subagent auth modes are:
   requires root-level `auth.mode: oauth2`, but this mode is not implemented yet
   and currently fails closed at runtime.
 
-## LLM Support
+### LLM Support
 
 The engine supports any OpenAI-compatible API for connecting to an LLM.
 Configure these fields:
@@ -193,7 +195,7 @@ Configure these fields:
   recommended
 - `llm.model` (**required**)
 
-## Authorization
+### Authorization
 
 The agent supports 3 authorization modes configured through the **required**
 `auth` field:
@@ -205,7 +207,7 @@ The agent supports 3 authorization modes configured through the **required**
 **Note**: the agent card endpoint (`/.well-known/agent-card.json`) is publicly
 accessible, even when auth is enabled.
 
-### API Key
+#### API Key
 
 If API Key auth is configured, the agent will look for an `API-Key` HTTP header
 for every request, and check its value against the configured API key.
@@ -213,7 +215,7 @@ for every request, and check its value against the configured API key.
 This mode **requires** that `auth.api_key` be set to any arbitrary string. Use of
 environment variable substitution is highly recommended.
 
-### OAuth2
+#### OAuth2
 
 If OAuth2 mode is enabled, the agent will look for a bearer token in the
 `Authorization` HTTP header upon receiving a request. It will then validate the
@@ -260,33 +262,7 @@ configured. Both can be set simultaneously.
 For more information about how tokens are validated, check out
 [docs/oauth-token-validation.md](docs/oauth-token-validation.md)
 
-## End-to-end tests
-
-A manual end-to-end suite under `tests/e2e/` drives the engine through its real
-`a3s-agent` entrypoint against a real LLM under OAuth2 inbound auth. The suite
-is gated behind the `e2e` pytest marker so it's excluded from the default
-`pytest` run, and behind three env vars that point at the LLM endpoint. Run it
-with `-m e2e` after exporting them:
-
-```bash
-A3S_LLM_API_URL=http://localhost:11434/v1 \
-    A3S_LLM_API_KEY=ollama \
-    A3S_LLM_MODEL="qwen2.5:7b" \
-    uv run pytest -m e2e
-```
-
-**Note**: `A3S_LLM_API_URL` is used as-is by the host-side test. For the
-containerised test, the suite rewrites `localhost`/`127.0.0.1` in that URL to
-`host.docker.internal` so the agent container can reach a host-side LLM through
-the docker host-gateway alias. Remote provider URLs pass through unchanged.
-
-E2E tests assert only that some non-empty text comes back within the timeout,
-not on response content; they exist to catch breakage in the engine glue
-(config loading, env-var substitution, OAuth2 middleware, CLI shutdown path)
-that no other test layer exercises. Without the env vars set, every test in
-the suite skips.
-
-## MCP configuration
+### MCP configuration
 
 Define the MCP servers an agent has access to with `mcp_servers` as a YAML list
 of objects. Each entry must include a `url` and an `auth` property:
