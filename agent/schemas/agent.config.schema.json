@@ -794,6 +794,27 @@
       "title": "ServerConfig",
       "type": "object"
     },
+    "SessionsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "connect_string": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "format": "multi-host-uri",
+              "minLength": 1,
+              "title": "Connect String",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "required": [
+        "connect_string"
+      ],
+      "title": "SessionsConfig",
+      "type": "object"
+    },
     "SubagentConfig": {
       "additionalProperties": false,
       "properties": {
@@ -884,6 +905,17 @@
         }
       ],
       "title": "Auth"
+    },
+    "sessions": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SessionsConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "mcp_servers": {
       "default": [],

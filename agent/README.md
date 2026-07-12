@@ -195,6 +195,21 @@ Configure these fields:
   recommended
 - `llm.model` (**required**)
 
+### Session persistence
+
+By default, sessions/conversations with the agent are kept in memory and lost
+when the agent stops or restarts. To persist them, point the agent at a
+PostgreSQL database using `sessions.connect_string`.
+
+The connect string is a PostgreSQL URL of the form
+`postgresql://user:password@host:5432/database` (`postgres` is also
+accepted as a scheme). The engine creates the required tables on first
+use, so **the configured user needs DDL privileges on the target
+database**.
+
+**Note**: Use of environment variable substitution is highly recommended to
+protect the `password` contained in the connect string.
+
 ### Authorization
 
 The agent supports 3 authorization modes configured through the **required**

@@ -17,6 +17,7 @@ import docker
 import pytest
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.network import Network
+from testcontainers.postgres import PostgresContainer
 
 from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
 from tests.common.containers_utilities import (
@@ -58,6 +59,8 @@ _SUBAGENT_INTERNAL_PORT = 3000
 _SUBAGENT_AUDIENCE = "a3s-subagent"  # This needs to correspond to the audience configured in the keycloak
 _SUBAGENT_IMAGE_TAG = "a3s-agent-test-subagent:latest"
 _SUBAGENT_RESPONSE_TEXT = "Subagent acknowledged the request."
+
+_POSTGRES_IMAGE = "postgres:18-alpine"
 
 _CONTAINERS_DIR = Path(__file__).parent / "containers"
 _MCP_IMAGE_CONTEXT = _CONTAINERS_DIR / "mcp_server"
@@ -282,6 +285,21 @@ def subagent_server(
         _record_leaked_endpoint("Subagent server (external)", external_url)
 
         yield SubagentServerFixture(url=external_url)
+    finally:
+        if not _session_state.has_failures:
+            container.stop()
+
+
+@pytest.fixture(scope="session")
+def postgres_connect_string(_integration_network: Network) -> Iterator[str]:
+    container = PostgresContainer(_POSTGRES_IMAGE)
+    with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
+
+    container.start()
+    try:
+        connect_string = container.get_connection_url(driver=None)
+        _record_leaked_endpoint("Postgres (external)", connect_string)
+        yield connect_string
     finally:
         if not _session_state.has_failures:
             container.stop()
