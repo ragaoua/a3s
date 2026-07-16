@@ -22,6 +22,7 @@ from src.config.types import ServerConfig, SessionsConfig
 from tests.common.a2a import create_send_message_payload, wait_for_agent_card
 from tests.common.config import get_base_test_config
 from tests.common.llm import LlmFixture
+from tests.integration.common.session_service_db import SessionServiceDbFixture
 
 
 @contextmanager
@@ -76,10 +77,10 @@ async def _send_message(base_url: str, *, text: str, context_id: str) -> Task:
 @pytest.mark.asyncio
 async def test_conversation_is_stored_in_postgres(
     mock_llm: LlmFixture,
-    postgres_connect_string: str,
+    session_service_db: SessionServiceDbFixture,
 ) -> None:
     sessions = SessionsConfig.model_validate(
-        {"connect_string": postgres_connect_string}
+        {"connect_string": session_service_db.connect_string}
     )
     context_id = uuid4().hex
 
@@ -87,7 +88,7 @@ async def test_conversation_is_stored_in_postgres(
     with _running_agent_server(mock_llm=mock_llm, sessions=sessions) as base_url:
         _ = await _send_message(base_url, text="hi", context_id=context_id)
 
-    connection = await asyncpg.connect(postgres_connect_string)
+    connection = await asyncpg.connect(session_service_db.connect_string)
     try:
         session_row = await connection.fetchrow(
             "SELECT app_name, user_id FROM sessions WHERE id = $1", context_id
@@ -107,10 +108,10 @@ async def test_conversation_is_stored_in_postgres(
 @pytest.mark.asyncio
 async def test_conversation_survives_server_restart(
     mock_llm: LlmFixture,
-    postgres_connect_string: str,
+    session_service_db: SessionServiceDbFixture,
 ) -> None:
     sessions = SessionsConfig.model_validate(
-        {"connect_string": postgres_connect_string}
+        {"connect_string": session_service_db.connect_string}
     )
     context_id = uuid4().hex
 

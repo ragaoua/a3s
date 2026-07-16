@@ -32,6 +32,7 @@ from tests.common.keycloak import (
     build_keycloak_container,
 )
 from tests.integration.common.mcp import McpServerFixture
+from tests.integration.common.session_service_db import SessionServiceDbFixture
 from tests.integration.common.subagent import SubagentServerFixture
 
 # ----------------------------------------------------------------------------
@@ -291,7 +292,9 @@ def subagent_server(
 
 
 @pytest.fixture(scope="session")
-def postgres_connect_string(_integration_network: Network) -> Iterator[str]:
+def session_service_db(
+    _integration_network: Network,
+) -> Iterator[SessionServiceDbFixture]:
     container = PostgresContainer(_POSTGRES_IMAGE)
     with_suite_label(container, labels={_CONTAINER_LABEL_KEY: _CONTAINER_LABEL_VALUE})
 
@@ -299,7 +302,7 @@ def postgres_connect_string(_integration_network: Network) -> Iterator[str]:
     try:
         connect_string = container.get_connection_url(driver=None)
         _record_leaked_endpoint("Postgres (external)", connect_string)
-        yield connect_string
+        yield SessionServiceDbFixture(connect_string)
     finally:
         if not _session_state.has_failures:
             container.stop()
