@@ -28,21 +28,6 @@ from tests.e2e.utils import LocalAgent, LocalAgentInContainer
 pytestmark = pytest.mark.e2e
 
 
-def _fetch_bearer_token(keycloak: KeycloakFixture) -> str:
-    """Mint a client_credentials access token against Keycloak's token endpoint."""
-    response = httpx.post(
-        keycloak.token_endpoint_url,
-        data={
-            "grant_type": "client_credentials",
-            "client_id": keycloak.confidential_client_id,
-            "client_secret": keycloak.confidential_client_secret,
-        },
-        timeout=10.0,
-    )
-    response.raise_for_status()
-    return response.json()["access_token"]
-
-
 async def _send_and_assert_text(
     *,
     base_url: str,
@@ -94,7 +79,7 @@ async def test_local_round_trip(
     OAuth2 inbound auth, do an A2A round trip, then shut the server down via
     the stdin `"q"` quit path and assert it exits cleanly."""
     try:
-        token = _fetch_bearer_token(keycloak)
+        token = keycloak.mint_user_access_token()
         await _send_and_assert_text(
             base_url=local_agent.base_url,
             prompt="say hi",
@@ -133,7 +118,7 @@ async def test_container_round_trip(
     container. The `local_agent_in_container` fixture builds the image, starts the
     container on the e2e network with OAuth2 wired to Keycloak, waits for
     the agent card, and tears the container down at end-of-test."""
-    token = _fetch_bearer_token(keycloak)
+    token = keycloak.mint_user_access_token()
     try:
         await _send_and_assert_text(
             base_url=local_agent_in_container.base_url,

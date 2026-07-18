@@ -18,20 +18,6 @@ from tests.common.a2a import (
 from tests.common.keycloak import KeycloakFixture
 
 
-async def _mint_client_credentials_access_token(keycloak: KeycloakFixture) -> str:
-    async with httpx.AsyncClient(timeout=httpx.Timeout(10, connect=5)) as client:
-        response = await client.post(
-            keycloak.token_endpoint_url,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": keycloak.confidential_client_id,
-                "client_secret": keycloak.confidential_client_secret,
-            },
-        )
-    response.raise_for_status()
-    return response.json()["access_token"]
-
-
 @pytest.mark.asyncio
 async def test_agent_accepts_a2a_request_with_valid_jwt_bearer(
     agent_with_jwt_inbound_auth: A2aServerFixture,
@@ -41,7 +27,7 @@ async def test_agent_accepts_a2a_request_with_valid_jwt_bearer(
     OAuth2 middleware (signature verified against Keycloak's JWKS, iss matches
     the configured issuer), and the a2a request flows through to the stubbed
     LLM."""
-    token = await _mint_client_credentials_access_token(keycloak)
+    token = keycloak.mint_user_access_token()
     agent_with_jwt_inbound_auth.mock_llm.stub_response("Authorized response.")
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
@@ -82,7 +68,7 @@ async def test_agent_accepts_a2a_request_with_valid_bearer_via_introspection(
 ) -> None:
     """Happy path: the middleware POSTs the bearer to Keycloak's introspection
     endpoint, Keycloak responds active=true, and the a2a request proceeds."""
-    token = await _mint_client_credentials_access_token(keycloak)
+    token = keycloak.mint_user_access_token()
     agent_with_introspection_inbound_auth.mock_llm.stub_response("Authorized response.")
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
