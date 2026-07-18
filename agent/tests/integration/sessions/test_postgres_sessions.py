@@ -12,15 +12,31 @@ from a2a.types import (
     SendMessageSuccessResponse,
     Task,
 )
-from src.config.types import SessionsConfig
+from pydantic_core import Url
+from src.config.types import (
+    OAuthConfig,
+    OAuthJwtPolicyConfig,
+    OAuthPoliciesConfig,
+    OAuthStaticJwksPolicyConfig,
+    SessionsConfig,
+)
 from tests.common.a2a import create_send_message_payload, wait_for_agent_card
+from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
 from tests.integration.common.agent import start_agent_server
 from tests.integration.common.session_service_db import SessionServiceDbFixture
 
 
-async def _send_message(base_url: str, *, text: str, context_id: str) -> Task:
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
+async def _send_message(
+    base_url: str,
+    *,
+    text: str,
+    context_id: str,
+    headers: dict[str, str] | None = None,
+) -> Task:
+    async with httpx.AsyncClient(
+        headers=headers, timeout=httpx.Timeout(30, connect=5)
+    ) as httpx_client:
         agent_card = await wait_for_agent_card(base_url, httpx_client)
         client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
 
@@ -114,3 +130,70 @@ async def test_conversation_survives_server_restart(
     assert first_message == {"role": "user", "content": "My name is Ada."}
     assert first_response == {"role": "assistant", "content": "Nice to meet you, Ada!"}
     assert second_message == {"role": "user", "content": "What is my name?"}
+
+
+@pytest.mark.asyncio
+async def test_sessions_are_scoped_by_token_subject(
+    mock_llm: LlmFixture,
+    session_service_db: SessionServiceDbFixture,
+    keycloak: KeycloakFixture,
+) -> None:
+    """With oauth2+jwt inbound auth, sessions are partitioned by the token's
+    `sub`: a caller reusing another user's context id gets their own fresh
+    session instead of accessing/resuming the other user's conversation."""
+    sessions_config = SessionsConfig.model_validate(
+        {"connect_string": session_service_db.connect_string}
+    )
+    auth_config = OAuthConfig(
+        mode="oauth2",
+        issuer_url=Url(keycloak.internal_issuer_url),
+        policies=OAuthPoliciesConfig(
+            jwt=OAuthJwtPolicyConfig(
+                jwks=OAuthStaticJwksPolicyConfig(url=Url(keycloak.external_jwks_url)),
+            ),
+        ),
+    )
+    context_id = uuid4().hex
+
+    with start_agent_server(
+        mock_llm=mock_llm,
+        sessions_config=sessions_config,
+        auth_config=auth_config,
+    ) as agent_server:
+        mock_llm.stub_response("Nice to meet you, Ada!")
+        token = keycloak.mint_user_access_token(username="alice")
+        _ = await _send_message(
+            agent_server.base_url,
+            text="My name is Ada.",
+            context_id=context_id,
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        mock_llm.stub_response("I don't know your name.")
+        _ = await _send_message(
+            agent_server.base_url,
+            text="What is my name?",
+            context_id=context_id,
+            headers={
+                "Authorization": f"Bearer {keycloak.mint_user_access_token(username='bob')}"
+            },
+        )
+
+    # The sessions table is keyed by (app_name, user_id, id): the same
+    # context id yields one session per authenticated subject.
+    connection = await asyncpg.connect(session_service_db.connect_string)
+    try:
+        rows = await connection.fetch(
+            "SELECT user_id FROM sessions WHERE id = $1", context_id
+        )
+    finally:
+        await connection.close()
+
+    assert sorted(row["user_id"] for row in rows) == ["alice", "bob"]
+
+    # Bob's LLM call must not have been prompted with any of Alice's
+    # conversation, even though he presented the same context id as her.
+    messages: list[dict[str, str]] = mock_llm.requests[-1].get_json()["messages"]  # pyright: ignore[reportAny]
+    system_prompt, bob_message = messages  # pyright: ignore[reportUnusedVariable]
+
+    assert bob_message == {"role": "user", "content": "What is my name?"}
