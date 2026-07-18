@@ -1,10 +1,5 @@
 from __future__ import annotations
 
-import socket
-import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
-from ipaddress import IPv4Address
 from uuid import uuid4
 
 import asyncpg
@@ -17,43 +12,11 @@ from a2a.types import (
     SendMessageSuccessResponse,
     Task,
 )
-from src.a2a.server import build_a2a_server
-from src.config.types import ServerConfig, SessionsConfig
+from src.config.types import SessionsConfig
 from tests.common.a2a import create_send_message_payload, wait_for_agent_card
-from tests.common.config import get_base_test_config
 from tests.common.llm import LlmFixture
+from tests.integration.common.agent import start_agent_server
 from tests.integration.common.session_service_db import SessionServiceDbFixture
-
-
-@contextmanager
-def _running_agent_server(
-    *,
-    mock_llm: LlmFixture,
-    sessions_config: SessionsConfig,
-) -> Iterator[str]:
-    """Runs the agent server and yields its base URL."""
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        port: int = s.getsockname()[1]
-
-    config = get_base_test_config(
-        llm=mock_llm.llm_config(),
-        auth="none",
-        server=ServerConfig(
-            listen_address=IPv4Address("127.0.0.1"),
-            listen_port=port,
-        ),
-        sessions=sessions_config,
-    )
-
-    server = build_a2a_server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{port}"
-    finally:
-        server.should_exit = True
-        thread.join(timeout=5)
 
 
 async def _send_message(base_url: str, *, text: str, context_id: str) -> Task:
@@ -85,10 +48,12 @@ async def test_conversation_is_stored_in_postgres(
     context_id = uuid4().hex
 
     mock_llm.stub_response("Hello from the mock LLM!")
-    with _running_agent_server(
-        mock_llm=mock_llm, sessions_config=sessions_config
-    ) as base_url:
-        _ = await _send_message(base_url, text="hi", context_id=context_id)
+    with start_agent_server(
+        auth_config="none",
+        mock_llm=mock_llm,
+        sessions_config=sessions_config,
+    ) as agent_server:
+        _ = await _send_message(agent_server.base_url, text="hi", context_id=context_id)
 
     connection = await asyncpg.connect(session_service_db.connect_string)
     try:
@@ -118,17 +83,23 @@ async def test_conversation_survives_server_restart(
     context_id = uuid4().hex
 
     mock_llm.stub_response("Nice to meet you, Ada!")
-    with _running_agent_server(
-        mock_llm=mock_llm, sessions_config=sessions_config
-    ) as base_url:
-        _ = await _send_message(base_url, text="My name is Ada.", context_id=context_id)
+    with start_agent_server(
+        auth_config="none",
+        mock_llm=mock_llm,
+        sessions_config=sessions_config,
+    ) as agent_server:
+        _ = await _send_message(
+            agent_server.base_url, text="My name is Ada.", context_id=context_id
+        )
 
     mock_llm.stub_response("Your name is Ada.")
-    with _running_agent_server(
-        mock_llm=mock_llm, sessions_config=sessions_config
-    ) as base_url:
+    with start_agent_server(
+        auth_config="none",
+        mock_llm=mock_llm,
+        sessions_config=sessions_config,
+    ) as agent_server:
         task = await _send_message(
-            base_url, text="What is my name?", context_id=context_id
+            agent_server.base_url, text="What is my name?", context_id=context_id
         )
 
     assert task.artifacts is not None
