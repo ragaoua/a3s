@@ -29,7 +29,7 @@ from tests.integration.common.session_service_db import SessionServiceDbFixture
 def _running_agent_server(
     *,
     mock_llm: LlmFixture,
-    sessions: SessionsConfig,
+    sessions_config: SessionsConfig,
 ) -> Iterator[str]:
     """Runs the agent server and yields its base URL."""
     with socket.socket() as s:
@@ -43,7 +43,7 @@ def _running_agent_server(
             listen_address=IPv4Address("127.0.0.1"),
             listen_port=port,
         ),
-        sessions=sessions,
+        sessions=sessions_config,
     )
 
     server = build_a2a_server(config)
@@ -79,13 +79,15 @@ async def test_conversation_is_stored_in_postgres(
     mock_llm: LlmFixture,
     session_service_db: SessionServiceDbFixture,
 ) -> None:
-    sessions = SessionsConfig.model_validate(
+    sessions_config = SessionsConfig.model_validate(
         {"connect_string": session_service_db.connect_string}
     )
     context_id = uuid4().hex
 
     mock_llm.stub_response("Hello from the mock LLM!")
-    with _running_agent_server(mock_llm=mock_llm, sessions=sessions) as base_url:
+    with _running_agent_server(
+        mock_llm=mock_llm, sessions_config=sessions_config
+    ) as base_url:
         _ = await _send_message(base_url, text="hi", context_id=context_id)
 
     connection = await asyncpg.connect(session_service_db.connect_string)
@@ -110,17 +112,21 @@ async def test_conversation_survives_server_restart(
     mock_llm: LlmFixture,
     session_service_db: SessionServiceDbFixture,
 ) -> None:
-    sessions = SessionsConfig.model_validate(
+    sessions_config = SessionsConfig.model_validate(
         {"connect_string": session_service_db.connect_string}
     )
     context_id = uuid4().hex
 
     mock_llm.stub_response("Nice to meet you, Ada!")
-    with _running_agent_server(mock_llm=mock_llm, sessions=sessions) as base_url:
+    with _running_agent_server(
+        mock_llm=mock_llm, sessions_config=sessions_config
+    ) as base_url:
         _ = await _send_message(base_url, text="My name is Ada.", context_id=context_id)
 
     mock_llm.stub_response("Your name is Ada.")
-    with _running_agent_server(mock_llm=mock_llm, sessions=sessions) as base_url:
+    with _running_agent_server(
+        mock_llm=mock_llm, sessions_config=sessions_config
+    ) as base_url:
         task = await _send_message(
             base_url, text="What is my name?", context_id=context_id
         )

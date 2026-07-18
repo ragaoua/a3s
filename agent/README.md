@@ -210,6 +210,20 @@ database**.
 **Note**: Use of environment variable substitution is highly recommended to
 protect the `password` contained in the connect string.
 
+#### Session ownership
+
+Sessions are partitioned by user identity. When OAuth2 auth is enabled with the
+JWT policy (`auth.policies.jwt`), the validated token's `sub` claim, if
+present, is used as the user identity: each subject gets its own sessions, and
+a client presenting another user's context id gets a fresh session instead of
+resuming that user's conversation.
+
+In every other configuration (`auth: none`, `api_key`, OAuth2 without a JWT
+policy), the engine derives a pseudo-user from the client-supplied context id.
+**Any client that knows a context id can then resume that conversation**, so
+with persistent sessions, prefer OAuth2 + JWT validation if conversations may
+contain sensitive data.
+
 ### Authorization
 
 The agent supports 3 authorization modes configured through the **required**

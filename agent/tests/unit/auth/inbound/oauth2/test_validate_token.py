@@ -117,7 +117,9 @@ def _route_fetch_json(
 
 
 @pytest.mark.asyncio
-async def test_returns_success_when_only_jwt_policy_and_validation_succeeds() -> None:
+async def test_returns_token_claims_when_only_jwt_policy_and_validation_succeeds() -> (
+    None
+):
     config = OAuthPoliciesConfig(
         jwt=OAuthJwtPolicyConfig(jwks=STATIC_JWKS_CONFIG, rfc9068=None, claims={}),
     )
@@ -129,6 +131,9 @@ async def test_returns_success_when_only_jwt_policy_and_validation_succeeds() ->
     res = await middleware._validate_token(_valid_token())  # pyright: ignore[reportPrivateUsage]
 
     assert isinstance(res, Success)
+    claims = res.unwrap()
+    assert claims is not None
+    assert claims["iss"] == ISSUER_URL
 
 
 @pytest.mark.asyncio
@@ -144,10 +149,12 @@ async def test_returns_success_when_only_introspection_policy_and_token_is_activ
     res = await middleware._validate_token("opaque-token")  # pyright: ignore[reportPrivateUsage]
 
     assert isinstance(res, Success)
+    # Opaque tokens carry no claims we can read
+    assert res.unwrap() is None
 
 
 @pytest.mark.asyncio
-async def test_returns_success_when_both_jwt_and_introspection_policies_succeed() -> (
+async def test_returns_token_claims_when_both_jwt_and_introspection_policies_succeed() -> (
     None
 ):
     config = OAuthPoliciesConfig(
@@ -167,6 +174,9 @@ async def test_returns_success_when_both_jwt_and_introspection_policies_succeed(
     res = await middleware._validate_token(_valid_token())  # pyright: ignore[reportPrivateUsage]
 
     assert isinstance(res, Success)
+    claims = res.unwrap()
+    assert claims is not None
+    assert claims["iss"] == ISSUER_URL
 
 
 @pytest.mark.asyncio
