@@ -6,6 +6,7 @@ from authlib.jose.errors import JoseError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
 from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
 from pydantic import JsonValue
+from starlette.authentication import AuthCredentials, SimpleUser
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -279,7 +280,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         issuer_url: str,
         jwt_config: OAuthJwtPolicyConfig,
         jwk_set: KeySet,
-    ) -> Result[None, str]:
+    ) -> Result[JWTClaims, str]:
         """
         jwt_config is taken as a parameter rather than read from
         self.config.jwt so the caller's null-narrowing flows through and
@@ -323,7 +324,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
             return Failure("The access token is invalid")
 
-        return Success(None)
+        return Success(claims)
 
     def _unauthorized_error_response(
         self,
@@ -344,7 +345,16 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             headers={"WWW-Authenticate": authenticate_header},
         )
 
-    async def _validate_token(self, token: str) -> Result[None, JSONResponse]:
+    async def _validate_token(
+        self, token: str
+    ) -> Result[JWTClaims | None, JSONResponse]:
+        """Validates the token against the configured policies.
+
+        On success, carries the validated JWT claims when the `jwt` policy is
+        configured, and `None` otherwise (introspection-only setups validate
+        opaque tokens, which carry no claims we can read).
+        """
+        claims: JWTClaims | None = None
         auth_server_metadata: AuthorizationServerMetadata | None = None
         if self._requires_authorization_server_metadata():
             res = await self._fetch_authorization_server_metadata()
@@ -389,6 +399,8 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                     )
                 )
 
+            claims = res.unwrap()
+
         if self.config.introspection is not None:
             res = await self._introspect_access_token(
                 token,
@@ -399,7 +411,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             if isinstance(res, Failure):
                 return res
 
-        return Success(None)
+        return Success(claims)
 
     @override
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
@@ -423,5 +435,39 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         if isinstance(res, Failure):
             return res.failure()
 
+        token_claims = res.unwrap()
+        if token_claims is not None:
+            self._authenticate_request_user(request, token_claims)
+
         with bind_current_authorization_header(f"Bearer {token}"):
             return await call_next(request)
+
+    def _authenticate_request_user(
+        self,
+        request: Request,
+        claims: JWTClaims,
+    ) -> None:
+        """Exposes the token's `sub` claim (if it exists) as the request's authenticated user.
+
+        Downstream, the a2a-sdk call-context builder reads `request.user` and
+        the ADK request converter uses it as the `user_id` that sessions (and
+        memory) are partitioned by — without it, ADK falls back to deriving a
+        pseudo-user from the client-supplied context id, so any caller
+        presenting a known context id can resume that conversation.
+
+        The token's `scope` claim (a space-delimited string, per RFC 8693
+        section 4.2) is translated into the request's auth credentials, so
+        downstream handlers can authorize on OAuth2 scopes (e.g. Starlette's
+        `@requires`).
+        """
+        subject = claims.get("sub")
+        if not isinstance(subject, str) or not subject:
+            return
+
+        credentials = ["authenticated"]
+        scope = claims.get("scope")
+        if isinstance(scope, str):
+            credentials.extend(scope.split())
+
+        request.scope["user"] = SimpleUser(subject)
+        request.scope["auth"] = AuthCredentials(credentials)

@@ -11,12 +11,19 @@ from __future__ import annotations
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
+from typing import Literal, override
 
+import httpx
 from testcontainers.core.network import Network
 from testcontainers.keycloak import KeycloakContainer
 
 from tests.common.containers_utilities import poll_until_ready, with_suite_label
+
+
+# Realm users importable at Keycloak startup, each with password
+# "<username>-password" and a user id pinned to the username, so minted tokens
+# carry `sub == username`. See tests/common/realm.json.
+TestUser = Literal["alice", "bob"]
 
 
 @dataclass(frozen=True)
@@ -32,9 +39,23 @@ class KeycloakFixture:
     confidential_client_id: str
     confidential_client_secret: str
 
+    def mint_user_access_token(self, username: TestUser = "alice") -> str:
+        response = httpx.post(
+            self.token_endpoint_url,
+            data={
+                "grant_type": "password",
+                "client_id": self.confidential_client_id,
+                "client_secret": self.confidential_client_secret,
+                "username": username,
+                "password": f"{username}-password",
+            },
+        )
+        _ = response.raise_for_status()
+        return response.json()["access_token"]
+
 
 # These must match the values configured in the realm.json fed to Keycloak at
-# realm-import time. See tests/integration/containers/keycloak/realm.json.
+# realm-import time. See tests/common/realm.json.
 _KEYCLOAK_CLIENT_ID = "a3s-agent"
 _KEYCLOAK_CLIENT_SECRET = "a3s-agent-secret"
 _KEYCLOAK_REALM = "a3s-realm"

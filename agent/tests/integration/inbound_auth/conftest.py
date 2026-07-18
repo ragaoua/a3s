@@ -14,31 +14,25 @@ verified end-to-end against an issuer.
 
 from __future__ import annotations
 
-import socket
-import threading
 from collections.abc import Iterator
-from ipaddress import IPv4Address
 
 import pytest
 from pydantic import SecretStr
 from pydantic_core import Url
 
-from src.a2a.server import build_a2a_server
 from src.config.types import (
     ApiKeyAuthConfig,
-    AuthConfig,
     OAuthConfig,
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticIntrospectionPolicyConfig,
     OAuthStaticJwksPolicyConfig,
-    ServerConfig,
 )
 from src.config.types.auth import OAuthDiscoveredJwksPolicyConfig
 from tests.common.a2a import A2aServerFixture
-from tests.common.config import get_base_test_config
 from tests.common.llm import LlmFixture
 from tests.common.keycloak import KeycloakFixture
+from tests.integration.common.agent import start_agent_server
 
 
 # The API key value used by `agent_with_api_key_inbound_auth`. Tests import
@@ -51,52 +45,23 @@ API_KEY = "test-api-key"
 FAKE_OAUTH2_ISSUER = Url("https://issuer.example")
 
 
-def _start_agent_server(
-    *,
-    auth: AuthConfig,
-    mock_llm: LlmFixture,
-) -> Iterator[A2aServerFixture]:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        port: int = s.getsockname()[1]
-
-    config = get_base_test_config(
-        llm=mock_llm.llm_config(),
-        auth=auth,
-        server=ServerConfig(
-            listen_address=IPv4Address("127.0.0.1"),
-            listen_port=port,
-        ),
-    )
-
-    server = build_a2a_server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    try:
-        yield A2aServerFixture(
-            base_url=f"http://127.0.0.1:{port}",
-            mock_llm=mock_llm,
-        )
-    finally:
-        server.should_exit = True
-        thread.join(timeout=5)
-
-
 @pytest.fixture
 def agent_with_no_inbound_auth(
     mock_llm: LlmFixture,
 ) -> Iterator[A2aServerFixture]:
-    yield from _start_agent_server(mock_llm=mock_llm, auth="none")
+    with start_agent_server(mock_llm=mock_llm, auth_config="none") as agent_server:
+        yield agent_server
 
 
 @pytest.fixture
 def agent_with_api_key_inbound_auth(
     mock_llm: LlmFixture,
 ) -> Iterator[A2aServerFixture]:
-    yield from _start_agent_server(
+    with start_agent_server(
         mock_llm=mock_llm,
-        auth=ApiKeyAuthConfig(mode="api_key", api_key=SecretStr(API_KEY)),
-    )
+        auth_config=ApiKeyAuthConfig(mode="api_key", api_key=SecretStr(API_KEY)),
+    ) as agent_server:
+        yield agent_server
 
 
 @pytest.fixture
@@ -110,9 +75,9 @@ def agent_with_fake_oauth2_inbound_auth(
     For end-to-end OAuth2 verification, use `agent_with_jwt_inbound_auth` or
     `agent_with_introspection_inbound_auth`.
     """
-    yield from _start_agent_server(
+    with start_agent_server(
         mock_llm=mock_llm,
-        auth=OAuthConfig(
+        auth_config=OAuthConfig(
             mode="oauth2",
             issuer_url=FAKE_OAUTH2_ISSUER,
             policies=OAuthPoliciesConfig(
@@ -121,7 +86,8 @@ def agent_with_fake_oauth2_inbound_auth(
                 )
             ),
         ),
-    )
+    ) as agent_server:
+        yield agent_server
 
 
 @pytest.fixture
@@ -129,9 +95,9 @@ def agent_with_jwt_inbound_auth(
     mock_llm: LlmFixture,
     keycloak: KeycloakFixture,
 ) -> Iterator[A2aServerFixture]:
-    yield from _start_agent_server(
+    with start_agent_server(
         mock_llm=mock_llm,
-        auth=OAuthConfig(
+        auth_config=OAuthConfig(
             mode="oauth2",
             issuer_url=Url(keycloak.internal_issuer_url),
             policies=OAuthPoliciesConfig(
@@ -142,7 +108,8 @@ def agent_with_jwt_inbound_auth(
                 ),
             ),
         ),
-    )
+    ) as agent_server:
+        yield agent_server
 
 
 @pytest.fixture
@@ -150,9 +117,9 @@ def agent_with_introspection_inbound_auth(
     mock_llm: LlmFixture,
     keycloak: KeycloakFixture,
 ) -> Iterator[A2aServerFixture]:
-    yield from _start_agent_server(
+    with start_agent_server(
         mock_llm=mock_llm,
-        auth=OAuthConfig(
+        auth_config=OAuthConfig(
             mode="oauth2",
             issuer_url=Url(keycloak.internal_issuer_url),
             policies=OAuthPoliciesConfig(
@@ -163,4 +130,5 @@ def agent_with_introspection_inbound_auth(
                 ),
             ),
         ),
-    )
+    ) as agent_server:
+        yield agent_server

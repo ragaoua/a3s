@@ -79,6 +79,8 @@ def test_returns_success_for_valid_base_jwt() -> None:
     )
 
     assert isinstance(res, Success)
+    claims = res.unwrap()
+    assert claims["iss"] == ISSUER_URL
 
 
 def test_returns_failure_when_token_is_expired() -> None:
@@ -139,6 +141,10 @@ def test_returns_success_for_valid_rfc9068_token() -> None:
     )
 
     assert isinstance(res, Success)
+    claims = res.unwrap()
+    assert claims["iss"] == ISSUER_URL
+    assert claims["sub"] == "user"
+    assert claims["client_id"] == "client"
 
 
 def test_returns_failure_when_rfc9068_required_claim_is_missing() -> None:
@@ -218,3 +224,6 @@ def test_returns_success_when_required_custom_claim_matches() -> None:
     )
 
     assert isinstance(res, Success)
+    claims = res.unwrap()
+    assert claims["iss"] == ISSUER_URL
+    assert claims["tenant"] == "acme"

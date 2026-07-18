@@ -10,7 +10,7 @@
       "secret": "a3s-agent-secret",
       "serviceAccountsEnabled": true,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "attributes": {
         "access.token.header.type.rfc9068": "true"
       },
@@ -38,6 +38,40 @@
             "id.token.claim": "false",
             "introspection.token.claim": "true"
           }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "alice",
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@example.com",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "Test",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "alice-password"
+        }
+      ]
+    },
+    {
+      "id": "bob",
+      "username": "bob",
+      "enabled": true,
+      "email": "bob@example.com",
+      "emailVerified": true,
+      "firstName": "Bob",
+      "lastName": "Test",
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bob-password"
         }
       ]
     }
