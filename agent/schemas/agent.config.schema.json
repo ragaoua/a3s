@@ -803,10 +803,15 @@
             {
               "format": "multi-host-uri",
               "minLength": 1,
-              "title": "Connect String",
+              "type": "string"
+            },
+            {
+              "format": "uri",
+              "minLength": 1,
               "type": "string"
             }
-          ]
+          ],
+          "title": "Connect String"
         }
       },
       "required": [

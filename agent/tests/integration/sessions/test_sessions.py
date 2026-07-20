@@ -1,5 +1,16 @@
+"""Session persistence tests, parametrized over the database backends.
+
+Note: queries run through `_fetch_rows` use f-string interpolation, because
+sqlite and postgres use different placeholders for parameterized queries. For
+a test setup, the "SQL injection" risk induced by the use of f-strings
+isn't a real concern.
+"""
+
 from __future__ import annotations
 
+import sqlite3
+from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import asyncpg
@@ -20,11 +31,39 @@ from src.config.types import (
     OAuthStaticJwksPolicyConfig,
     SessionsConfig,
 )
+from src.config.types.sessions import PostgresUrl, SqliteUrl
 from tests.common.a2a import create_send_message_payload, wait_for_agent_card
 from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
 from tests.integration.common.agent import start_agent_server
 from tests.integration.common.session_service_db import SessionServiceDbFixture
+
+
+@pytest.fixture(params=["postgres", "sqlite"])
+def sessions_db_connect_string(request: pytest.FixtureRequest, tmp_path: Path) -> str:
+    if request.param == "postgres":
+        db: SessionServiceDbFixture = request.getfixturevalue("session_service_db")
+        return db.connect_string
+    return f"sqlite:///{tmp_path / 'sessions.db'}"
+
+
+async def _fetch_rows(connect_string: PostgresUrl | SqliteUrl, query: str) -> list[Any]:
+    """Run a query against the sessions database, whichever backend it is."""
+    if connect_string.scheme == "sqlite":
+        connection = sqlite3.connect(
+            connect_string.unicode_string().removeprefix("sqlite:///")
+        )
+        connection.row_factory = sqlite3.Row
+        try:
+            return connection.execute(query).fetchall()
+        finally:
+            connection.close()
+
+    pg_connection = await asyncpg.connect(connect_string.unicode_string())
+    try:
+        return await pg_connection.fetch(query)
+    finally:
+        await pg_connection.close()
 
 
 async def _send_message(
@@ -54,12 +93,12 @@ async def _send_message(
 
 
 @pytest.mark.asyncio
-async def test_conversation_is_stored_in_postgres(
+async def test_conversation_is_stored_in_database(
     mock_llm: LlmFixture,
-    session_service_db: SessionServiceDbFixture,
+    sessions_db_connect_string: str,
 ) -> None:
     sessions_config = SessionsConfig.model_validate(
-        {"connect_string": session_service_db.connect_string}
+        {"connect_string": sessions_db_connect_string}
     )
     context_id = uuid4().hex
 
@@ -71,30 +110,28 @@ async def test_conversation_is_stored_in_postgres(
     ) as agent_server:
         _ = await _send_message(agent_server.base_url, text="hi", context_id=context_id)
 
-    connection = await asyncpg.connect(session_service_db.connect_string)
-    try:
-        session_row = await connection.fetchrow(
-            "SELECT app_name, user_id FROM sessions WHERE id = $1", context_id
-        )
-        event_count = await connection.fetchval(
-            "SELECT count(*) FROM events WHERE session_id = $1", context_id
-        )
-    finally:
-        await connection.close()
+    session_rows = await _fetch_rows(
+        sessions_config.connect_string.get_secret_value(),
+        f"SELECT app_name, user_id FROM sessions WHERE id = '{context_id}'",
+    )
+    event_count_rows = await _fetch_rows(
+        sessions_config.connect_string.get_secret_value(),
+        f"SELECT count(*) AS event_count FROM events WHERE session_id = '{context_id}'",
+    )
 
-    assert session_row is not None
-    assert session_row["app_name"] == "Cody"
+    assert len(session_rows) == 1
+    assert session_rows[0]["app_name"] == "Cody"
     # One event for the user message, one for the agent reply
-    assert event_count >= 2
+    assert event_count_rows[0]["event_count"] >= 2
 
 
 @pytest.mark.asyncio
 async def test_conversation_survives_server_restart(
     mock_llm: LlmFixture,
-    session_service_db: SessionServiceDbFixture,
+    sessions_db_connect_string: str,
 ) -> None:
     sessions_config = SessionsConfig.model_validate(
-        {"connect_string": session_service_db.connect_string}
+        {"connect_string": sessions_db_connect_string}
     )
     context_id = uuid4().hex
 
@@ -123,7 +160,7 @@ async def test_conversation_survives_server_restart(
     assert task.artifacts[0].parts[0].root.text == "Your name is Ada."
 
     # The second LLM call, served by a fresh server process state, must have
-    # been prompted with the conversation history loaded from Postgres.
+    # been prompted with the conversation history loaded from the database.
     messages: dict[str, str] = mock_llm.requests[-1].get_json()["messages"]  # pyright: ignore[reportAny]
     system_prompt, first_message, first_response, second_message = messages  # pyright: ignore[reportUnusedVariable]
 
@@ -135,14 +172,14 @@ async def test_conversation_survives_server_restart(
 @pytest.mark.asyncio
 async def test_sessions_are_scoped_by_token_subject(
     mock_llm: LlmFixture,
-    session_service_db: SessionServiceDbFixture,
+    sessions_db_connect_string: str,
     keycloak: KeycloakFixture,
 ) -> None:
     """With oauth2+jwt inbound auth, sessions are partitioned by the token's
     `sub`: a caller reusing another user's context id gets their own fresh
     session instead of accessing/resuming the other user's conversation."""
     sessions_config = SessionsConfig.model_validate(
-        {"connect_string": session_service_db.connect_string}
+        {"connect_string": sessions_db_connect_string}
     )
     auth_config = OAuthConfig(
         mode="oauth2",
@@ -181,13 +218,10 @@ async def test_sessions_are_scoped_by_token_subject(
 
     # The sessions table is keyed by (app_name, user_id, id): the same
     # context id yields one session per authenticated subject.
-    connection = await asyncpg.connect(session_service_db.connect_string)
-    try:
-        rows = await connection.fetch(
-            "SELECT user_id FROM sessions WHERE id = $1", context_id
-        )
-    finally:
-        await connection.close()
+    rows = await _fetch_rows(
+        sessions_config.connect_string.get_secret_value(),
+        f"SELECT user_id FROM sessions WHERE id = '{context_id}'",
+    )
 
     assert sorted(row["user_id"] for row in rows) == ["alice", "bob"]
 

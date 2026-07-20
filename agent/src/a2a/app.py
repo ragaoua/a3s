@@ -54,9 +54,12 @@ logger = get_logger(__name__)
 
 
 def _sqlalchemy_db_url(sessions_config: SessionsConfig) -> str:
-    """The connect string normalized to the asyncpg SQLAlchemy driver."""
-    _, _, rest = str(sessions_config.connect_string.get_secret_value()).partition("://")
-    return f"postgresql+asyncpg://{rest}"
+    """The connect string normalized to its async SQLAlchemy driver."""
+    scheme, _, rest = str(sessions_config.connect_string.get_secret_value()).partition(
+        "://"
+    )
+    driver = "sqlite+aiosqlite" if scheme == "sqlite" else "postgresql+asyncpg"
+    return f"{driver}://{rest}"
 
 
 def build_agent_a2a_app(

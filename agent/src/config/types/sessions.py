@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from pydantic import Secret, UrlConstraints
+from pydantic import AnyUrl, Secret, UrlConstraints
 from pydantic_core import MultiHostUrl
 
 from src.config.types.common import StrictModel
@@ -13,6 +13,11 @@ PostgresUrl = Annotated[
     ),
 ]
 
+SqliteUrl = Annotated[
+    AnyUrl,
+    UrlConstraints(allowed_schemes=["sqlite"]),
+]
+
 
 class SessionsConfig(StrictModel):
-    connect_string: Secret[PostgresUrl]
+    connect_string: Secret[PostgresUrl | SqliteUrl]

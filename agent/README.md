@@ -199,9 +199,9 @@ Configure these fields:
 
 By default, sessions/conversations with the agent are kept in memory and lost
 when the agent stops or restarts. To persist them, point the agent at a
-PostgreSQL database using `sessions.connect_string`.
+PostgreSQL database or a SQLite file using `sessions.connect_string`.
 
-The connect string is a PostgreSQL URL of the form
+For PostgreSQL, the connect string is a URL of the form
 `postgresql://user:password@host:5432/database` (`postgres` is also
 accepted as a scheme). The engine creates the required tables on first
 use, so **the configured user needs DDL privileges on the target
@@ -209,6 +209,17 @@ database**.
 
 **Note**: Use of environment variable substitution is highly recommended to
 protect the `password` contained in the connect string.
+
+For SQLite, the connect string points at a database file:
+`sqlite:///relative/path.db`, `sqlite:////absolute/path.db`. The file and
+tables are created on first use. SQLite is embedded in the engine, so nothing
+external needs to be provisioned or managed — a good fit for single-instance
+deployments; prefer PostgreSQL when running multiple replicas, since they must
+share one session store.
+
+In-memory SQLite (`sqlite://` or `sqlite:///:memory:`) is also accepted; note
+that it persists nothing across restarts, just like the default in-memory
+sessions you get by omitting the `sessions` config altogether.
 
 #### Session ownership
 
