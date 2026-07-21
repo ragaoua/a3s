@@ -46,6 +46,7 @@ TOKEN_EXCHANGE_DISCOVERED = OAuthDiscoveredTokenExchangeAuthConfig(
     mode="oauth_token_exchange",
     client_id="c",
     client_secret=SecretStr("s"),
+    issuer_url=Url("http://example.com"),
 )
 TOKEN_EXCHANGE_STATIC = OAuthStaticTokenExchangeAuthConfig(
     mode="oauth_token_exchange",
@@ -174,6 +175,26 @@ def test_token_modes_pass_when_root_auth_is_oauth2(
     )
 
     assert isinstance(config.auth, OAuthConfig)
+
+
+def test_discovered_token_exchange_gets_issuer_url_resolved_from_root_oauth2() -> None:
+    agent = AGENT_NO_SUBAGENTS.model_copy()
+    agent.subagents = {"helper": _subagent(TOKEN_EXCHANGE_DISCOVERED)}
+
+    config = Config(
+        llm=VALID_LLM,
+        agent=agent,
+        auth=ROOT_OAUTH,
+        mcp_servers=[_mcp_server(TOKEN_EXCHANGE_DISCOVERED)],
+    )
+
+    mcp_auth = config.mcp_servers[0].auth
+    assert isinstance(mcp_auth, OAuthDiscoveredTokenExchangeAuthConfig)
+    assert mcp_auth.issuer_url == ROOT_OAUTH.issuer_url
+
+    subagent_auth = config.agent.subagents["helper"].auth
+    assert isinstance(subagent_auth, OAuthDiscoveredTokenExchangeAuthConfig)
+    assert subagent_auth.issuer_url == ROOT_OAUTH.issuer_url
 
 
 def test_oauth_client_credentials_does_not_require_root_oauth2() -> None:
