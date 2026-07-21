@@ -6,7 +6,7 @@ from mcp.shared._httpx_utils import create_mcp_http_client
 from pydantic_core import Url
 
 from src.auth.context import get_current_authorization_header
-from src.auth.outbound import OAuthClientCredentialsAuth
+from src.auth.outbound import OAuthClientCredentialsAuth, OAuthTokenExchangeAuth
 from src.config.types import (
     McpServerConfig,
     OAuthClientCredentialsAuthConfig,
@@ -29,8 +29,12 @@ def get_mcp_toolsets(config: list[McpServerConfig]) -> list[ToolUnion]:
                 ),
             )
         elif isinstance(server_config.auth, OAuthTokenExchangeAuthConfig):
-            raise NotImplementedError(
-                "mcp_servers[].auth.mode='oauth_token_exchange' is not implemented yet"
+            connection_params = StreamableHTTPConnectionParams(
+                url=str(server_config.url),
+                httpx_client_factory=_build_oauth_token_exchange_mcp_client_factory(
+                    server_config.url,
+                    server_config.auth,
+                ),
             )
         else:
             connection_params = StreamableHTTPConnectionParams(
@@ -75,6 +79,31 @@ def _build_oauth_client_credentials_mcp_client_factory(
                 auth
                 if auth is not None
                 else OAuthClientCredentialsAuth(
+                    server_url,
+                    server_auth_config,
+                )
+            ),
+        )
+
+    return factory
+
+
+def _build_oauth_token_exchange_mcp_client_factory(
+    server_url: Url,
+    server_auth_config: OAuthTokenExchangeAuthConfig,
+):
+    def factory(
+        headers: dict[str, str] | None = None,
+        timeout: httpx.Timeout | None = None,
+        auth: httpx.Auth | None = None,
+    ) -> httpx.AsyncClient:
+        return create_mcp_http_client(
+            headers=headers,
+            timeout=timeout,
+            auth=(
+                auth
+                if auth is not None
+                else OAuthTokenExchangeAuth(
                     server_url,
                     server_auth_config,
                 )

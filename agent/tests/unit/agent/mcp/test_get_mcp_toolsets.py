@@ -1,15 +1,16 @@
 from pydantic import SecretStr
-import pytest
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 from pydantic_core import Url
+import pytest
 
 from src.agent import mcp
 from src.agent.mcp import get_mcp_toolsets
-from src.auth.outbound import OAuthClientCredentialsAuth
+from src.auth.outbound import OAuthClientCredentialsAuth, OAuthTokenExchangeAuth
 from src.config.types import (
     McpServerConfig,
     OAuthClientCredentialsAuthConfig,
     OAuthDiscoveredTokenExchangeAuthConfig,
+    OAuthStaticTokenExchangeAuthConfig,
     OAuthTokenForwardAuthConfig,
 )
 
@@ -95,20 +96,44 @@ def test_get_mcp_toolset_client_credentials_auth_installs_httpx_factory_bound_to
     assert built_client.auth._server_auth_config is auth_config  # pyright: ignore[reportPrivateUsage]
 
 
-def test_get_mcp_toolset_token_exchange_auth_raises_not_implemented() -> None:
-    config = [
-        McpServerConfig(
-            url=Url("https://mcp.example/server"),
-            auth=OAuthDiscoveredTokenExchangeAuthConfig(
-                mode="oauth_token_exchange",
-                client_id="client-id",
-                client_secret=SecretStr("client-secret"),
-            ),
-        )
-    ]
+@pytest.mark.parametrize(
+    "auth_config",
+    (
+        OAuthDiscoveredTokenExchangeAuthConfig(
+            mode="oauth_token_exchange",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            issuer_url=Url("https://issuer.example/realm"),
+        ),
+        OAuthStaticTokenExchangeAuthConfig(
+            mode="oauth_token_exchange",
+            token_endpoint=Url("https://issuer.example/oauth/token"),
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+        ),
+    ),
+)
+def test_get_mcp_toolset_token_exchange_installs_httpx_factory_bound_to_config(
+    auth_config: OAuthDiscoveredTokenExchangeAuthConfig
+    | OAuthStaticTokenExchangeAuthConfig,
+) -> None:
+    server_config = McpServerConfig(
+        url=Url("https://mcp.example/server"),
+        auth=auth_config,
+    )
 
-    with pytest.raises(NotImplementedError, match="oauth_token_exchange"):
-        get_mcp_toolsets(config)
+    toolsets = get_mcp_toolsets([server_config])
+
+    toolset = _assert_is_toolset(toolsets[0])
+    params = _get_connection_params(toolset)
+    assert params.url == "https://mcp.example/server"
+    assert toolset._header_provider is None  # pyright: ignore[reportPrivateUsage]
+
+    factory = params.httpx_client_factory
+    built_client = factory()
+    assert isinstance(built_client.auth, OAuthTokenExchangeAuth)
+    assert built_client.auth._server_url == server_config.url  # pyright: ignore[reportPrivateUsage]
+    assert built_client.auth._server_auth_config is auth_config  # pyright: ignore[reportPrivateUsage]
 
 
 def test_get_mcp_toolset_preserves_order_across_multiple_servers() -> None:
