@@ -23,7 +23,7 @@ def get_mcp_toolsets(config: list[McpServerConfig]) -> list[ToolUnion]:
         if isinstance(server_config.auth, OAuthClientCredentialsAuthConfig):
             connection_params = StreamableHTTPConnectionParams(
                 url=str(server_config.url),
-                httpx_client_factory=_build_mcp_http_client_factory(
+                httpx_client_factory=_build_oauth_client_credentials_mcp_client_factory(
                     server_config.url,
                     server_config.auth,
                 ),
@@ -59,7 +59,7 @@ def _oauth_token_forward_header_provider(
     return {"Authorization": authorization_header}
 
 
-def _build_mcp_http_client_factory(
+def _build_oauth_client_credentials_mcp_client_factory(
     server_url: Url,
     server_auth_config: OAuthClientCredentialsAuthConfig,
 ):
