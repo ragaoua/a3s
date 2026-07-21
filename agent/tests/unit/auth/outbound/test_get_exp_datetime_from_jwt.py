@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pydantic import JsonValue
 import pytest
 
-from src.auth.outbound import OAuthClientCredentialsAuth
+from src.auth.outbound.token_expiry import get_exp_datetime_from_jwt_payload
 
 
 def test_get_exp_datetime_from_jwt_returns_datetime_for_numeric_exp() -> None:
@@ -11,7 +11,7 @@ def test_get_exp_datetime_from_jwt_returns_datetime_for_numeric_exp() -> None:
     payload: dict[str, JsonValue] = {"exp": expiry.timestamp()}
 
     assert (
-        OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload) == expiry  # pyright: ignore[reportPrivateUsage]
+        get_exp_datetime_from_jwt_payload(payload) == expiry  # pyright: ignore[reportPrivateUsage]
     )
 
 
@@ -20,7 +20,7 @@ def test_get_exp_datetime_from_jwt_parses_string_exp() -> None:
     payload: dict[str, JsonValue] = {"exp": str(expiry.timestamp())}
 
     assert (
-        OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload) == expiry  # pyright: ignore[reportPrivateUsage]
+        get_exp_datetime_from_jwt_payload(payload) == expiry  # pyright: ignore[reportPrivateUsage]
     )
 
 
@@ -33,5 +33,5 @@ def test_get_exp_datetime_from_jwt_returns_none_for_unsupported_exp_types(
     payload: dict[str, JsonValue] = {"exp": exp}
 
     assert (
-        OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload) is None  # pyright: ignore[reportPrivateUsage]
+        get_exp_datetime_from_jwt_payload(payload) is None  # pyright: ignore[reportPrivateUsage]
     )

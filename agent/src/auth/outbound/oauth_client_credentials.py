@@ -5,10 +5,9 @@ from datetime import datetime, timedelta, timezone
 from typing import override
 
 import httpx
-import jwt
-from pydantic import JsonValue
 from pydantic_core import Url
 
+from src.auth.outbound.token_expiry import get_access_token_expiry_date
 from src.config.types import OAuthClientCredentialsAuthConfig
 from src.auth.oauth_client_auth import build_client_authenticated_request
 from src.auth.outbound.types import AccessTokenCacheKey, AccessTokenInfo
@@ -146,60 +145,10 @@ class OAuthClientCredentialsAuth(httpx.Auth):
 
         access_token_info = AccessTokenInfo(
             access_token=access_token,
-            expires_at=self._get_access_token_expiry_date(
+            expires_at=get_access_token_expiry_date(
                 token_response,
                 access_token,
             ),
         )
         self._ACCESS_TOKEN_CACHE[self._cache_key] = access_token_info
         return access_token_info
-
-    @staticmethod
-    def _get_access_token_expiry_date(
-        token_response: dict[str, JsonValue],
-        token: str,
-    ) -> datetime | None:
-        expires_in = token_response.get("expires_in")
-
-        if isinstance(expires_in, (int, float)):
-            if not isinstance(expires_in, bool):
-                return datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-        elif isinstance(expires_in, str):
-            try:
-                return datetime.now(timezone.utc) + timedelta(seconds=float(expires_in))
-            except ValueError:
-                pass
-
-        # No expires_in key in the token response. Try and
-        # decode the token as a JWT to fetch the "exp" claim
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-        except jwt.DecodeError:
-            # Not a JWT, we can't know the expiry date.
-            # We'll fall back to reactive token refreshing
-            return None
-
-        return OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload)
-
-    @staticmethod
-    def _get_exp_datetime_from_jwt_payload(
-        payload: dict[str, JsonValue],
-    ) -> datetime | None:
-        exp = payload.get("exp")
-
-        if isinstance(exp, (int, float)):
-            if isinstance(exp, bool):
-                return None
-
-            try:
-                return datetime.fromtimestamp(exp, tz=timezone.utc)
-            except (OverflowError, OSError, ValueError):
-                return None
-
-        if not isinstance(exp, str):
-            return None
-
-        try:
-            return datetime.fromtimestamp(float(exp), tz=timezone.utc)
-        except (OverflowError, OSError, ValueError):
-            return None
