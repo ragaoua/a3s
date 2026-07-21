@@ -314,6 +314,6 @@ def _clear_outbound_client_credentials_cache() -> Iterator[None]:
     # (token_endpoint, client_id). The keycloak fixture is session-scoped,
     # so consecutive tests would otherwise hit the cache and skip the
     # token-endpoint round trip we're trying to exercise.
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()  # pyright: ignore[reportPrivateUsage]
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()  # pyright: ignore[reportPrivateUsage]
+    OAuthClientCredentialsAuth._access_token_cache.clear()  # pyright: ignore[reportPrivateUsage]
+    OAuthClientCredentialsAuth._access_token_cache_locks.clear()  # pyright: ignore[reportPrivateUsage]
     yield

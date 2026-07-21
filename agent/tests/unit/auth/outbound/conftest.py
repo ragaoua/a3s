@@ -10,7 +10,7 @@ from src.config.types import OAuthClientCredentialsAuthConfig
 from src.utils import FetchJson
 
 
-class BuildAuth(Protocol):
+class BuildGrantAuth(Protocol):
     def __call__(
         self,
         auth_method: Literal[
@@ -23,13 +23,13 @@ class BuildAuth(Protocol):
 
 @pytest.fixture(autouse=True)
 def clear_access_token_cache() -> Generator[None, None, None]:
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()  # pyright: ignore[reportPrivateUsage]
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()  # pyright: ignore[reportPrivateUsage]
+    OAuthClientCredentialsAuth._access_token_cache.clear()  # pyright: ignore[reportPrivateUsage]
+    OAuthClientCredentialsAuth._access_token_cache_locks.clear()  # pyright: ignore[reportPrivateUsage]
     yield
 
 
 @pytest.fixture
-def build_auth() -> BuildAuth:
+def build_auth() -> BuildGrantAuth:
     def _build(
         auth_method: Literal[
             "client_secret_basic", "client_secret_post"
