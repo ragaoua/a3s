@@ -32,9 +32,9 @@ The agent is configured from a YAML file. By default, it reads
 `A3S_CONFIG_FILE` to use a different config file path.
 
 An example config lives at
-[agent/config/agent.example.yaml](agent/config/agent.example.yaml) and the JSON
+[agent/config/agent.example.yaml](config/agent.example.yaml) and the JSON
 schema lives at
-[agent/schemas/agent.config.schema.json](agent/schemas/agent.config.schema.json).
+[agent/schemas/agent.config.schema.json](schemas/agent.config.schema.json).
 
 Variable substitution is supported in config values using the `${ENV_VAR}`
 format. If the environment variable is missing, configuration validation fails.
@@ -265,7 +265,9 @@ See `config/agent.example.yaml` for the current config shape.
 
 This mode **requires** that the following configuration parameters be set:
 
-- `auth.issuer_url`: must point to the authorization server.
+- `auth.issuer_url`: must point to the authorization server. See
+  [docs/oauth-token-validation.md](docs/auth/oauth-transport-security.md)
+  regarding URL and endpoints schemes (http/https).
 - `auth.policies`: configures the token validation policies. Policies are
   additive: all configured policies are evaluated and applied.
 
@@ -300,7 +302,7 @@ At least one of `auth.policies.jwt` or `auth.policies.introspection` must be
 configured. Both can be set simultaneously.
 
 For more information about how tokens are validated, check out
-[docs/oauth-token-validation.md](docs/oauth-token-validation.md)
+[docs/oauth-token-validation.md](docs/auth/oauth-token-validation.md)
 
 ### MCP configuration
 
