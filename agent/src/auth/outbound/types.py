@@ -29,3 +29,11 @@ class AccessTokenCacheKey(NamedTuple):
     client_id: str
 
 
+class TokenExchangeCacheKey(NamedTuple):
+    token_endpoint: Url
+    client_id: str
+    # sha256 hex digest of the inbound subject token. Exchanged tokens are
+    # derived from the caller's token, so the cache MUST be scoped per subject
+    # to avoid handing one caller's exchanged token to another. Hashed rather
+    # than stored raw as defense-in-depth against leaking tokens via the key.
+    subject_token_hash: str
