@@ -103,7 +103,6 @@ def test_get_mcp_toolset_client_credentials_auth_installs_httpx_factory_bound_to
             mode="oauth_token_exchange",
             client_id="client-id",
             client_secret=SecretStr("client-secret"),
-            issuer_url=Url("https://issuer.example/realm"),
         ),
         OAuthStaticTokenExchangeAuthConfig(
             mode="oauth_token_exchange",

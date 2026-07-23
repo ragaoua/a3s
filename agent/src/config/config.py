@@ -77,11 +77,11 @@ class Config(StrictModel):
     def _resolve_outbound_oauth2_issuer_url(self, issuer_url: Url):
         for server_config in self.mcp_servers:
             if isinstance(server_config.auth, OAuthDiscoveredTokenExchangeAuthConfig):
-                server_config.auth.issuer_url = issuer_url
+                server_config.auth.resolve_issuer_url(issuer_url)
 
         for subagent_config in self.agent.subagents.values():
             if isinstance(subagent_config.auth, OAuthDiscoveredTokenExchangeAuthConfig):
-                subagent_config.auth.issuer_url = issuer_url
+                subagent_config.auth.resolve_issuer_url(issuer_url)
 
 
 def load_config(env: Mapping[str, str] = os.environ) -> Config:

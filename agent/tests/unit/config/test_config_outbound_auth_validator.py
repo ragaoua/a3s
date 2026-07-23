@@ -46,7 +46,6 @@ TOKEN_EXCHANGE_DISCOVERED = OAuthDiscoveredTokenExchangeAuthConfig(
     mode="oauth_token_exchange",
     client_id="c",
     client_secret=SecretStr("s"),
-    issuer_url=Url("http://example.com"),
 )
 TOKEN_EXCHANGE_STATIC = OAuthStaticTokenExchangeAuthConfig(
     mode="oauth_token_exchange",
@@ -195,6 +194,38 @@ def test_discovered_token_exchange_gets_issuer_url_resolved_from_root_oauth2() -
     subagent_auth = config.agent.subagents["helper"].auth
     assert isinstance(subagent_auth, OAuthDiscoveredTokenExchangeAuthConfig)
     assert subagent_auth.issuer_url == ROOT_OAUTH.issuer_url
+
+
+def test_discovered_token_exchange_parses_without_user_supplied_issuer_url() -> None:
+    # Mirrors a real config file: `issuer_url` is intentionally omitted (it is
+    # hidden from the JSON schema) and must be resolved from root auth.issuer_url
+    # rather than being required at parse time.
+    config = Config.model_validate(
+        {
+            "llm": {"api_url": "http://example.com", "api_key": "k", "model": "m"},
+            "agent": {"name": "a", "description": "d", "instructions": "i"},
+            "auth": {
+                "mode": "oauth2",
+                "issuer_url": "http://issuer.example.com",
+                "policies": {"jwt": {"jwks": {"discovered": True}}},
+            },
+            "mcp_servers": [
+                {
+                    "url": "http://mcp.example.com",
+                    "auth": {
+                        "mode": "oauth_token_exchange",
+                        "discovered": True,
+                        "client_id": "c",
+                        "client_secret": "s",
+                    },
+                }
+            ],
+        }
+    )
+
+    mcp_auth = config.mcp_servers[0].auth
+    assert isinstance(mcp_auth, OAuthDiscoveredTokenExchangeAuthConfig)
+    assert mcp_auth.issuer_url == Url("http://issuer.example.com")
 
 
 def test_oauth_client_credentials_does_not_require_root_oauth2() -> None:

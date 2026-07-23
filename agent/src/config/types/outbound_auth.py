@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, PrivateAttr, SecretStr, computed_field
 from pydantic_core import Url
 
 from src.config.types.common import NonEmptyStr, StrictModel
@@ -29,20 +29,28 @@ class BaseOAuthTokenExchangeAuthConfig(OAuthClientAuthConfig):
 
 class OAuthDiscoveredTokenExchangeAuthConfig(BaseOAuthTokenExchangeAuthConfig):
     discovered: Literal[True] = True
-    issuer_url: Url
 
-    # Exclude issuer_url from the schema generated from self.model_json_schema:
-    # when the token endpoint is "discovered", the issuer url shouldn't be user-defined.
-    # Instead, it should be resolved as the value of top-level auth.issuer_url
-    @classmethod
-    def __get_pydantic_json_schema__(cls, core_schema, handler):
-        schema = handler(core_schema)
+    # When the token endpoint is "discovered", the issuer URL is never
+    # user-defined: it is resolved from the top-level auth.issuer_url by the
+    # Config after-validator (see Config._resolve_outbound_oauth2_issuer_url),
+    # which calls resolve_issuer_url().
+    #
+    # It is stored as a private attribute so it stays out of the (validation)
+    # input schema -- a user cannot set it -- and exposed as a computed field so
+    # consumers get a non-optional Url and it still appears in model_dump().
+    _issuer_url: Url | None = PrivateAttr(default=None)
 
-        schema["properties"].pop("issuer_url", None)
-        if "required" in schema:
-            schema["required"] = [x for x in schema["required"] if x != "issuer_url"]
+    def resolve_issuer_url(self, issuer_url: Url) -> None:
+        self._issuer_url = issuer_url
 
-        return schema
+    @computed_field
+    @property
+    def issuer_url(self) -> Url:
+        if self._issuer_url is None:
+            raise RuntimeError(
+                "issuer_url accessed before it was resolved from the root auth config"
+            )
+        return self._issuer_url
 
 
 class OAuthStaticTokenExchangeAuthConfig(BaseOAuthTokenExchangeAuthConfig):

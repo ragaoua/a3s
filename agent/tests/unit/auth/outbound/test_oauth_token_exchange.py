@@ -52,14 +52,15 @@ def _build_discovered_auth(
     *,
     fetch_json: FetchJson = _default_fetch_json,
 ) -> OAuthTokenExchangeAuth:
+    server_auth_config = OAuthDiscoveredTokenExchangeAuthConfig(
+        mode="oauth_token_exchange",
+        client_id="client-id",
+        client_secret=SecretStr("client-secret"),
+    )
+    server_auth_config.resolve_issuer_url(Url(_ISSUER_URL))
     return OAuthTokenExchangeAuth(
         server_url=Url("https://mcp.example"),
-        server_auth_config=OAuthDiscoveredTokenExchangeAuthConfig(
-            mode="oauth_token_exchange",
-            client_id="client-id",
-            client_secret=SecretStr("client-secret"),
-            issuer_url=Url(_ISSUER_URL),
-        ),
+        server_auth_config=server_auth_config,
         fetch_json=fetch_json,
     )
 

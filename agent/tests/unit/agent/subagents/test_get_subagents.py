@@ -139,7 +139,6 @@ def test_get_subagents_token_forward_registers_before_request_interceptor() -> N
             mode="oauth_token_exchange",
             client_id="client-id",
             client_secret=SecretStr("client-secret"),
-            issuer_url=Url("https://issuer.example/realm"),
         ),
         OAuthStaticTokenExchangeAuthConfig(
             mode="oauth_token_exchange",
