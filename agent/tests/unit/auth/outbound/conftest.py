@@ -1,52 +1,61 @@
-from collections.abc import Generator
-from typing import Literal, Protocol
+from collections.abc import Awaitable, Callable, Generator
+from typing import Protocol, override
 
-from pydantic import SecretStr
 import pytest
-from pydantic_core import Url
 
-from src.auth.outbound.oauth_client_credentials import OAuthClientCredentialsAuth
-from src.config.types import OAuthClientCredentialsAuthConfig
-from src.utils import FetchJson
+from src.auth.outbound.oauth_grant import OAuthGrantAuth
+from src.auth.outbound.types import AccessTokenInfo, PreparedGrant
+from src.config.types import OAuthClientAuthConfig
 
 
-class BuildAuth(Protocol):
+class _FakeGrantAuth(OAuthGrantAuth[str, OAuthClientAuthConfig]):
+    """Minimal concrete grant used to exercise the base OAuthGrantAuth behavior
+    (fetch-and-cache, proactive refresh, retry) on its own, without depending on
+    any real grant's token request.
+
+    `_prepare_grant` hands back a caller-supplied `fetch`, so tests control
+    exactly what the grant produces and assert only on base-class behavior;
+    token parsing/expiry belongs to each concrete grant's own tests."""
+
+    def __init__(  # pyright: ignore[reportMissingSuperCall]
+        self,
+        cache_key: str,
+        fetch: Callable[[], Awaitable[AccessTokenInfo]],
+    ) -> None:
+        self._cache_key: str = cache_key
+        self._fetch: Callable[[], Awaitable[AccessTokenInfo]] = fetch
+
+    @override
+    async def _prepare_grant(self) -> PreparedGrant[str]:
+        return PreparedGrant(self._cache_key, self._fetch)
+
+
+class BuildGrantAuth(Protocol):
     def __call__(
         self,
-        auth_method: Literal[
-            "client_secret_basic", "client_secret_post"
-        ] = "client_secret_basic",
         *,
-        fetch_json: FetchJson | None = None,
-    ) -> OAuthClientCredentialsAuth: ...
+        fetch: Callable[[], Awaitable[AccessTokenInfo]] | None = None,
+        cache_key: str = "cache-key",
+    ) -> _FakeGrantAuth: ...
 
 
 @pytest.fixture(autouse=True)
 def clear_access_token_cache() -> Generator[None, None, None]:
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE.clear()  # pyright: ignore[reportPrivateUsage]
-    OAuthClientCredentialsAuth._ACCESS_TOKEN_CACHE_LOCKS.clear()  # pyright: ignore[reportPrivateUsage]
+    _FakeGrantAuth._access_token_cache.clear()  # pyright: ignore[reportPrivateUsage]
+    _FakeGrantAuth._access_token_cache_locks.clear()  # pyright: ignore[reportPrivateUsage]
     yield
 
 
 @pytest.fixture
-def build_auth() -> BuildAuth:
+def build_auth() -> BuildGrantAuth:
+    async def _default_fetch() -> AccessTokenInfo:
+        raise AssertionError("the grant fetch must not be called")
+
     def _build(
-        auth_method: Literal[
-            "client_secret_basic", "client_secret_post"
-        ] = "client_secret_basic",
         *,
-        fetch_json: FetchJson | None = None,
-    ) -> OAuthClientCredentialsAuth:
-        return OAuthClientCredentialsAuth(
-            server_url=Url("https://mcp.example"),
-            server_auth_config=OAuthClientCredentialsAuthConfig(
-                mode="oauth_client_credentials",
-                token_endpoint=Url("https://issuer.example/oauth/token"),
-                client_id="client-id",
-                client_secret=SecretStr("client-secret"),
-                auth_method=auth_method,
-            ),
-            **({"fetch_json": fetch_json} if fetch_json is not None else {}),
-        )
+        fetch: Callable[[], Awaitable[AccessTokenInfo]] | None = None,
+        cache_key: str = "cache-key",
+    ) -> _FakeGrantAuth:
+        return _FakeGrantAuth(cache_key, fetch or _default_fetch)
 
     return _build

@@ -1,17 +1,18 @@
 from google.adk.agents import BaseAgent
 import httpx
 from pydantic import SecretStr
-import pytest
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.tools import agent_tool
 from pydantic_core import Url
+import pytest
 
 import src.agent.subagents as subagents_module
 from src.agent.subagents import get_subagents
-from src.auth.outbound import OAuthClientCredentialsAuth
+from src.auth.outbound import OAuthClientCredentialsAuth, OAuthTokenExchangeAuth
 from src.config.types import (
     OAuthClientCredentialsAuthConfig,
     OAuthDiscoveredTokenExchangeAuthConfig,
+    OAuthStaticTokenExchangeAuthConfig,
     OAuthTokenForwardAuthConfig,
     OutboundApiKeyAuthConfig,
     SubagentConfig,
@@ -131,21 +132,42 @@ def test_get_subagents_token_forward_registers_before_request_interceptor() -> N
     assert _has_token_forward_interceptor(agent)
 
 
-def test_get_subagents_token_exchange_raises_not_implemented() -> None:
-    config = {
-        "helper": SubagentConfig(
-            url=Url("https://agent.example/api"),
-            type="delegate",
-            auth=OAuthDiscoveredTokenExchangeAuthConfig(
-                mode="oauth_token_exchange",
-                client_id="client-id",
-                client_secret=SecretStr("client-secret"),
-            ),
-        )
-    }
+@pytest.mark.parametrize(
+    "auth_config",
+    (
+        OAuthDiscoveredTokenExchangeAuthConfig(
+            mode="oauth_token_exchange",
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+            issuer_url=Url("https://issuer.example/realm"),
+        ),
+        OAuthStaticTokenExchangeAuthConfig(
+            mode="oauth_token_exchange",
+            token_endpoint=Url("https://issuer.example/oauth/token"),
+            client_id="client-id",
+            client_secret=SecretStr("client-secret"),
+        ),
+    ),
+)
+def test_get_subagents_token_exchange_attaches_token_exchange_auth_to_httpx_client(
+    auth_config: OAuthDiscoveredTokenExchangeAuthConfig
+    | OAuthStaticTokenExchangeAuthConfig,
+) -> None:
+    subagent_config = SubagentConfig(
+        url=Url("https://agent.example/api"),
+        type="delegate",
+        auth=auth_config,
+    )
 
-    with pytest.raises(NotImplementedError, match="oauth_token_exchange"):
-        get_subagents(config)
+    result = get_subagents({"helper": subagent_config})
+
+    agent = _assert_is_remote_agent(result.delegate_subagents[0])
+    client = _get_httpx_client(agent)
+    assert client is not None
+    assert isinstance(client.auth, OAuthTokenExchangeAuth)
+    assert client.auth._server_url == subagent_config.url  # pyright: ignore[reportPrivateUsage]
+    assert client.auth._server_auth_config is subagent_config.auth  # pyright: ignore[reportPrivateUsage]
+    assert not _has_token_forward_interceptor(agent)
 
 
 def test_get_subagents_peer_type_is_wrapped_in_agent_tool() -> None:

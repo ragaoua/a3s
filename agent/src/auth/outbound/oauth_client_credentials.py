@@ -1,34 +1,19 @@
-import asyncio
-from collections import defaultdict
-from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
 from typing import override
 
-import httpx
-import jwt
-from pydantic import JsonValue
 from pydantic_core import Url
 
-from src.config.types import OAuthClientCredentialsAuthConfig
 from src.auth.oauth_client_auth import build_client_authenticated_request
+from src.auth.outbound.oauth_grant import OAuthGrantAuth
+from src.auth.outbound.types import PreparedGrant
+from src.auth.outbound.token_expiry import get_access_token_expiry_date
 from src.auth.outbound.types import AccessTokenCacheKey, AccessTokenInfo
+from src.config.types import OAuthClientCredentialsAuthConfig
 from src.utils import FetchJson, fetch_json
 
 
-class OAuthClientCredentialsAuth(httpx.Auth):
-    _ACCESS_TOKEN_CACHE: dict[
-        AccessTokenCacheKey,
-        AccessTokenInfo,
-    ] = {}
-    _ACCESS_TOKEN_CACHE_LOCKS: defaultdict[
-        AccessTokenCacheKey,
-        asyncio.Lock,
-    ] = defaultdict(asyncio.Lock)
-
-    # NOTE: this could be configurable by the client, or it
-    # could be more dynamic (percentage of the token's TTL)
-    _ACCESS_TOKEN_REFRESH_WINDOW: timedelta = timedelta(seconds=30)
-
+class OAuthClientCredentialsAuth(
+    OAuthGrantAuth[AccessTokenCacheKey, OAuthClientCredentialsAuthConfig]
+):
     def __init__(
         self,
         server_url: Url,
@@ -36,94 +21,19 @@ class OAuthClientCredentialsAuth(httpx.Auth):
         *,
         fetch_json: FetchJson = fetch_json,
     ):
-        self._server_url: Url = server_url
-        self._server_auth_config: OAuthClientCredentialsAuthConfig = server_auth_config
+        super().__init__(server_url, server_auth_config, fetch_json=fetch_json)
+        # The token endpoint and client id are fixed for this grant, so the cache
+        # key is stable across requests.
         self._cache_key: AccessTokenCacheKey = AccessTokenCacheKey(
             server_auth_config.token_endpoint,
             server_auth_config.client_id,
         )
-        self._fetch_json: FetchJson = fetch_json
 
     @override
-    async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
-        should_retry = False
+    async def _prepare_grant(self) -> PreparedGrant[AccessTokenCacheKey]:
+        return PreparedGrant(self._cache_key, self._request_token)
 
-        async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
-            cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
-
-            # Token not in cache: fetch fresh one from auth server
-            if cached_token_info is None:
-                token_info = await self._fetch_access_token_from_auth_server()
-
-            # Token expired or almost expired: fetch new one.
-            # If fetch fails, use cached token if not completely expired.
-            # In that case, we don't want to retry (should_retry stays False)
-            # if the request fails later, because even if we are using a cached
-            # token, the remote refresh failed.
-            elif (
-                cached_token_info.expires_at is not None
-                and cached_token_info.expires_at
-                <= (datetime.now(timezone.utc) + self._ACCESS_TOKEN_REFRESH_WINDOW)
-            ):
-                try:
-                    token_info = await self._fetch_access_token_from_auth_server()
-                except Exception:
-                    if cached_token_info.expires_at > datetime.now(timezone.utc):
-                        token_info = cached_token_info
-                    else:
-                        raise
-
-            # Token found in cache: use it.
-            else:
-                token_info = cached_token_info
-                should_retry = True
-
-        request.headers["Authorization"] = "Bearer " + token_info.access_token
-        response = yield request
-
-        if not self._is_unauthorized_bearer(response):
-            return
-
-        # If the token we used was in cache (and not soon expired),
-        # fetch a new one from the auth server and retry (in case the token
-        # was revoked/has expired etc since we cached it).
-        if should_retry:
-            async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
-                cached_token_info = self._ACCESS_TOKEN_CACHE.get(self._cache_key)
-                if token_info == cached_token_info or cached_token_info is None:
-                    try:
-                        token_info = await self._fetch_access_token_from_auth_server()
-                    except Exception:
-                        _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
-                        raise
-                else:
-                    token_info = cached_token_info
-
-            request.headers["Authorization"] = "Bearer " + token_info.access_token
-            response = yield request
-
-            if not self._is_unauthorized_bearer(response):
-                return
-
-        async with self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key]:
-            if token_info == self._ACCESS_TOKEN_CACHE.get(self._cache_key):
-                _ = self._ACCESS_TOKEN_CACHE.pop(self._cache_key, None)
-
-    @staticmethod
-    def _is_unauthorized_bearer(response: httpx.Response):
-        return response.status_code == 401 and any(
-            "bearer" in header.lower()
-            for header in response.headers.get_list("www-authenticate")
-        )
-
-    async def _fetch_access_token_from_auth_server(self) -> AccessTokenInfo:
-        if not self._ACCESS_TOKEN_CACHE_LOCKS[self._cache_key].locked():
-            raise RuntimeError(
-                "The access token cache lock must be acquired first since this method updates the cache upon fetching a fresh token from the authorization server"
-            )
-
+    async def _request_token(self) -> AccessTokenInfo:
         request = build_client_authenticated_request(
             url=str(self._server_auth_config.token_endpoint),
             body={"grant_type": "client_credentials"},
@@ -144,62 +54,10 @@ class OAuthClientCredentialsAuth(httpx.Auth):
                 "OAuth2 client credentials response is missing a valid 'access_token'"
             )
 
-        access_token_info = AccessTokenInfo(
+        return AccessTokenInfo(
             access_token=access_token,
-            expires_at=self._get_access_token_expiry_date(
+            expires_at=get_access_token_expiry_date(
                 token_response,
                 access_token,
             ),
         )
-        self._ACCESS_TOKEN_CACHE[self._cache_key] = access_token_info
-        return access_token_info
-
-    @staticmethod
-    def _get_access_token_expiry_date(
-        token_response: dict[str, JsonValue],
-        token: str,
-    ) -> datetime | None:
-        expires_in = token_response.get("expires_in")
-
-        if isinstance(expires_in, (int, float)):
-            if not isinstance(expires_in, bool):
-                return datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-        elif isinstance(expires_in, str):
-            try:
-                return datetime.now(timezone.utc) + timedelta(seconds=float(expires_in))
-            except ValueError:
-                pass
-
-        # No expires_in key in the token response. Try and
-        # decode the token as a JWT to fetch the "exp" claim
-        try:
-            payload = jwt.decode(token, options={"verify_signature": False})
-        except jwt.DecodeError:
-            # Not a JWT, we can't know the expiry date.
-            # We'll fall back to reactive token refreshing
-            return None
-
-        return OAuthClientCredentialsAuth._get_exp_datetime_from_jwt_payload(payload)
-
-    @staticmethod
-    def _get_exp_datetime_from_jwt_payload(
-        payload: dict[str, JsonValue],
-    ) -> datetime | None:
-        exp = payload.get("exp")
-
-        if isinstance(exp, (int, float)):
-            if isinstance(exp, bool):
-                return None
-
-            try:
-                return datetime.fromtimestamp(exp, tz=timezone.utc)
-            except (OverflowError, OSError, ValueError):
-                return None
-
-        if not isinstance(exp, str):
-            return None
-
-        try:
-            return datetime.fromtimestamp(float(exp), tz=timezone.utc)
-        except (OverflowError, OSError, ValueError):
-            return None

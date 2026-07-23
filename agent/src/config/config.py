@@ -11,7 +11,7 @@ from pydantic import (
     ValidationError,
     model_validator,
 )
-from pydantic_core import InitErrorDetails
+from pydantic_core import InitErrorDetails, Url
 
 from src.config.types import (
     AgentConfig,
@@ -20,6 +20,7 @@ from src.config.types import (
     LoggingConfig,
     McpServerConfig,
     OAuthConfig,
+    OAuthDiscoveredTokenExchangeAuthConfig,
     ServerConfig,
     SessionsConfig,
 )
@@ -48,6 +49,7 @@ class Config(StrictModel):
     @model_validator(mode="after")
     def validate_outbound_auth_requires_oauth2(self):
         if isinstance(self.auth, OAuthConfig):
+            self._resolve_outbound_oauth2_issuer_url(self.auth.issuer_url)
             return self
 
         oauth_token_modes = {"oauth_token_forward", "oauth_token_exchange"}
@@ -71,6 +73,15 @@ class Config(StrictModel):
                 )
 
         return self
+
+    def _resolve_outbound_oauth2_issuer_url(self, issuer_url: Url):
+        for server_config in self.mcp_servers:
+            if isinstance(server_config.auth, OAuthDiscoveredTokenExchangeAuthConfig):
+                server_config.auth.issuer_url = issuer_url
+
+        for subagent_config in self.agent.subagents.values():
+            if isinstance(subagent_config.auth, OAuthDiscoveredTokenExchangeAuthConfig):
+                subagent_config.auth.issuer_url = issuer_url
 
 
 def load_config(env: Mapping[str, str] = os.environ) -> Config:

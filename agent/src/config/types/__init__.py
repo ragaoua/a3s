@@ -14,9 +14,11 @@ from .sessions import SessionsConfig
 from .mcp_servers import McpServerConfig
 from .outbound_auth import (
     OAuthTokenForwardAuthConfig,
+    OAuthClientAuthConfig,
     OAuthClientCredentialsAuthConfig,
     OAuthTokenExchangeAuthConfig,
     OAuthDiscoveredTokenExchangeAuthConfig,
+    OAuthStaticTokenExchangeAuthConfig,
     OutboundApiKeyAuthConfig,
 )
 from .logging import LoggingConfig
@@ -36,9 +38,11 @@ __all__ = [
     "SessionsConfig",
     "McpServerConfig",
     "OAuthTokenForwardAuthConfig",
+    "OAuthClientAuthConfig",
     "OAuthClientCredentialsAuthConfig",
     "OAuthTokenExchangeAuthConfig",
     "OAuthDiscoveredTokenExchangeAuthConfig",
+    "OAuthStaticTokenExchangeAuthConfig",
     "OutboundApiKeyAuthConfig",
     "LoggingConfig",
 ]

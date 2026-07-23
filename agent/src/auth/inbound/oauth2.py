@@ -3,7 +3,7 @@ from returns.result import Failure, Result, Success
 
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
 from authlib.jose.errors import JoseError
-from authlib.oauth2.rfc8414 import AuthorizationServerMetadata, get_well_known_url
+from authlib.oauth2.rfc8414 import AuthorizationServerMetadata
 from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
 from pydantic import JsonValue
 from starlette.authentication import AuthCredentials, SimpleUser
@@ -18,6 +18,7 @@ from src.auth.context import (
     bind_current_authorization_header,
 )
 from src.auth.oauth_client_auth import build_client_authenticated_request
+from src.auth.oauth_metadata import fetch_authorization_server_metadata
 from src.config.types import (
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
@@ -59,46 +60,14 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         self.config = config
         self._fetch_json = fetch_json
 
-    @staticmethod
-    def _validate_authorization_server_metadata(
-        metadata_raw: dict[str, JsonValue],
-        *,
-        expected_issuer: str,
-    ) -> Result[AuthorizationServerMetadata, str]:
-        try:
-            metadata = AuthorizationServerMetadata(metadata_raw)
-            metadata.validate_issuer()
-        except Exception as err:
-            return Failure(f"Failed to validate authorization server metadata: {err}")
-
-        metadata_issuer = str(metadata.get("issuer", "")).rstrip("/")
-        if metadata_issuer != expected_issuer:
-            return Failure(
-                "Failed to validate authorization server metadata: Issuer mismatch in OAuth2 authorization server metadata"
-            )
-
-        return Success(metadata)
-
-    async def _fetch_authorization_server_metadata(
-        self,
-    ) -> Result[AuthorizationServerMetadata, str]:
-        try:
-            metadata_url = get_well_known_url(self.issuer_url, external=True)
-            metadata_raw = await self._fetch_json(metadata_url)
-        except Exception as err:
-            return Failure(f"Failed to fetch authorization server metadata: {err}")
-
-        return self._validate_authorization_server_metadata(
-            metadata_raw,
-            expected_issuer=self.issuer_url,
-        )
-
     async def _discover_jwks_uri(
         self,
         metadata: AuthorizationServerMetadata | None = None,
     ) -> Result[str, str]:
         if not metadata:
-            res = await self._fetch_authorization_server_metadata()
+            res = await fetch_authorization_server_metadata(
+                self.issuer_url, fetch_json=self._fetch_json
+            )
             if isinstance(res, Failure):
                 return res
             metadata = res.unwrap()
@@ -161,7 +130,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         metadata: AuthorizationServerMetadata | None = None,
     ) -> Result[str, str]:
         if not metadata:
-            res = await self._fetch_authorization_server_metadata()
+            res = await fetch_authorization_server_metadata(
+                self.issuer_url, fetch_json=self._fetch_json
+            )
             if isinstance(res, Failure):
                 return res
             metadata = res.unwrap()
@@ -357,7 +328,9 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         claims: JWTClaims | None = None
         auth_server_metadata: AuthorizationServerMetadata | None = None
         if self._requires_authorization_server_metadata():
-            res = await self._fetch_authorization_server_metadata()
+            res = await fetch_authorization_server_metadata(
+                self.issuer_url, fetch_json=self._fetch_json
+            )
 
             if isinstance(res, Failure):
                 return Failure(

@@ -23,15 +23,29 @@ class OAuthClientCredentialsAuthConfig(OAuthClientAuthConfig):
     token_endpoint: Url
 
 
-class OAuthTokenExchangeAuthConfig(OAuthClientAuthConfig):
+class BaseOAuthTokenExchangeAuthConfig(OAuthClientAuthConfig):
     mode: Literal["oauth_token_exchange"]
 
 
-class OAuthDiscoveredTokenExchangeAuthConfig(OAuthTokenExchangeAuthConfig):
+class OAuthDiscoveredTokenExchangeAuthConfig(BaseOAuthTokenExchangeAuthConfig):
     discovered: Literal[True] = True
+    issuer_url: Url
+
+    # Exclude issuer_url from the schema generated from self.model_json_schema:
+    # when the token endpoint is "discovered", the issuer url shouldn't be user-defined.
+    # Instead, it should be resolved as the value of top-level auth.issuer_url
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema, handler):
+        schema = handler(core_schema)
+
+        schema["properties"].pop("issuer_url", None)
+        if "required" in schema:
+            schema["required"] = [x for x in schema["required"] if x != "issuer_url"]
+
+        return schema
 
 
-class OAuthStaticTokenExchangeAuthConfig(OAuthTokenExchangeAuthConfig):
+class OAuthStaticTokenExchangeAuthConfig(BaseOAuthTokenExchangeAuthConfig):
     discovered: Literal[False] = False
     token_endpoint: Url
 
@@ -39,3 +53,8 @@ class OAuthStaticTokenExchangeAuthConfig(OAuthTokenExchangeAuthConfig):
 class OutboundApiKeyAuthConfig(StrictModel):
     mode: Literal["api_key"]
     api_key: SecretStr = Field(min_length=1)
+
+
+OAuthTokenExchangeAuthConfig = (
+    OAuthDiscoveredTokenExchangeAuthConfig | OAuthStaticTokenExchangeAuthConfig
+)

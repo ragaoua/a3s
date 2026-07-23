@@ -16,7 +16,7 @@ from google.adk.agents.remote_a2a_agent import RemoteA2aAgent
 from google.adk.tools import agent_tool
 
 from src.auth.context import get_current_authorization_header
-from src.auth.outbound import OAuthClientCredentialsAuth
+from src.auth.outbound import OAuthClientCredentialsAuth, OAuthTokenExchangeAuth
 from src.config.types import (
     OAuthClientCredentialsAuthConfig,
     OAuthTokenExchangeAuthConfig,
@@ -57,8 +57,11 @@ def get_subagents(config: dict[str, SubagentConfig]) -> GetSubagentResult:
                 ]
             )
         elif isinstance(agent_config.auth, OAuthTokenExchangeAuthConfig):
-            raise NotImplementedError(
-                "agent.subagents[].auth.mode='oauth_token_exchange' is not implemented yet"
+            httpx_client = httpx.AsyncClient(
+                auth=OAuthTokenExchangeAuth(
+                    server_url=agent_config.url,
+                    server_auth_config=agent_config.auth,
+                )
             )
 
         a2a_client_factory = ClientFactory(
