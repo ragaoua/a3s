@@ -15,10 +15,9 @@ export const CONFIG: Config = {
   host: process.env.HOST || "localhost",
   port: Number(process.env.PORT) || 3000,
   auth: {
-    issuer: "http://localhost:8080/realms/a3s-realm",
-    // jwksUri:
-    //   "http://localhost:8080/realms/a3s-realm/protocol/openid-connect/certs",
-    clientId: "a3s-test-client",
+    issuer: process.env.ISSUER_URL || "http://localhost:8080/realms/a3s-realm",
+    jwksUri: process.env.ISSUER_JWKS_URL ?? undefined,
+    clientId: process.env.CLIENT_ID || "a3s-test-client",
     allowedJwtAlgs: ["RS256"],
   },
 };
