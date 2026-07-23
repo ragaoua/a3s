@@ -19,6 +19,8 @@ podman run --rm -p 3000:3000 demo-mcp
 
 ## Options
 
+CLI flags:
+
 | Flag          | Effect                     |
 | ------------- | -------------------------- |
 | `--no-auth`   | Disable OAuth bearer auth. |
