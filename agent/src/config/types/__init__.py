@@ -10,7 +10,7 @@ from .auth import (
     OAuthStaticIntrospectionPolicyConfig,
 )
 from .server import ServerConfig
-from .sessions import SessionsConfig
+from .persistence import PersistenceConfig
 from .mcp_servers import McpServerConfig
 from .outbound_auth import (
     OAuthTokenForwardAuthConfig,
@@ -35,7 +35,7 @@ __all__ = [
     "OAuthStaticJwksPolicyConfig",
     "OAuthStaticIntrospectionPolicyConfig",
     "ServerConfig",
-    "SessionsConfig",
+    "PersistenceConfig",
     "McpServerConfig",
     "OAuthTokenForwardAuthConfig",
     "OAuthClientAuthConfig",

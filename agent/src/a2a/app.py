@@ -4,6 +4,7 @@ from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import (
+    DatabaseTaskStore,
     InMemoryTaskStore,
 )
 from a2a.types import (
@@ -31,6 +32,7 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
+from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.applications import Starlette
 
 from src.auth.inbound import (
@@ -41,19 +43,19 @@ from src.config.types import (
     ApiKeyAuthConfig,
     AuthConfig,
     OAuthConfig,
+    PersistenceConfig,
     ServerConfig,
-    SessionsConfig,
 )
 from src.observability.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def _sqlalchemy_db_url(sessions_config: SessionsConfig) -> str:
+def _sqlalchemy_db_url(persistence_config: PersistenceConfig) -> str:
     """The connect string normalized to its async SQLAlchemy driver."""
-    scheme, _, rest = str(sessions_config.connect_string.get_secret_value()).partition(
-        "://"
-    )
+    scheme, _, rest = str(
+        persistence_config.connect_string.get_secret_value()
+    ).partition("://")
     driver = "sqlite+aiosqlite" if scheme == "sqlite" else "postgresql+asyncpg"
     return f"{driver}://{rest}"
 
@@ -63,15 +65,23 @@ def build_agent_a2a_app(
     agent: LlmAgent,
     server_config: ServerConfig,
     auth_config: AuthConfig,
-    sessions_config: SessionsConfig | None = None,
+    persistence_config: PersistenceConfig | None = None,
 ) -> Starlette:
     adk_logger = logging.getLogger("google_adk")
     adk_logger.setLevel(logging.INFO)
 
-    session_service = (
-        DatabaseSessionService(db_url=_sqlalchemy_db_url(sessions_config))
-        if sessions_config is not None
-        else InMemorySessionService()
+    if persistence_config is not None:
+        db_url = _sqlalchemy_db_url(persistence_config)
+        session_service = DatabaseSessionService(db_url=db_url)
+        task_store = DatabaseTaskStore(engine=create_async_engine(db_url))
+    else:
+        session_service = InMemorySessionService()
+        task_store = InMemoryTaskStore()
+
+    db_url = (
+        _sqlalchemy_db_url(persistence_config)
+        if persistence_config is not None
+        else None
     )
 
     async def create_runner() -> Runner:
@@ -91,7 +101,7 @@ def build_agent_a2a_app(
     )
     request_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
-        task_store=InMemoryTaskStore(),
+        task_store=task_store,
     )
 
     rpc_url = f"http://{server_config.listen_address}:{server_config.listen_port}"

@@ -22,7 +22,7 @@ def build_a2a_server(config: Config) -> uvicorn.Server:
         agent=agent,
         server_config=config.server,
         auth_config=config.auth,
-        sessions_config=config.sessions,
+        persistence_config=config.persistence,
     )
 
     if isinstance(config.auth, ApiKeyAuthConfig):
