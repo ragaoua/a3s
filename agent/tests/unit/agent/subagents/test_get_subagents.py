@@ -90,6 +90,28 @@ def test_get_subagents_api_key_auth_sets_api_key_header_on_httpx_client() -> Non
     assert not _has_token_forward_interceptor(agent)
 
 
+def test_get_subagents_api_key_auth_uses_the_configured_header_name() -> None:
+    config = {
+        "helper": SubagentConfig(
+            url=Url("https://agent.example/api"),
+            type="delegate",
+            auth=OutboundApiKeyAuthConfig(
+                mode="api_key",
+                api_key=SecretStr("topsecret"),
+                header_name="X-My-Api-Key",
+            ),
+        )
+    }
+
+    result = get_subagents(config)
+
+    agent = _assert_is_remote_agent(result.delegate_subagents[0])
+    client = _get_httpx_client(agent)
+    assert client is not None
+    assert client.headers["X-My-Api-Key"] == "topsecret"
+    assert "API-Key" not in client.headers
+
+
 def test_get_subagents_client_credentials_auth_attaches_oauth_auth_to_httpx_client() -> (
     None
 ):

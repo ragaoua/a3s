@@ -41,7 +41,9 @@ def get_subagents(config: dict[str, SubagentConfig]) -> GetSubagentResult:
 
         if isinstance(agent_config.auth, OutboundApiKeyAuthConfig):
             httpx_client = httpx.AsyncClient(
-                headers={"API-Key": agent_config.auth.api_key.get_secret_value()}
+                headers={
+                    agent_config.auth.header_name: agent_config.auth.api_key.get_secret_value()
+                }
             )
         elif isinstance(agent_config.auth, OAuthClientCredentialsAuthConfig):
             httpx_client = httpx.AsyncClient(

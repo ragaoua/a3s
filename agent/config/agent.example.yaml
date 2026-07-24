@@ -22,6 +22,7 @@ agent:
       auth:
         mode: api_key
         api_key: ${A3S_WORKER1_API_KEY}
+        # header_name: API-Key # The header the key is sent in. Defaults to API-Key.
     worker2:
       url: https://worker.example.com/a2a
       type: peer
@@ -74,6 +75,7 @@ auth: none
 # auth:
 #   mode: api_key
 #   api_key: ${A3S_AGENT_API_KEY}
+#   header_name: API-Key # The header the key is read from. Defaults to API-Key.
 # auth:
 #   mode: oauth2
 #   issuer_url: http://auth.example.com

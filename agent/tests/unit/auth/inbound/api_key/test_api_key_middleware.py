@@ -10,10 +10,17 @@ from src.auth.inbound.constants import EXCLUDED_PATHS
 API_KEY = "s3cret-key"
 
 
-def _build_request(*, path: str, api_key_header: str | None = None) -> Request:
+def _build_request(
+    *,
+    path: str,
+    api_key_header: str | None = None,
+    header_name: str = ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME,
+) -> Request:
     headers: list[tuple[bytes, bytes]] = []
     if api_key_header is not None:
-        headers.append((b"api-key", api_key_header.encode("utf-8")))
+        headers.append(
+            (header_name.lower().encode("utf-8"), api_key_header.encode("utf-8"))
+        )
 
     scope = {
         "type": "http",
@@ -34,11 +41,15 @@ def _build_request(*, path: str, api_key_header: str | None = None) -> Request:
     return Request(scope, receive)
 
 
-def _build_middleware(*, api_key: str = API_KEY) -> ApiKeyAuthMiddleware:
+def _build_middleware(
+    *,
+    api_key: str = API_KEY,
+    header_name: str = ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME,
+) -> ApiKeyAuthMiddleware:
     async def app(_scope: Scope, _receive: Receive, _send: Send):
         return None
 
-    return ApiKeyAuthMiddleware(app=app, api_key=api_key)
+    return ApiKeyAuthMiddleware(app=app, api_key=api_key, header_name=header_name)
 
 
 @pytest.mark.asyncio
@@ -100,3 +111,44 @@ async def test_dispatch_calls_next_when_api_key_matches() -> None:
 
     assert called
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_dispatch_reads_the_key_from_the_configured_header_name() -> None:
+    custom_header = "X-My-Api-Key"
+    middleware = _build_middleware(header_name=custom_header)
+    request = _build_request(
+        path="/rpc", api_key_header=API_KEY, header_name=custom_header
+    )
+    called = False
+
+    async def call_next(_: Request) -> Response:
+        nonlocal called
+        called = True
+        return JSONResponse({"ok": True}, status_code=200)
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert called
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_dispatch_ignores_the_default_header_when_a_custom_name_is_configured() -> (
+    None
+):
+    custom_header = "X-My-Api-Key"
+    middleware = _build_middleware(header_name=custom_header)
+    request = _build_request(
+        path="/rpc",
+        api_key_header=API_KEY,
+        header_name=ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME,
+    )
+
+    async def call_next(_: Request) -> Response:
+        pytest.fail("call_next should not be called when the key is on the wrong header")
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response.status_code == 401
+    assert response.headers["WWW-Authenticate"] == custom_header

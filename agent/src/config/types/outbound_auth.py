@@ -61,6 +61,7 @@ class OAuthStaticTokenExchangeAuthConfig(BaseOAuthTokenExchangeAuthConfig):
 class OutboundApiKeyAuthConfig(StrictModel):
     mode: Literal["api_key"]
     api_key: SecretStr = Field(min_length=1)
+    header_name: NonEmptyStr = "API-Key"
 
 
 OAuthTokenExchangeAuthConfig = (

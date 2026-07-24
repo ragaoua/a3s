@@ -35,7 +35,7 @@ async def test_agent_card_exposes_api_key_security_scheme(
 
     security_scheme = agent_card.security_schemes["APIKeySecurityScheme"]
     assert isinstance(security_scheme.root, APIKeySecurityScheme)
-    assert security_scheme.root.name == ApiKeyAuthMiddleware.HEADER_NAME
+    assert security_scheme.root.name == ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME
     assert security_scheme.root.in_ == In.header
 
 

@@ -92,6 +92,17 @@
               "writeOnly": true
             }
           ]
+        },
+        "header_name": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": "API-Key",
+              "minLength": 1,
+              "title": "Header Name",
+              "type": "string"
+            }
+          ]
         }
       },
       "required": [
@@ -749,6 +760,17 @@
               "title": "Api Key",
               "type": "string",
               "writeOnly": true
+            }
+          ]
+        },
+        "header_name": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": "API-Key",
+              "minLength": 1,
+              "title": "Header Name",
+              "type": "string"
             }
           ]
         }

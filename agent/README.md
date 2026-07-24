@@ -171,7 +171,8 @@ Supported subagent auth modes are:
 
 - `auth: none`: no authorization is added to requests sent to that subagent.
 - `auth.mode: api_key`: the agent sends the configured API key in the `API-Key`
-  header.
+  header. The header name can be overridden with `auth.header_name` (defaults to
+  `API-Key`).
 - `auth.mode: oauth_client_credentials`: the agent obtains an access token for
   that subagent using the configured `token_endpoint`, `client_id`, and
   `client_secret`. `auth_method` defaults to `client_secret_basic` and also
@@ -252,6 +253,9 @@ for every request, and check its value against the configured API key.
 
 This mode **requires** that `auth.api_key` be set to any arbitrary string. Use of
 environment variable substitution is highly recommended.
+
+The header the agent reads the key from can be customized with
+`auth.header_name`, which defaults to `API-Key`.
 
 #### OAuth2
 

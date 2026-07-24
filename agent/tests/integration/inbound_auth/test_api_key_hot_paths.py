@@ -34,7 +34,7 @@ async def test_agent_accepts_a2a_request_with_valid_api_key(
         )
 
     async with httpx.AsyncClient(
-        headers={ApiKeyAuthMiddleware.HEADER_NAME: API_KEY},
+        headers={ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME: API_KEY},
         timeout=httpx.Timeout(30, connect=5),
     ) as httpx_client:
         client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
@@ -69,7 +69,7 @@ async def test_agent_rejects_a2a_request_with_invalid_api_key(
         )
 
     async with httpx.AsyncClient(
-        headers={ApiKeyAuthMiddleware.HEADER_NAME: "wrong-key"},
+        headers={ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME: "wrong-key"},
         timeout=httpx.Timeout(30, connect=5),
     ) as httpx_client:
         client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
