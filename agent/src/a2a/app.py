@@ -4,7 +4,6 @@ from a2a.server.agent_execution import RequestContext
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import (
-    InMemoryPushNotificationConfigStore,
     InMemoryTaskStore,
 )
 from a2a.types import (
@@ -97,7 +96,6 @@ def build_agent_a2a_app(
     request_handler = DefaultRequestHandler(
         agent_executor=agent_executor,
         task_store=InMemoryTaskStore(),
-        push_config_store=InMemoryPushNotificationConfigStore(),
     )
 
     rpc_url = f"http://{server_config.listen_address}:{server_config.listen_port}"
