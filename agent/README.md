@@ -62,8 +62,6 @@ A3S_OTEL_ENABLED=true \
     uv run a3s-agent
 ```
 
-The credential lives in the agent's environment with this option.
-
 With tracing enabled, the runtime relies on OpenTelemetry auto-instrumentation
 to emit:
 
