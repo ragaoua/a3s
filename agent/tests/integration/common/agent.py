@@ -5,7 +5,7 @@ import socket
 import threading
 
 from src.a2a import build_a2a_server
-from src.config.types import AuthConfig, ServerConfig, SessionsConfig
+from src.config.types import AuthConfig, PersistenceConfig, ServerConfig
 from tests.common.a2a import A2aServerFixture
 from tests.common.config import get_base_test_config
 from tests.common.llm import LlmFixture
@@ -16,7 +16,7 @@ def start_agent_server(
     *,
     auth_config: AuthConfig,
     mock_llm: LlmFixture,
-    sessions_config: SessionsConfig | None = None,
+    persistence_config: PersistenceConfig | None = None,
 ) -> Generator[A2aServerFixture]:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -29,7 +29,7 @@ def start_agent_server(
             listen_address=IPv4Address("127.0.0.1"),
             listen_port=port,
         ),
-        sessions=sessions_config,
+        persistence=persistence_config,
     )
 
     server = build_a2a_server(config)

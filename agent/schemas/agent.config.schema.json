@@ -816,7 +816,7 @@
       "title": "ServerConfig",
       "type": "object"
     },
-    "SessionsConfig": {
+    "PersistenceConfig": {
       "additionalProperties": false,
       "properties": {
         "connect_string": {
@@ -839,7 +839,7 @@
       "required": [
         "connect_string"
       ],
-      "title": "SessionsConfig",
+      "title": "PersistenceConfig",
       "type": "object"
     },
     "SubagentConfig": {
@@ -933,10 +933,10 @@
       ],
       "title": "Auth"
     },
-    "sessions": {
+    "persistence": {
       "anyOf": [
         {
-          "$ref": "#/$defs/SessionsConfig"
+          "$ref": "#/$defs/PersistenceConfig"
         },
         {
           "type": "null"

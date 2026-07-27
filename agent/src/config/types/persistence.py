@@ -19,5 +19,5 @@ SqliteUrl = Annotated[
 ]
 
 
-class SessionsConfig(StrictModel):
+class PersistenceConfig(StrictModel):
     connect_string: Secret[PostgresUrl | SqliteUrl]

@@ -5,97 +5,25 @@ The database-backed tests verify the (app_name, user_id, context_id) mapping
 by inspecting the sessions table. The in-memory service has no table to query,
 so it is exercised behaviorally: conversation continuity proves the key maps
 back to the same session, and subject scoping proves `user_id` is part of it.
-
-Note: queries run through `_fetch_rows` use f-string interpolation, because
-sqlite and postgres use different placeholders for parameterized queries. For
-a test setup, the "SQL injection" risk induced by the use of f-strings
-isn't a real concern.
 """
 
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
-from typing import Any
 from uuid import uuid4
 
-import asyncpg
-import httpx
 import pytest
-from a2a.client import A2AClient
-from a2a.types import (
-    MessageSendParams,
-    SendMessageRequest,
-    SendMessageSuccessResponse,
-    Task,
-)
 from pydantic_core import Url
 from src.config.types import (
     OAuthConfig,
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
     OAuthStaticJwksPolicyConfig,
-    SessionsConfig,
+    PersistenceConfig,
 )
-from src.config.types.sessions import PostgresUrl, SqliteUrl
-from tests.common.a2a import create_send_message_payload, wait_for_agent_card
 from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
 from tests.integration.common.agent import start_agent_server
-from tests.integration.common.session_service_db import SessionServiceDbFixture
-
-
-@pytest.fixture(params=["postgres", "sqlite"])
-def sessions_db_connect_string(request: pytest.FixtureRequest, tmp_path: Path) -> str:
-    if request.param == "postgres":
-        db: SessionServiceDbFixture = request.getfixturevalue("session_service_db")
-        return db.connect_string
-    return f"sqlite:///{tmp_path / 'sessions.db'}"
-
-
-async def _fetch_rows(connect_string: PostgresUrl | SqliteUrl, query: str) -> list[Any]:
-    """Run a query against the sessions database, whichever backend it is."""
-    if connect_string.scheme == "sqlite":
-        connection = sqlite3.connect(
-            connect_string.unicode_string().removeprefix("sqlite:///")
-        )
-        connection.row_factory = sqlite3.Row
-        try:
-            return connection.execute(query).fetchall()
-        finally:
-            connection.close()
-
-    pg_connection = await asyncpg.connect(connect_string.unicode_string())
-    try:
-        return await pg_connection.fetch(query)
-    finally:
-        await pg_connection.close()
-
-
-async def _send_message(
-    base_url: str,
-    *,
-    text: str,
-    context_id: str,
-    headers: dict[str, str] | None = None,
-) -> Task:
-    async with httpx.AsyncClient(
-        headers=headers, timeout=httpx.Timeout(30, connect=5)
-    ) as httpx_client:
-        agent_card = await wait_for_agent_card(base_url, httpx_client)
-        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
-
-        request = SendMessageRequest(
-            id=str(uuid4()),
-            params=MessageSendParams(
-                **create_send_message_payload(text=text, context_id=context_id)
-            ),
-        )
-        response = await client.send_message(request)
-
-    assert isinstance(response.root, SendMessageSuccessResponse)
-    assert isinstance(response.root.result, Task)
-    return response.root.result
+from tests.integration.common.persistence import fetch_rows, send_message
 
 
 def _oauth_config(keycloak: KeycloakFixture) -> OAuthConfig:
@@ -114,7 +42,7 @@ def _oauth_config(keycloak: KeycloakFixture) -> OAuthConfig:
 async def _assert_sessions_scoped_by_subject(
     mock_llm: LlmFixture,
     keycloak: KeycloakFixture,
-    sessions_config: SessionsConfig | None,
+    persistence_config: PersistenceConfig | None,
 ) -> str:
     """Create two conversations/sessions that use the same context id but with
     two different token subjects, and assert both sessions are isolated.
@@ -128,11 +56,11 @@ async def _assert_sessions_scoped_by_subject(
 
     with start_agent_server(
         mock_llm=mock_llm,
-        sessions_config=sessions_config,
+        persistence_config=persistence_config,
         auth_config=_oauth_config(keycloak),
     ) as agent_server:
         mock_llm.stub_response("Nice to meet you, Ada!")
-        _ = await _send_message(
+        _ = await send_message(
             agent_server.base_url,
             text="My name is Ada.",
             context_id=context_id,
@@ -142,7 +70,7 @@ async def _assert_sessions_scoped_by_subject(
         )
 
         mock_llm.stub_response("I don't know your name.")
-        _ = await _send_message(
+        _ = await send_message(
             agent_server.base_url,
             text="What is my name?",
             context_id=context_id,
@@ -164,10 +92,10 @@ async def _assert_sessions_scoped_by_subject(
 @pytest.mark.asyncio
 async def test_conversation_is_stored_in_database(
     mock_llm: LlmFixture,
-    sessions_db_connect_string: str,
+    persistence_db_connect_string: str,
 ) -> None:
-    sessions_config = SessionsConfig.model_validate(
-        {"connect_string": sessions_db_connect_string}
+    persistence_config = PersistenceConfig.model_validate(
+        {"connect_string": persistence_db_connect_string}
     )
     context_id = uuid4().hex
 
@@ -175,16 +103,16 @@ async def test_conversation_is_stored_in_database(
     with start_agent_server(
         auth_config="none",
         mock_llm=mock_llm,
-        sessions_config=sessions_config,
+        persistence_config=persistence_config,
     ) as agent_server:
-        _ = await _send_message(agent_server.base_url, text="hi", context_id=context_id)
+        _ = await send_message(agent_server.base_url, text="hi", context_id=context_id)
 
-    session_rows = await _fetch_rows(
-        sessions_config.connect_string.get_secret_value(),
+    session_rows = await fetch_rows(
+        persistence_config.connect_string.get_secret_value(),
         f"SELECT app_name, user_id FROM sessions WHERE id = '{context_id}'",
     )
-    event_count_rows = await _fetch_rows(
-        sessions_config.connect_string.get_secret_value(),
+    event_count_rows = await fetch_rows(
+        persistence_config.connect_string.get_secret_value(),
         f"SELECT count(*) AS event_count FROM events WHERE session_id = '{context_id}'",
     )
 
@@ -197,10 +125,10 @@ async def test_conversation_is_stored_in_database(
 @pytest.mark.asyncio
 async def test_session_db_backed_conversation_survives_server_restart(
     mock_llm: LlmFixture,
-    sessions_db_connect_string: str,
+    persistence_db_connect_string: str,
 ) -> None:
-    sessions_config = SessionsConfig.model_validate(
-        {"connect_string": sessions_db_connect_string}
+    persistence_config = PersistenceConfig.model_validate(
+        {"connect_string": persistence_db_connect_string}
     )
     context_id = uuid4().hex
 
@@ -208,9 +136,9 @@ async def test_session_db_backed_conversation_survives_server_restart(
     with start_agent_server(
         auth_config="none",
         mock_llm=mock_llm,
-        sessions_config=sessions_config,
+        persistence_config=persistence_config,
     ) as agent_server:
-        _ = await _send_message(
+        _ = await send_message(
             agent_server.base_url, text="My name is Ada.", context_id=context_id
         )
 
@@ -218,9 +146,9 @@ async def test_session_db_backed_conversation_survives_server_restart(
     with start_agent_server(
         auth_config="none",
         mock_llm=mock_llm,
-        sessions_config=sessions_config,
+        persistence_config=persistence_config,
     ) as agent_server:
-        task = await _send_message(
+        task = await send_message(
             agent_server.base_url, text="What is my name?", context_id=context_id
         )
 
@@ -241,25 +169,25 @@ async def test_session_db_backed_conversation_survives_server_restart(
 @pytest.mark.asyncio
 async def test_db_backed_sessions_are_scoped_by_token_subject(
     mock_llm: LlmFixture,
-    sessions_db_connect_string: str,
+    persistence_db_connect_string: str,
     keycloak: KeycloakFixture,
 ) -> None:
     """With oauth2+jwt inbound auth, a persistent backend partitions sessions by
     the token's `sub`: a caller reusing another user's context id gets their own
     fresh session instead of resuming the other user's conversation. The keying
     is additionally visible in the sessions table, one row per subject."""
-    sessions_config = SessionsConfig.model_validate(
-        {"connect_string": sessions_db_connect_string}
+    persistence_config = PersistenceConfig.model_validate(
+        {"connect_string": persistence_db_connect_string}
     )
 
     context_id = await _assert_sessions_scoped_by_subject(
-        mock_llm, keycloak, sessions_config
+        mock_llm, keycloak, persistence_config
     )
 
     # The sessions table is keyed by (app_name, user_id, id): the same
     # context id yields one session per authenticated subject.
-    rows = await _fetch_rows(
-        sessions_config.connect_string.get_secret_value(),
+    rows = await fetch_rows(
+        persistence_config.connect_string.get_secret_value(),
         f"SELECT user_id FROM sessions WHERE id = '{context_id}'",
     )
 
@@ -270,7 +198,7 @@ async def test_db_backed_sessions_are_scoped_by_token_subject(
 async def test_in_memory_conversation_is_remembered_within_server_lifetime(
     mock_llm: LlmFixture,
 ) -> None:
-    """The default (no `sessions_config`) in-memory service maps (app_name,
+    """The default (no `persistence_config`) in-memory service maps (app_name,
     user_id, context_id) to a session in process memory: a follow-up message
     on the same context id is served the earlier exchange as history, with no
     database involved. There is no restart counterpart — surviving a restart
@@ -280,15 +208,15 @@ async def test_in_memory_conversation_is_remembered_within_server_lifetime(
     with start_agent_server(
         auth_config="none",
         mock_llm=mock_llm,
-        sessions_config=None,
+        persistence_config=None,
     ) as agent_server:
         mock_llm.stub_response("Nice to meet you, Ada!")
-        _ = await _send_message(
+        _ = await send_message(
             agent_server.base_url, text="My name is Ada.", context_id=context_id
         )
 
         mock_llm.stub_response("Your name is Ada.")
-        task = await _send_message(
+        task = await send_message(
             agent_server.base_url, text="What is my name?", context_id=context_id
         )
 
@@ -314,5 +242,5 @@ async def test_in_memory_sessions_are_scoped_by_token_subject(
     """The default in-memory service applies the same subject scoping, verified
     purely behaviorally since there is no sessions table to inspect."""
     _ = await _assert_sessions_scoped_by_subject(
-        mock_llm, keycloak, sessions_config=None
+        mock_llm, keycloak, persistence_config=None
     )
