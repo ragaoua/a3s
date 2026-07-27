@@ -27,7 +27,6 @@ from google.adk.a2a.executor.a2a_agent_executor import A2aAgentExecutor
 from google.adk.a2a.executor.config import A2aAgentExecutorConfig
 from google.adk.agents import LlmAgent
 from google.adk.agents.run_config import StreamingMode
-from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
@@ -88,7 +87,6 @@ def build_agent_a2a_app(
         return Runner(
             app_name=agent.name,
             agent=agent,
-            artifact_service=InMemoryArtifactService(),
             session_service=session_service,
             memory_service=InMemoryMemoryService(),
         )
