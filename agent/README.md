@@ -257,10 +257,21 @@ accessible, even when auth is enabled.
 #### API Key
 
 If API Key auth is configured, the agent will look for an `API-Key` HTTP header
-for every request, and check its value against the configured API key.
+for every request. It hashes the presented value with SHA-256 and compares it,
+in constant time, against the configured digest.
 
-This mode **requires** that `auth.api_key` be set to any arbitrary string. Use of
-environment variable substitution is highly recommended.
+This mode **requires** that `auth.api_key` be set to the SHA-256 hash of the
+API key — the config stores only the hash, never the plaintext key, so a leaked
+config file yields no usable credential.
+
+Because the key must be high-entropy for the unsalted hash to be safe, generate
+a random key rather than hashing a hand-picked string. For example:
+
+```sh
+KEY="$(openssl rand -hex 32)"
+HASH="$(printf '%s' "$KEY" | sha256)"
+printf 'API key (give to clients): %s\napi_key (put in config):   %s\n' "$KEY" "$HASH"
+```
 
 The header the agent reads the key from can be customized with
 `auth.header_name`, which defaults to `API-Key`.

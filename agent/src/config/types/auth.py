@@ -3,7 +3,7 @@ from typing import ClassVar, Literal
 from pydantic import ConfigDict, Field, SecretStr, model_validator
 from pydantic_core import Url
 
-from src.config.types.common import NonEmptyStr, StrictModel
+from src.config.types.common import NonEmptyStr, Sha256Hex, StrictModel
 
 
 class OAuthDiscoveredJwksPolicyConfig(StrictModel):
@@ -84,7 +84,11 @@ class OAuthConfig(StrictModel):
 
 class ApiKeyAuthConfig(StrictModel):
     mode: Literal["api_key"]
-    api_key: SecretStr = Field(min_length=1)
+    # Holds the SHA-256 digest of the API key, not the key itself: the
+    # middleware hashes the incoming header and compares digests. Storing only
+    # the hash means a leaked config yields no usable credential. The key must
+    # be high-entropy for the unsalted hash to be safe (see the README).
+    api_key: Sha256Hex
     header_name: NonEmptyStr = "API-Key"
 
 

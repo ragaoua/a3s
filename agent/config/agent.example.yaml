@@ -74,7 +74,9 @@ mcp_servers:
 auth: none
 # auth:
 #   mode: api_key
-#   api_key: ${A3S_AGENT_API_KEY}
+#   # SHA-256 hash of the API key, not the key itself. Generate a high-entropy
+#   # key, hand it to clients, and put its hash here (see the README).
+#   api_key: 817b823905cc7853f381992575a9041fcdb17fc70e776707abfb4d7c59ecbf3f # plaintext: s3cret-key
 #   header_name: API-Key # The header the key is read from. Defaults to API-Key.
 # auth:
 #   mode: oauth2

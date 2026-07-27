@@ -109,7 +109,7 @@ def build_agent_a2a_app(
     if isinstance(auth_config, ApiKeyAuthConfig):
         app.add_middleware(
             ApiKeyAuthMiddleware,
-            api_key=auth_config.api_key.get_secret_value(),
+            api_key=auth_config.api_key,
             header_name=auth_config.header_name,
         )
         security_schemes = {
