@@ -8,6 +8,7 @@ from src.auth.inbound.constants import EXCLUDED_PATHS
 
 
 API_KEY = "s3cret-key"
+API_KEY_SHA256 = "817b823905cc7853f381992575a9041fcdb17fc70e776707abfb4d7c59ecbf3f"
 
 
 def _build_request(
@@ -43,13 +44,14 @@ def _build_request(
 
 def _build_middleware(
     *,
-    api_key: str = API_KEY,
     header_name: str = ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME,
 ) -> ApiKeyAuthMiddleware:
     async def app(_scope: Scope, _receive: Receive, _send: Send):
         return None
 
-    return ApiKeyAuthMiddleware(app=app, api_key=api_key, header_name=header_name)
+    return ApiKeyAuthMiddleware(
+        app=app, api_key=API_KEY_SHA256, header_name=header_name
+    )
 
 
 @pytest.mark.asyncio
@@ -94,6 +96,23 @@ async def test_dispatch_returns_401_when_api_key_header_missing_or_empty_or_wron
     assert response.status_code == 401
     assert response.body == b'{"detail":"Unauthorized"}'
     assert response.headers["WWW-Authenticate"] == "API-Key"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_returns_401_when_header_carries_the_hash_instead_of_the_key() -> (
+    None
+):
+    """The header must carry the plaintext key: the middleware hashes it and
+    compares digests, so presenting the stored digest itself is unauthorized."""
+    middleware = _build_middleware()
+    request = _build_request(path="/rpc", api_key_header=API_KEY_SHA256)
+
+    async def call_next(_: Request) -> Response:
+        pytest.fail("call_next should not be called when the digest is presented")
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -146,7 +165,9 @@ async def test_dispatch_ignores_the_default_header_when_a_custom_name_is_configu
     )
 
     async def call_next(_: Request) -> Response:
-        pytest.fail("call_next should not be called when the key is on the wrong header")
+        pytest.fail(
+            "call_next should not be called when the key is on the wrong header"
+        )
 
     response = await middleware.dispatch(request, call_next)
 

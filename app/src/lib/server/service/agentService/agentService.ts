@@ -1,6 +1,6 @@
 import { AppsV1Api, CoreV1Api, KubeConfig } from '@kubernetes/client-node';
 import type { V1DeploymentStatus, V1OwnerReference } from '@kubernetes/client-node';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import YAML from 'yaml';
 import { agentRuntimeConfigSchema, type AgentRuntimeConfig } from '$lib/types/agentRuntimeConfig';
 import type { AgentConfigForm } from '$lib/types/agentConfigForm';
@@ -9,10 +9,13 @@ import { AGENT_NAME_ANNOTATION, sanitizeKubernetesName } from '../kubernetesName
 import type { AgentSummary } from './types/agentSummary';
 import type { AgentDeploymentConfig } from './types/agentDeploymentConfig';
 import type { Subagents } from '$lib/types/agentRuntimeConfig/subagent';
-import { policiesSchema, type OAuth2RuntimePolicies } from '$lib/types/agentRuntimeConfig/auth';
+import {
+	policiesSchema,
+	type Auth,
+	type OAuth2RuntimePolicies
+} from '$lib/types/agentRuntimeConfig/auth';
 
 const LLM_API_KEY_ENV_VAR = 'A3S_LLM_API_KEY';
-const AGENT_API_KEY_ENV_VAR = 'A3S_AGENT_API_KEY';
 const INTROSPECTION_CLIENT_SECRET_ENV_VAR = 'A3S_INTROSPECTION_CLIENT_SECRET';
 const MCP_SERVER_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_MCP_SERVER_CLIENT_SECRET';
 const SUBAGENT_CLIENT_SECRET_ENV_VAR_PREFIX = 'A3S_SUBAGENT_CLIENT_SECRET';
@@ -30,7 +33,7 @@ export abstract class AgentService {
 		const core = kc.makeApiClient(CoreV1Api);
 		const apps = kc.makeApiClient(AppsV1Api);
 
-		const { runtimeConfig, secretData } = this.buildAgentDeploymentConfig(agentConfig);
+		const { runtimeConfig, secretData, agentApiKey } = this.buildAgentDeploymentConfig(agentConfig);
 		const kubernetesAgentName = sanitizeKubernetesName(runtimeConfig.agent.name);
 
 		if (runtimeConfig.auth === 'none') {
@@ -39,7 +42,7 @@ export abstract class AgentService {
 			console.log('Agent will be configured with OAuth2 Authorization.');
 		} else {
 			console.log(
-				`Agent will be configured with API Key Authorization.\nUse API Key ${secretData[AGENT_API_KEY_ENV_VAR]}`
+				`Agent will be configured with API Key Authorization.\nUse API Key ${agentApiKey}`
 			);
 		}
 
@@ -230,11 +233,7 @@ export abstract class AgentService {
 			throw error;
 		}
 
-		if (AGENT_API_KEY_ENV_VAR in secretData) {
-			return { agentApiKey: secretData[AGENT_API_KEY_ENV_VAR] };
-		} else {
-			return {};
-		}
+		return agentApiKey !== undefined ? { agentApiKey } : {};
 	}
 
 	private buildAgentDeploymentConfig(agentConfig: AgentConfigForm): AgentDeploymentConfig {
@@ -242,9 +241,22 @@ export abstract class AgentService {
 			[LLM_API_KEY_ENV_VAR]: agentConfig.apiKey
 		};
 
-		if (agentConfig.authMode === 'apiKey') {
-			const agentApiKey = randomBytes(32).toString('hex');
-			secretData[AGENT_API_KEY_ENV_VAR] = agentApiKey;
+		let agentApiKey: string | undefined;
+		let auth: Auth;
+		if (agentConfig.authMode === 'none') {
+			auth = 'none';
+		} else if (agentConfig.authMode === 'oauth2') {
+			auth = {
+				mode: 'oauth2',
+				issuer_url: agentConfig.oauth2IssuerUrl,
+				policies: buildOauth2Policies(agentConfig.oauth2Policies, secretData)
+			};
+		} else {
+			agentApiKey = randomBytes(32).toString('hex');
+			auth = {
+				mode: 'api_key',
+				api_key: hashApiKey(agentApiKey)
+			};
 		}
 
 		const subagents: Subagents = {};
@@ -330,19 +342,7 @@ export abstract class AgentService {
 				listen_address: '0.0.0.0',
 				listen_port: 8000
 			},
-			auth:
-				agentConfig.authMode === 'none'
-					? 'none'
-					: agentConfig.authMode === 'oauth2'
-						? {
-								mode: 'oauth2',
-								issuer_url: agentConfig.oauth2IssuerUrl,
-								policies: buildOauth2Policies(agentConfig.oauth2Policies, secretData)
-							}
-						: {
-								mode: 'api_key',
-								api_key: `\${${AGENT_API_KEY_ENV_VAR}}`
-							},
+			auth,
 			mcp_servers: agentConfig.mcpServers.map((mcpServer, index) => {
 				switch (mcpServer.authMode) {
 					case 'none':
@@ -402,7 +402,8 @@ export abstract class AgentService {
 
 		return {
 			runtimeConfig: agentRuntimeConfigSchema.parse(config),
-			secretData
+			secretData,
+			agentApiKey
 		};
 	}
 
@@ -468,6 +469,13 @@ function deriveDeploymentStatus(status: V1DeploymentStatus | undefined): string 
 	}
 
 	return 'Pending';
+}
+
+// Lowercase hex SHA-256 digest of an API key, matching the agent's inbound
+// middleware (`hashlib.sha256(key.encode()).hexdigest()`). The agent compares
+// this against the hash of the presented `API-Key` header.
+function hashApiKey(apiKey: string): string {
+	return createHash('sha256').update(apiKey, 'utf8').digest('hex');
 }
 
 function buildSkillMarkdown(skill: { name: string; description: string; content: string }): string {

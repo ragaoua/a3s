@@ -85,11 +85,9 @@
           "anyOf": [
             { "$ref": "#/$defs/EnvVarPlaceholder" },
             {
-              "format": "password",
-              "minLength": 1,
+              "pattern": "^[0-9a-f]{64}$",
               "title": "Api Key",
-              "type": "string",
-              "writeOnly": true
+              "type": "string"
             }
           ]
         },

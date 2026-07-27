@@ -38,6 +38,7 @@ from tests.integration.common.agent import start_agent_server
 # The API key value used by `agent_with_api_key_inbound_auth`. Tests import
 # this so they can present the right header instead of duplicating the literal.
 API_KEY = "test-api-key"
+API_KEY_SHA256 = "4c806362b613f7496abf284146efd31da90e4b16169fe001841ca17290f427c4"
 
 # Fake issuer URL used by `agent_with_fake_oauth2_inbound_auth`. The agent-card
 # surface only requires that the configured issuer flows through to the card;
@@ -59,7 +60,7 @@ def agent_with_api_key_inbound_auth(
 ) -> Iterator[A2aServerFixture]:
     with start_agent_server(
         mock_llm=mock_llm,
-        auth_config=ApiKeyAuthConfig(mode="api_key", api_key=SecretStr(API_KEY)),
+        auth_config=ApiKeyAuthConfig(mode="api_key", api_key=API_KEY_SHA256),
     ) as agent_server:
         yield agent_server
 

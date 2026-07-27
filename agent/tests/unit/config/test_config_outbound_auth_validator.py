@@ -39,7 +39,7 @@ ROOT_OAUTH = OAuthConfig(
         jwt=OAuthJwtPolicyConfig(jwks=OAuthDiscoveredJwksPolicyConfig()),
     ),
 )
-ROOT_API_KEY = ApiKeyAuthConfig(mode="api_key", api_key=SecretStr("k"))
+ROOT_API_KEY = ApiKeyAuthConfig(mode="api_key", api_key="a" * 64)
 
 TOKEN_FORWARD = OAuthTokenForwardAuthConfig(mode="oauth_token_forward")
 TOKEN_EXCHANGE_DISCOVERED = OAuthDiscoveredTokenExchangeAuthConfig(

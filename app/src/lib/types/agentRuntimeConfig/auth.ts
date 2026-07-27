@@ -51,7 +51,10 @@ export const authSchema = z.union([
 	z.literal('none'),
 	z.object({
 		mode: z.literal('api_key'),
-		api_key: z.string().min(1)
+		// Holds the SHA-256 hash of the API key, not the key itself. The agent
+		// hashes the incoming header and compares digests, so the config (which may
+		// live in a ConfigMap) never holds usable credential material.
+		api_key: z.string().regex(/^[0-9a-f]{64}$/)
 	}),
 	z.object({
 		mode: z.literal('oauth2'),
@@ -59,3 +62,4 @@ export const authSchema = z.union([
 		policies: policiesSchema
 	})
 ]);
+export type Auth = z.infer<typeof authSchema>;
