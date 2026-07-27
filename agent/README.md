@@ -194,17 +194,25 @@ Configure these fields:
   recommended
 - `llm.model` (**required**)
 
-### Session persistence
+### Persistence
 
-By default, sessions/conversations with the agent are kept in memory and lost
-when the agent stops or restarts. To persist them, point the agent at a
-PostgreSQL database or a SQLite file using `sessions.connect_string`.
+By default, the agent keeps all of its state (conversation **sessions** and
+A2A **tasks**) in memory, so everything is lost when the agent stops or
+restarts. To make state durable, point the agent at a PostgreSQL database or a
+SQLite file using `persistence.connect_string`.
+
+A single connect string backs both stores: sessions are written to the session
+tables and A2A `Task` records to the `tasks` table. This means a restarted (or
+replacement) process that shares the same backend can resume conversations and
+resolve tasks that a previous process created.
+
+Omit the `persistence` block entirely to keep the in-memory defaults, in which
+case neither sessions nor tasks survive a restart.
 
 For PostgreSQL, the connect string is a URL of the form
-`postgresql://user:password@host:5432/database` (`postgres` is also
-accepted as a scheme). The engine creates the required tables on first
-use, so **the configured user needs DDL privileges on the target
-database**.
+`postgresql://user:password@host:5432/database` (`postgres` is also accepted as
+a scheme). The engine creates the required tables on first use, so **the
+configured user needs DDL privileges on the target database**.
 
 **Note**: Use of environment variable substitution is highly recommended to
 protect the `password` contained in the connect string.
@@ -214,11 +222,11 @@ For SQLite, the connect string points at a database file:
 tables are created on first use. SQLite is embedded in the engine, so nothing
 external needs to be provisioned or managed — a good fit for single-instance
 deployments; prefer PostgreSQL when running multiple replicas, since they must
-share one session store.
+share one persistence backend.
 
 In-memory SQLite (`sqlite://` or `sqlite:///:memory:`) is also accepted; note
-that it persists nothing across restarts, just like the default in-memory
-sessions you get by omitting the `sessions` config altogether.
+that it persists nothing across restarts, just like the default in-memory state
+you get by omitting the `persistence` config altogether.
 
 #### Session ownership
 
