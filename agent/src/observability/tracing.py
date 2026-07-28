@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def telemetry_instrumentation(config: Config) -> Generator[None]:
+def tracing_instrumentation(config: Config) -> Generator[None]:
     if not config.observability.tracing.enabled:
         logger.debug(
             "OpenTelemetry disabled. Set `observability.tracing.enabled: true` "

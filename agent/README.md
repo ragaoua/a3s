@@ -45,7 +45,7 @@ match `${ENV_VAR}`. So `agent.name: ${AGENT_NAME}` works (if `AGENT_NAME` is
 set), but not `agent.name: prefix_${AGENT_NAME}`. The latter will be left
 unchanged.
 
-## Telemetry
+## Tracing
 
 Set `observability.tracing.enabled: true` in the agent config to enable
 OpenTelemetry tracing. When enabled, spans are batch-exported over OTLP/HTTP.
