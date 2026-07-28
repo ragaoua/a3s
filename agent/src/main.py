@@ -39,7 +39,7 @@ def main() -> None:
             logging.error(e)
         raise SystemExit(1)
 
-    setup_logging(config.logging)
+    setup_logging(config.observability.logging)
 
     with telemetry_instrumentation(config):
         # NOTE: Lazily import build_a2a_server, inside the telemetry context.

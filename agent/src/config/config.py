@@ -17,10 +17,10 @@ from src.config.types import (
     AgentConfig,
     AuthConfig,
     LlmConfig,
-    LoggingConfig,
     McpServerConfig,
     OAuthConfig,
     OAuthDiscoveredTokenExchangeAuthConfig,
+    ObservabilityConfig,
     PersistenceConfig,
     ServerConfig,
 )
@@ -44,7 +44,7 @@ class Config(StrictModel):
     auth: AuthConfig
     persistence: PersistenceConfig | None = None
     mcp_servers: list[McpServerConfig] = list()
-    logging: LoggingConfig = LoggingConfig()
+    observability: ObservabilityConfig = ObservabilityConfig()
 
     @model_validator(mode="after")
     def validate_outbound_auth_requires_oauth2(self):

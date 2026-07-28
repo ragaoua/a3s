@@ -192,6 +192,20 @@
       "title": "LoggingConfig",
       "type": "object"
     },
+    "ObservabilityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "logging": {
+          "$ref": "#/$defs/LoggingConfig",
+          "default": {
+            "level": "INFO",
+            "format": "plain"
+          }
+        }
+      },
+      "title": "ObservabilityConfig",
+      "type": "object"
+    },
     "McpServerConfig": {
       "additionalProperties": false,
       "properties": {
@@ -950,11 +964,13 @@
       "title": "Mcp Servers",
       "type": "array"
     },
-    "logging": {
-      "$ref": "#/$defs/LoggingConfig",
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
       "default": {
-        "level": "INFO",
-        "format": "plain"
+        "logging": {
+          "format": "plain",
+          "level": "INFO"
+        }
       }
     }
   },
