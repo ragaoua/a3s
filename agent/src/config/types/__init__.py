@@ -21,7 +21,7 @@ from .outbound_auth import (
     OAuthStaticTokenExchangeAuthConfig,
     OutboundApiKeyAuthConfig,
 )
-from .observability import LoggingConfig, ObservabilityConfig
+from .observability import LoggingConfig, ObservabilityConfig, TracingConfig
 
 __all__ = [
     "LlmConfig",
@@ -46,4 +46,5 @@ __all__ = [
     "OutboundApiKeyAuthConfig",
     "LoggingConfig",
     "ObservabilityConfig",
+    "TracingConfig",
 ]

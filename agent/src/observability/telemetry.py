@@ -1,6 +1,5 @@
 from contextlib import contextmanager
 import logging
-import os
 from collections.abc import Generator
 from typing import Any
 
@@ -18,18 +17,13 @@ from src.config import Config
 
 logger = logging.getLogger(__name__)
 
-_TELEMETRY_ENABLED_ENV_VAR = "A3S_OTEL_ENABLED"
-
-
-def _is_truthy(value: str | None) -> bool:
-    return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
-
 
 @contextmanager
 def telemetry_instrumentation(config: Config) -> Generator[None]:
-    if not _is_truthy(os.environ.get(_TELEMETRY_ENABLED_ENV_VAR)):
+    if not config.observability.tracing.enabled:
         logger.debug(
-            f"OpenTelemetry disabled. Set {_TELEMETRY_ENABLED_ENV_VAR}=true to enable tracing.",
+            "OpenTelemetry disabled. Set `observability.tracing.enabled: true` "
+            "in the config to enable tracing.",
         )
         yield
         return

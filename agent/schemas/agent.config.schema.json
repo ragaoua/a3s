@@ -201,9 +201,32 @@
             "level": "INFO",
             "format": "plain"
           }
+        },
+        "tracing": {
+          "$ref": "#/$defs/TracingConfig",
+          "default": {
+            "enabled": false
+          }
         }
       },
       "title": "ObservabilityConfig",
+      "type": "object"
+    },
+    "TracingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": false,
+              "title": "Enabled",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "title": "TracingConfig",
       "type": "object"
     },
     "McpServerConfig": {
@@ -970,6 +993,9 @@
         "logging": {
           "format": "plain",
           "level": "INFO"
+        },
+        "tracing": {
+          "enabled": false
         }
       }
     }

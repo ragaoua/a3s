@@ -8,5 +8,10 @@ class LoggingConfig(StrictModel):
     format: Literal["plain", "json"] = "plain"
 
 
+class TracingConfig(StrictModel):
+    enabled: bool = False
+
+
 class ObservabilityConfig(StrictModel):
     logging: LoggingConfig = LoggingConfig()
+    tracing: TracingConfig = TracingConfig()
