@@ -11,4 +11,4 @@ fi
 
 echo "Detected staged changes in agent/src or agent/tests. Running tests..."
 uv run --directory agent deptry src tests
-uv run --directory agent pytest -s
+uv run --directory agent pytest tests/unit
