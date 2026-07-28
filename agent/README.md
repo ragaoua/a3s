@@ -45,10 +45,16 @@ match `${ENV_VAR}`. So `agent.name: ${AGENT_NAME}` works (if `AGENT_NAME` is
 set), but not `agent.name: prefix_${AGENT_NAME}`. The latter will be left
 unchanged.
 
-## Telemetry
+## Tracing
 
-Set `A3S_OTEL_ENABLED=true` to enable OpenTelemetry tracing. When enabled,
-spans are batch-exported over OTLP/HTTP.
+Set `observability.tracing.enabled: true` in the agent config to enable
+OpenTelemetry tracing. When enabled, spans are batch-exported over OTLP/HTTP.
+
+```yaml
+observability:
+  tracing:
+    enabled: true
+```
 
 The runtime is agnostic to the telemetry backend. It emits standard OTLP and
 honors the standard OpenTelemetry environment variables, so it works with any
@@ -57,9 +63,7 @@ collector, ...). Spans are sent to `http://localhost:4318` by default; set
 `OTEL_EXPORTER_OTLP_ENDPOINT` to point at your backend or collector:
 
 ```bash
-A3S_OTEL_ENABLED=true \
-    OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:3002 \
-    uv run a3s-agent
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:3002 uv run a3s-agent
 ```
 
 With tracing enabled, the runtime relies on OpenTelemetry auto-instrumentation
@@ -86,8 +90,7 @@ request. For example, Langfuse expects HTTP Basic auth derived from its public
 and secret keys:
 
 ```bash
-A3S_OTEL_ENABLED=true \
-    OTEL_EXPORTER_OTLP_ENDPOINT="https://cloud.langfuse.com/api/public/otel" \
+OTEL_EXPORTER_OTLP_ENDPOINT="https://cloud.langfuse.com/api/public/otel" \
     OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_KEY:$LANGFUSE_SECRET_KEY" | base64)" \
     uv run a3s-agent
 ```

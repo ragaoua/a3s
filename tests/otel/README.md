@@ -9,11 +9,19 @@ podman-compose up
 
 Access the Jaeger UI through `http://localhost:16686` to see the traces.
 
-Run an agent with telemetry enabled:
+Enable tracing in the agent config:
+
+```yaml
+observability:
+  tracing:
+    enabled: true
+```
+
+Then run the agent (`OTEL_EXPORTER_OTLP_ENDPOINT` defaults to
+`http://localhost:4318`):
 
 ```bash
-# OTEL_EXPORTER_OTLP_ENDPOINT defaults to http://localhost:4318
-A3S_OTEL_ENABLED=true uv run a3s-agent
+uv run a3s-agent
 ```
 
 ## Run langfuse
@@ -40,11 +48,10 @@ wget https://raw.githubusercontent.com/langfuse/langfuse/refs/heads/main/docker-
 
 Access `localhost:3000` and log in with `john@doe.com`:`password$1`
 
-Run the agent :
+Run the agent (with tracing enabled in the config, as above):
 
 ```bash
-A3S_OTEL_ENABLED=true \
-    OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:3000/api/public/otel" \
+OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:3000/api/public/otel" \
     OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic $(echo -n 'lf_pk_1234567890:lf_sk_1234567890' | base64)" \
     uv run a3s-agent
 ```

@@ -192,6 +192,43 @@
       "title": "LoggingConfig",
       "type": "object"
     },
+    "ObservabilityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "logging": {
+          "$ref": "#/$defs/LoggingConfig",
+          "default": {
+            "level": "INFO",
+            "format": "plain"
+          }
+        },
+        "tracing": {
+          "$ref": "#/$defs/TracingConfig",
+          "default": {
+            "enabled": false
+          }
+        }
+      },
+      "title": "ObservabilityConfig",
+      "type": "object"
+    },
+    "TracingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "anyOf": [
+            { "$ref": "#/$defs/EnvVarPlaceholder" },
+            {
+              "default": false,
+              "title": "Enabled",
+              "type": "boolean"
+            }
+          ]
+        }
+      },
+      "title": "TracingConfig",
+      "type": "object"
+    },
     "McpServerConfig": {
       "additionalProperties": false,
       "properties": {
@@ -950,11 +987,16 @@
       "title": "Mcp Servers",
       "type": "array"
     },
-    "logging": {
-      "$ref": "#/$defs/LoggingConfig",
+    "observability": {
+      "$ref": "#/$defs/ObservabilityConfig",
       "default": {
-        "level": "INFO",
-        "format": "plain"
+        "logging": {
+          "format": "plain",
+          "level": "INFO"
+        },
+        "tracing": {
+          "enabled": false
+        }
       }
     }
   },

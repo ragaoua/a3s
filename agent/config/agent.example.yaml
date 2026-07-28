@@ -109,6 +109,12 @@ auth: none
 #       # Defaults to client_secret_basic.
 #       auth_method: client_secret_post
 
-logging:
-  level: "INFO"
-  format: "plain"
+observability:
+  logging:
+    level: "INFO"
+    format: "plain"
+  tracing:
+    # When enabled, spans are batch-exported over OTLP/HTTP. The exporter honors
+    # the standard OpenTelemetry env vars (OTEL_EXPORTER_OTLP_ENDPOINT,
+    # OTEL_EXPORTER_OTLP_HEADERS, ...); defaults to http://localhost:4318.
+    enabled: false

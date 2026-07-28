@@ -21,7 +21,7 @@ flowchart TD
 
     main --> config
     main --> observability.logging
-    main --> observability.telemetry
+    main --> observability.tracing
     main --> server
 
     server --> app
