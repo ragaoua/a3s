@@ -9,19 +9,10 @@ path in `src/main.py`.
 from __future__ import annotations
 
 import subprocess
-from uuid import uuid4
 
-import httpx
 import pytest
-from a2a.client import A2AClient
-from a2a.types import (
-    MessageSendParams,
-    SendMessageRequest,
-    SendMessageSuccessResponse,
-    Task,
-)
 
-from tests.common.a2a import create_send_message_payload, wait_for_agent_card
+from tests.common.a2a import get_artifact_text_parts, send_message
 from tests.common.keycloak import KeycloakFixture
 from tests.e2e.utils import LocalAgent, LocalAgentInContainer
 
@@ -38,36 +29,17 @@ async def _send_and_assert_text(
     """Fetch the agent card, send `prompt` over A2A with the bearer token, and
     assert at least one non-empty text part comes back within `timeout`
     seconds."""
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(timeout, connect=5)
-    ) as httpx_client:
-        agent_card = await wait_for_agent_card(base_url, httpx_client)
-
-    async with httpx.AsyncClient(
+    task = await send_message(
+        base_url,
+        text=prompt,
         headers={"Authorization": f"Bearer {token}"},
-        timeout=httpx.Timeout(timeout, connect=5),
-    ) as httpx_client:
-        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
-        request = SendMessageRequest(
-            id=str(uuid4()),
-            params=MessageSendParams(**create_send_message_payload(text=prompt)),
-        )
-        response = await client.send_message(request)
-
-    assert isinstance(response.root, SendMessageSuccessResponse), (
-        f"a2a response was not success: {response.root!r}"
+        timeout=timeout,
     )
-    assert isinstance(response.root.result, Task)
-    task = response.root.result
     assert task.artifacts, "task returned no artifacts"
 
-    text_parts = [
-        part.root.text
-        for artifact in task.artifacts
-        for part in artifact.parts
-        if part.root.kind == "text" and part.root.text
-    ]
-    assert text_parts, "no non-empty text parts in a2a response"
+    assert [text for text in get_artifact_text_parts(task) if text], (
+        "no non-empty text parts in a2a response"
+    )
 
 
 @pytest.mark.asyncio

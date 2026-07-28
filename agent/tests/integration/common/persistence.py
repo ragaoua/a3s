@@ -1,7 +1,7 @@
 """Helpers shared by the persistence integration suites (sessions and tasks).
 
 `fetch_rows` reads directly from whichever backend (sqlite or postgres) is
-under test; `send_message` and `get_task` drive the agent over A2A.
+under test; the A2A side is driven through `tests.common.a2a`.
 
 Note: queries passed to `fetch_rows` use f-string interpolation, because sqlite
 and postgres use different placeholders for parameterized queries. For a test
@@ -12,22 +12,9 @@ from __future__ import annotations
 
 import sqlite3
 from typing import Any
-from uuid import uuid4
 
 import asyncpg
-import httpx
-from a2a.client import A2AClient
-from a2a.types import (
-    GetTaskRequest,
-    GetTaskResponse,
-    MessageSendParams,
-    SendMessageRequest,
-    SendMessageSuccessResponse,
-    Task,
-    TaskQueryParams,
-)
 from src.config.types.persistence import PostgresUrl, SqliteUrl
-from tests.common.a2a import create_send_message_payload, wait_for_agent_card
 
 
 async def fetch_rows(connect_string: PostgresUrl | SqliteUrl, query: str) -> list[Any]:
@@ -47,46 +34,3 @@ async def fetch_rows(connect_string: PostgresUrl | SqliteUrl, query: str) -> lis
         return await pg_connection.fetch(query)
     finally:
         await pg_connection.close()
-
-
-async def send_message(
-    base_url: str,
-    *,
-    text: str,
-    context_id: str,
-    headers: dict[str, str] | None = None,
-) -> Task:
-    async with httpx.AsyncClient(
-        headers=headers, timeout=httpx.Timeout(30, connect=5)
-    ) as httpx_client:
-        agent_card = await wait_for_agent_card(base_url, httpx_client)
-        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
-
-        request = SendMessageRequest(
-            id=str(uuid4()),
-            params=MessageSendParams(
-                **create_send_message_payload(text=text, context_id=context_id)
-            ),
-        )
-        response = await client.send_message(request)
-
-    assert isinstance(response.root, SendMessageSuccessResponse)
-    assert isinstance(response.root.result, Task)
-    return response.root.result
-
-
-async def get_task(
-    base_url: str,
-    task_id: str,
-    *,
-    headers: dict[str, str] | None = None,
-) -> GetTaskResponse:
-    async with httpx.AsyncClient(
-        headers=headers, timeout=httpx.Timeout(30, connect=5)
-    ) as httpx_client:
-        agent_card = await wait_for_agent_card(base_url, httpx_client)
-        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
-
-        return await client.get_task(
-            GetTaskRequest(id=str(uuid4()), params=TaskQueryParams(id=task_id))
-        )

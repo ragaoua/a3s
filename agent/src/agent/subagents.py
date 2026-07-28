@@ -1,9 +1,7 @@
 from typing import NamedTuple
 
 import httpx
-from a2a.client.client import ClientConfig
-from a2a.client.client_factory import ClientFactory
-from a2a.client.middleware import ClientCallContext
+from a2a.client import ClientCallContext, ClientConfig, ClientFactory
 from a2a.types import Message
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 from google.adk.a2a.agent.config import (
@@ -96,6 +94,11 @@ async def _token_forward_before_request(
 
     No-op when no inbound header is present. Initializes a `ClientCallContext`
     if the params don't already carry one.
+
+    Per-call headers live on `ClientCallContext.service_parameters`, which the
+    a2a client transports copy verbatim into the outgoing httpx request. Merge
+    into it rather than replacing it: the same mapping also carries the
+    `A2A-Extensions` parameter.
     """
     authorization_header = get_current_authorization_header()
     if not authorization_header:
@@ -104,10 +107,9 @@ async def _token_forward_before_request(
     if params.client_call_context is None:
         params.client_call_context = ClientCallContext()
 
-    http_kwargs = params.client_call_context.state.get("http_kwargs", {})
-    headers = http_kwargs.get("headers", {})
-    headers["Authorization"] = authorization_header
-    http_kwargs["headers"] = headers
-    params.client_call_context.state["http_kwargs"] = http_kwargs
+    params.client_call_context.service_parameters = {
+        **(params.client_call_context.service_parameters or {}),
+        "Authorization": authorization_header,
+    }
 
     return a2a_request, params

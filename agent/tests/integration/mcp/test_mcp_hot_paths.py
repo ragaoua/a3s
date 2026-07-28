@@ -1,20 +1,10 @@
-from uuid import uuid4
-
-import httpx
 import pytest
-from a2a.client import A2AClient
-from a2a.types import (
-    MessageSendParams,
-    SendMessageRequest,
-    SendMessageSuccessResponse,
-    Task,
-)
 
 from tests.common.a2a import (
     A2aServerFixture,
-    create_send_message_payload,
     get_adk_data_parts,
-    wait_for_agent_card,
+    get_artifact_text_parts,
+    send_message,
 )
 
 
@@ -33,32 +23,11 @@ async def test_agent_calls_oauth_protected_mcp_tool_with_client_credentials_toke
         "Tool responded as expected."
     )
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
-        agent_card = await wait_for_agent_card(
-            agent_with_client_credentials_mcp.base_url, httpx_client
-        )
-        client = A2AClient(httpx_client=httpx_client, agent_card=agent_card)
+    task = await send_message(
+        agent_with_client_credentials_mcp.base_url, text="please add 62 and 54"
+    )
 
-        request = SendMessageRequest(
-            id=str(uuid4()),
-            params=MessageSendParams(
-                **create_send_message_payload(text="please add 62 and 54")
-            ),
-        )
-        response = await client.send_message(request)
-
-    assert isinstance(response.root, SendMessageSuccessResponse)
-    assert isinstance(response.root.result, Task)
-    task = response.root.result
-    assert task.artifacts is not None
-
-    text_parts = [
-        part.root.text
-        for artifact in task.artifacts
-        for part in artifact.parts
-        if part.root.kind == "text"
-    ]
-    assert "Tool responded as expected." in text_parts
+    assert "Tool responded as expected." in get_artifact_text_parts(task)
 
     function_calls = get_adk_data_parts(task, "function_call")
     function_responses = get_adk_data_parts(task, "function_response")

@@ -4,11 +4,35 @@ from ipaddress import IPv4Address
 import socket
 import threading
 
+from pydantic_core import Url
+
 from src.a2a import build_a2a_server
-from src.config.types import AuthConfig, PersistenceConfig, ServerConfig
+from src.config.types import (
+    AuthConfig,
+    OAuthConfig,
+    OAuthJwtPolicyConfig,
+    OAuthPoliciesConfig,
+    OAuthStaticJwksPolicyConfig,
+    PersistenceConfig,
+    ServerConfig,
+)
 from tests.common.a2a import A2aServerFixture
 from tests.common.config import get_base_test_config
+from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
+
+
+def jwt_auth_config(keycloak: KeycloakFixture) -> OAuthConfig:
+    """Inbound oauth2+jwt auth validating tokens minted by the keycloak fixture."""
+    return OAuthConfig(
+        mode="oauth2",
+        issuer_url=Url(keycloak.internal_issuer_url),
+        policies=OAuthPoliciesConfig(
+            jwt=OAuthJwtPolicyConfig(
+                jwks=OAuthStaticJwksPolicyConfig(url=Url(keycloak.external_jwks_url)),
+            ),
+        ),
+    )
 
 
 @contextmanager
