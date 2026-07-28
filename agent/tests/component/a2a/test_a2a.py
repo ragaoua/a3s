@@ -284,12 +284,18 @@ async def test_send_message_streaming_returns_failed_task_status_update_when_llm
 
         chunks = [c async for c in client.send_message_streaming(request)]
 
-    assert len(chunks) == 3
-    first_chunk, second_chunk, third_chunk = chunks
+    # The failure path emits a `submitted` task, one or more non-final `working`
+    # status updates (ADK reports the LLM error as one of them), then a terminal
+    # `failed` update. Only the two ends are contractual — assert on those rather
+    # than on an exact chunk count, which ADK is free to grow.
+    first_chunk, *working_chunks, last_chunk = chunks
 
     _assert_first_streaming_response_chunk(first_chunk)
-    _assert_second_streaming_response_chunk(second_chunk)
+    for chunk in working_chunks:
+        _assert_second_streaming_response_chunk(chunk)
+        assert not chunk.root.result.final  # pyright: ignore[reportAttributeAccessIssue]
 
-    assert isinstance(third_chunk.root, SendStreamingMessageSuccessResponse)
-    assert isinstance(third_chunk.root.result, TaskStatusUpdateEvent)
-    assert third_chunk.root.result.status.state == TaskState.failed
+    assert isinstance(last_chunk.root, SendStreamingMessageSuccessResponse)
+    assert isinstance(last_chunk.root.result, TaskStatusUpdateEvent)
+    assert last_chunk.root.result.status.state == TaskState.failed
+    assert last_chunk.root.result.final
