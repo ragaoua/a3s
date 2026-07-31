@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from a2a.server.agent_execution import RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -36,7 +37,6 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.sessions.in_memory_session_service import InMemorySessionService
-from sqlalchemy.ext.asyncio import create_async_engine
 from starlette.applications import Starlette
 
 from src.auth.inbound import (
@@ -74,10 +74,12 @@ def build_agent_a2a_app(
     adk_logger = logging.getLogger("google_adk")
     adk_logger.setLevel(logging.INFO)
 
+    database_session_service: DatabaseSessionService | None = None
     if persistence_config is not None:
         db_url = _sqlalchemy_db_url(persistence_config)
-        session_service = DatabaseSessionService(db_url=db_url)
-        task_store = DatabaseTaskStore(engine=create_async_engine(db_url))
+        database_session_service = DatabaseSessionService(db_url=db_url)
+        session_service = database_session_service
+        task_store = DatabaseTaskStore(engine=database_session_service.db_engine)
     else:
         session_service = InMemorySessionService()
         task_store = InMemoryTaskStore()
@@ -98,14 +100,7 @@ def build_agent_a2a_app(
     )
     rpc_url = f"http://{server_config.listen_address}:{server_config.listen_port}"
 
-    app = Starlette()
-
     if isinstance(auth_config, ApiKeyAuthConfig):
-        app.add_middleware(
-            ApiKeyAuthMiddleware,
-            api_key=auth_config.api_key,
-            header_name=auth_config.header_name,
-        )
         security_schemes = {
             "APIKeySecurityScheme": SecurityScheme(
                 api_key_security_scheme=APIKeySecurityScheme(
@@ -115,12 +110,6 @@ def build_agent_a2a_app(
             ),
         }
     elif isinstance(auth_config, OAuthConfig):
-        app.add_middleware(
-            OAuth2BearerAuthMiddleware,
-            issuer_url=str(auth_config.issuer_url),
-            realm=agent.name,
-            config=auth_config.policies,
-        )
         security_schemes = {
             "OAuth2SecurityScheme": SecurityScheme(
                 oauth2_security_scheme=OAuth2SecurityScheme(
@@ -181,6 +170,32 @@ def build_agent_a2a_app(
         task_store=task_store,
         agent_card=agent_card,
     )
+
+    @asynccontextmanager
+    async def lifespan(_: Starlette):
+        try:
+            yield
+        finally:
+            try:
+                await request_handler.aclose()
+            finally:
+                if database_session_service is not None:
+                    await database_session_service.close()
+
+    app = Starlette(lifespan=lifespan)
+    if isinstance(auth_config, ApiKeyAuthConfig):
+        app.add_middleware(
+            ApiKeyAuthMiddleware,
+            api_key=auth_config.api_key,
+            header_name=auth_config.header_name,
+        )
+    elif isinstance(auth_config, OAuthConfig):
+        app.add_middleware(
+            OAuth2BearerAuthMiddleware,
+            issuer_url=str(auth_config.issuer_url),
+            realm=agent.name,
+            config=auth_config.policies,
+        )
 
     app.routes.extend(
         [

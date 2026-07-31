@@ -59,7 +59,7 @@ markers = [
 known_first_party = ["src"]
 
 [tool.deptry.per_rule_ignores]
-DEP002 = ["asyncpg", "aiosqlite"] # never imported directly; sqlalchemy loads them from the connect string
+DEP002 = ["asyncpg", "aiosqlite", "sqlalchemy"] # persistence dependencies are loaded through the ADK/A2A database services
 
 [tool.deptry.package_module_name_map]
 pydantic = ["pydantic", "pydantic_core"] # pydantic_core ships separately but is guaranteed by pydantic;
