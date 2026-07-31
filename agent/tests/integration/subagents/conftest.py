@@ -16,18 +16,15 @@ from src.config.types import (
     AgentConfig,
     AuthConfig,
     OAuthClientCredentialsAuthConfig,
-    OAuthConfig,
-    OAuthJwtPolicyConfig,
-    OAuthPoliciesConfig,
-    OAuthStaticJwksPolicyConfig,
     OAuthTokenForwardAuthConfig,
     ServerConfig,
     SubagentConfig,
 )
-from tests.common.keycloak import KeycloakFixture
-from tests.common.llm import LlmFixture
 from tests.common.a2a import A2aServerFixture
 from tests.common.config import get_base_test_config
+from tests.common.keycloak import KeycloakFixture
+from tests.common.llm import LlmFixture
+from tests.integration.common.agent import jwt_auth_config
 from tests.integration.common.subagent import SubagentServerFixture
 
 
@@ -114,15 +111,5 @@ def agent_with_token_forward_peer_subagent(
             type="peer",
             auth=OAuthTokenForwardAuthConfig(mode="oauth_token_forward"),
         ),
-        auth=OAuthConfig(
-            mode="oauth2",
-            issuer_url=Url(keycloak.internal_issuer_url),
-            policies=OAuthPoliciesConfig(
-                jwt=OAuthJwtPolicyConfig(
-                    jwks=OAuthStaticJwksPolicyConfig(
-                        url=Url(keycloak.external_jwks_url)
-                    ),
-                ),
-            ),
-        ),
+        auth=jwt_auth_config(keycloak),
     )
