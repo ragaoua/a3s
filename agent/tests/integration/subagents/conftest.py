@@ -14,7 +14,13 @@ from pydantic_core import Url
 from src.a2a.server import build_a2a_server
 from src.config.types import (
     AgentConfig,
+    AuthConfig,
     OAuthClientCredentialsAuthConfig,
+    OAuthConfig,
+    OAuthJwtPolicyConfig,
+    OAuthPoliciesConfig,
+    OAuthStaticJwksPolicyConfig,
+    OAuthTokenForwardAuthConfig,
     ServerConfig,
     SubagentConfig,
 )
@@ -28,11 +34,11 @@ from tests.integration.common.subagent import SubagentServerFixture
 PEER_SUBAGENT_NAME = "helper"
 
 
-@pytest.fixture
-def agent_with_client_credentials_peer_subagent(
+def _start_agent_with_peer_subagent(
+    *,
     mock_llm: LlmFixture,
-    keycloak: KeycloakFixture,
-    subagent_server: SubagentServerFixture,
+    subagent: SubagentConfig,
+    auth: AuthConfig,
 ) -> Iterator[A2aServerFixture]:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -44,20 +50,9 @@ def agent_with_client_credentials_peer_subagent(
             name="Cody",
             description="A helpful coding assistant",
             instructions="You are a coding agent.",
-            subagents={
-                PEER_SUBAGENT_NAME: SubagentConfig(
-                    url=Url(subagent_server.url),
-                    type="peer",
-                    auth=OAuthClientCredentialsAuthConfig(
-                        mode="oauth_client_credentials",
-                        token_endpoint=Url(keycloak.token_endpoint_url),
-                        client_id=keycloak.confidential_client_id,
-                        client_secret=SecretStr(keycloak.confidential_client_secret),
-                    ),
-                ),
-            },
+            subagents={PEER_SUBAGENT_NAME: subagent},
         ),
-        auth="none",
+        auth=auth,
         server=ServerConfig(
             listen_address=IPv4Address("127.0.0.1"),
             listen_port=port,
@@ -75,3 +70,59 @@ def agent_with_client_credentials_peer_subagent(
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+@pytest.fixture
+def agent_with_client_credentials_peer_subagent(
+    mock_llm: LlmFixture,
+    keycloak: KeycloakFixture,
+    subagent_server: SubagentServerFixture,
+) -> Iterator[A2aServerFixture]:
+    yield from _start_agent_with_peer_subagent(
+        mock_llm=mock_llm,
+        subagent=SubagentConfig(
+            url=Url(subagent_server.url),
+            type="peer",
+            auth=OAuthClientCredentialsAuthConfig(
+                mode="oauth_client_credentials",
+                token_endpoint=Url(keycloak.token_endpoint_url),
+                client_id=keycloak.confidential_client_id,
+                client_secret=SecretStr(keycloak.confidential_client_secret),
+            ),
+        ),
+        auth="none",
+    )
+
+
+@pytest.fixture
+def agent_with_token_forward_peer_subagent(
+    mock_llm: LlmFixture,
+    keycloak: KeycloakFixture,
+    subagent_server: SubagentServerFixture,
+) -> Iterator[A2aServerFixture]:
+    """Parent agent under oauth2+jwt inbound auth, forwarding the caller's own
+    bearer on to the subagent.
+
+    Both ends validate against the same Keycloak realm, so the subagent only
+    answers if the parent really put the inbound `Authorization` header on the
+    outbound A2A request.
+    """
+    yield from _start_agent_with_peer_subagent(
+        mock_llm=mock_llm,
+        subagent=SubagentConfig(
+            url=Url(subagent_server.url),
+            type="peer",
+            auth=OAuthTokenForwardAuthConfig(mode="oauth_token_forward"),
+        ),
+        auth=OAuthConfig(
+            mode="oauth2",
+            issuer_url=Url(keycloak.internal_issuer_url),
+            policies=OAuthPoliciesConfig(
+                jwt=OAuthJwtPolicyConfig(
+                    jwks=OAuthStaticJwksPolicyConfig(
+                        url=Url(keycloak.external_jwks_url)
+                    ),
+                ),
+            ),
+        ),
+    )

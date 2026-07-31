@@ -15,20 +15,26 @@ from typing import Any
 import httpx
 import jwt
 import uvicorn
+from a2a.helpers import new_text_message
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
 from a2a.server.events.event_queue import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import (
     InMemoryTaskStore,
 )
 from a2a.types import (
     AgentCapabilities,
     AgentCard,
+    AgentInterface,
     AgentSkill,
 )
-from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
-from a2a.utils.message import new_agent_text_message
+from a2a.utils.constants import (
+    AGENT_CARD_WELL_KNOWN_PATH,
+    DEFAULT_RPC_URL,
+    PROTOCOL_VERSION_CURRENT,
+    TransportProtocol,
+)
 from jwt import PyJWKClient
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -88,13 +94,10 @@ class StaticReplyExecutor(AgentExecutor):
 
     @override
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        await event_queue.enqueue_event(
-            new_agent_text_message(
-                RESPONSE_TEXT,
-                context_id=context.context_id,
-                task_id=context.task_id,
-            )
-        )
+        message = new_text_message(RESPONSE_TEXT)
+        message.context_id = context.context_id
+        message.task_id = context.task_id
+        await event_queue.enqueue_event(message)
 
     @override
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
@@ -125,9 +128,15 @@ def build_app() -> Starlette:
     agent_card = AgentCard(
         name="a3s-test-subagent",
         description="Deterministic echo subagent used by the agent integration suite.",
-        url=PUBLIC_URL,
+        supported_interfaces=[
+            AgentInterface(
+                url=PUBLIC_URL,
+                protocol_binding=TransportProtocol.JSONRPC.value,
+                protocol_version=PROTOCOL_VERSION_CURRENT,
+            )
+        ],
         version="0.0.1",
-        capabilities=AgentCapabilities(streaming=True),
+        capabilities=AgentCapabilities(streaming=True, extended_agent_card=False),
         skills=[
             AgentSkill(
                 id="echo",
@@ -138,12 +147,12 @@ def build_app() -> Starlette:
         ],
         default_input_modes=["text/plain"],
         default_output_modes=["text/plain"],
-        supports_authenticated_extended_card=False,
     )
 
     request_handler = DefaultRequestHandler(
         agent_executor=StaticReplyExecutor(),
         task_store=InMemoryTaskStore(),
+        agent_card=agent_card,
     )
 
     app = Starlette()
@@ -154,11 +163,10 @@ def build_app() -> Starlette:
         jwks_uri=JWKS_URI,
     )
 
-    a2a_app = A2AStarletteApplication(
-        agent_card=agent_card,
-        http_handler=request_handler,
-    )
-    a2a_app.add_routes_to_app(app)
+    app.routes.extend([
+        *create_agent_card_routes(agent_card),
+        *create_jsonrpc_routes(request_handler, DEFAULT_RPC_URL),
+    ])
 
     return app
 
