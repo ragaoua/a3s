@@ -6,12 +6,11 @@ from uuid import uuid4
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, create_client
-from a2a.helpers import new_text_message
+from a2a.helpers import get_text_parts, new_text_message
 from a2a.types import (
     AgentCard,
     GetTaskRequest,
     Message,
-    Part,
     Role,
     SendMessageRequest,
     StreamResponse,
@@ -165,10 +164,6 @@ async def post_rpc(
     async with _httpx_client(headers, timeout) as httpx_client:
         agent_card = await wait_for_agent_card(base_url, httpx_client)
         return await httpx_client.post(agent_card_rpc_url(agent_card), json={})
-
-
-def get_text_parts(parts: list[Part]) -> list[str]:
-    return [part.text for part in parts if part.HasField("text")]
 
 
 def get_artifact_text_parts(task: Task) -> list[str]:
