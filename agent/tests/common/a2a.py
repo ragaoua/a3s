@@ -2,7 +2,6 @@ import asyncio
 import time
 from dataclasses import dataclass
 from typing import Any
-from uuid import uuid4
 
 import httpx
 from a2a.client import A2ACardResolver, ClientConfig, create_client
@@ -10,7 +9,6 @@ from a2a.helpers import get_text_parts, new_text_message
 from a2a.types import (
     AgentCard,
     GetTaskRequest,
-    Message,
     Role,
     SendMessageRequest,
     StreamResponse,
@@ -27,19 +25,6 @@ DEFAULT_TIMEOUT = httpx.Timeout(30, connect=5)
 class A2aServerFixture:
     base_url: str
     mock_llm: LlmFixture
-
-
-def new_user_message(
-    text: str, task_id: str | None = None, context_id: str | None = None
-) -> Message:
-    """Build the user `Message` for a send-message call."""
-    message = new_text_message(text, role=Role.ROLE_USER)
-    message.message_id = uuid4().hex
-    if task_id:
-        message.task_id = task_id
-    if context_id:
-        message.context_id = context_id
-    return message
 
 
 async def wait_for_agent_card(
@@ -99,7 +84,12 @@ async def send_message(
             client_config=ClientConfig(httpx_client=httpx_client, streaming=False),
         )
         request = SendMessageRequest(
-            message=new_user_message(text, task_id=task_id, context_id=context_id)
+            message=new_text_message(
+                text,
+                role=Role.ROLE_USER,
+                task_id=task_id,
+                context_id=context_id,
+            )
         )
         chunks = [chunk async for chunk in client.send_message(request)]
 
@@ -125,7 +115,12 @@ async def send_message_streaming(
             client_config=ClientConfig(httpx_client=httpx_client, streaming=True),
         )
         request = SendMessageRequest(
-            message=new_user_message(text, task_id=task_id, context_id=context_id)
+            message=new_text_message(
+                text,
+                role=Role.ROLE_USER,
+                task_id=task_id,
+                context_id=context_id,
+            )
         )
         return [chunk async for chunk in client.send_message(request)]
 
