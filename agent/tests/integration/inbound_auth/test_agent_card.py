@@ -38,6 +38,7 @@ async def test_agent_card_omits_security_scheme_in_no_auth_mode(
 
     assert agent_card_rpc_url(agent_card) == agent_with_no_inbound_auth.base_url
     assert not agent_card.security_schemes
+    assert not agent_card.security_requirements
 
 
 @pytest.mark.asyncio
@@ -58,6 +59,10 @@ async def test_agent_card_exposes_api_key_security_scheme(
         == ApiKeyAuthMiddleware.DEFAULT_HEADER_NAME
     )
     assert security_scheme.api_key_security_scheme.location == "header"
+    assert len(agent_card.security_requirements) == 1
+    assert list(agent_card.security_requirements[0].schemes) == [
+        "APIKeySecurityScheme"
+    ]
 
 
 @pytest.mark.asyncio
@@ -76,3 +81,7 @@ async def test_agent_card_exposes_oauth2_security_scheme(
     assert security_scheme.oauth2_security_scheme.oauth2_metadata_url == (
         get_well_known_url(str(FAKE_OAUTH2_ISSUER), external=True)
     )
+    assert len(agent_card.security_requirements) == 1
+    assert list(agent_card.security_requirements[0].schemes) == [
+        "OAuth2SecurityScheme"
+    ]

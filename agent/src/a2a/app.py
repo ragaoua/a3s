@@ -17,7 +17,9 @@ from a2a.types import (
     AuthorizationCodeOAuthFlow,
     OAuth2SecurityScheme,
     OAuthFlows,
+    SecurityRequirement,
     SecurityScheme,
+    StringList,
 )
 from a2a.utils.constants import (
     DEFAULT_RPC_URL,
@@ -109,13 +111,18 @@ def build_agent_a2a_app(
                 )
             ),
         }
+        security_requirements = [
+            SecurityRequirement(
+                schemes={"APIKeySecurityScheme": StringList()},
+            )
+        ]
     elif isinstance(auth_config, OAuthConfig):
         security_schemes = {
             "OAuth2SecurityScheme": SecurityScheme(
                 oauth2_security_scheme=OAuth2SecurityScheme(
                     flows=OAuthFlows(
                         authorization_code=AuthorizationCodeOAuthFlow(
-                            # TODO
+                            # TODO(#47): Populate a usable flow from provider metadata.
                             authorization_url="",
                             refresh_url="",
                             scopes={},
@@ -128,8 +135,14 @@ def build_agent_a2a_app(
                 )
             ),
         }
+        security_requirements = [
+            SecurityRequirement(
+                schemes={"OAuth2SecurityScheme": StringList()},
+            )
+        ]
     else:
         security_schemes = None
+        security_requirements = []
 
     agent_card = AgentCard(
         name=agent.name,
@@ -161,6 +174,7 @@ def build_agent_a2a_app(
             )
         ],
         security_schemes=security_schemes,
+        security_requirements=security_requirements,
         default_input_modes=["text/plain"],
         default_output_modes=["text/plain"],
     )
