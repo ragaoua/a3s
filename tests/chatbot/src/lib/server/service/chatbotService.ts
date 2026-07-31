@@ -1,4 +1,4 @@
-import type { Message, MessageSendParams, Task } from '@a2a-js/sdk';
+import { Role, type Message, type SendMessageRequest, type Task } from '@a2a-js/sdk';
 import { ClientFactory } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -6,8 +6,8 @@ export const DEFAULT_AGENT_URL = 'http://localhost:8000';
 
 function getMessageResponse(message: Message) {
 	return message.parts
-		.filter((part) => part.kind === 'text')
-		.map((part) => part.text)
+		.filter((part) => part.content?.$case === 'text')
+		.map((part) => part.content?.value ?? '')
 		.join('');
 }
 
@@ -19,8 +19,8 @@ function getTaskResponse(task: Task) {
 	}
 
 	return parts
-		.filter((part) => part.kind === 'text')
-		.map((part) => part.text)
+		.filter((part) => part.content?.$case === 'text')
+		.map((part) => part.content?.value ?? '')
 		.join('');
 }
 
@@ -35,20 +35,33 @@ class ChatbotService {
 		const factory = new ClientFactory();
 		const client = await factory.createFromUrl(agentUrl);
 
-		const sendParams: MessageSendParams = {
+		const sendRequest: SendMessageRequest = {
+			tenant: '',
 			message: {
 				messageId: uuidv4(),
-				role: 'user',
-				parts: [{ kind: 'text', text: userMessage }],
-				kind: 'message',
-				contextId: this.contextId
-			}
+				role: Role.ROLE_USER,
+				parts: [
+					{
+						content: { $case: 'text', value: userMessage },
+						metadata: undefined,
+						filename: '',
+						mediaType: 'text/plain'
+					}
+				],
+				taskId: '',
+				contextId: this.contextId ?? '',
+				extensions: [],
+				metadata: {},
+				referenceTaskIds: []
+			},
+			configuration: undefined,
+			metadata: {}
 		};
 
-		const result = await client.sendMessage(sendParams);
+		const result = await client.sendMessage(sendRequest);
 		this.contextId = result.contextId;
 
-		const response = result.kind === 'task' ? getTaskResponse(result) : getMessageResponse(result);
+		const response = 'id' in result ? getTaskResponse(result) : getMessageResponse(result);
 		return response;
 	}
 }
