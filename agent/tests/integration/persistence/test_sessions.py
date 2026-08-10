@@ -12,31 +12,12 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from pydantic_core import Url
-from src.config.types import (
-    OAuthConfig,
-    OAuthJwtPolicyConfig,
-    OAuthPoliciesConfig,
-    OAuthStaticJwksPolicyConfig,
-    PersistenceConfig,
-)
+from src.config.types import PersistenceConfig
+from tests.common.a2a import get_text_parts, send_message
 from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
-from tests.integration.common.agent import start_agent_server
-from tests.integration.common.persistence import fetch_rows, send_message
-
-
-def _oauth_config(keycloak: KeycloakFixture) -> OAuthConfig:
-    """Inbound oauth2+jwt auth validating tokens minted by the keycloak fixture."""
-    return OAuthConfig(
-        mode="oauth2",
-        issuer_url=Url(keycloak.internal_issuer_url),
-        policies=OAuthPoliciesConfig(
-            jwt=OAuthJwtPolicyConfig(
-                jwks=OAuthStaticJwksPolicyConfig(url=Url(keycloak.external_jwks_url)),
-            ),
-        ),
-    )
+from tests.integration.common.agent import jwt_auth_config, start_agent_server
+from tests.integration.common.persistence import fetch_rows
 
 
 async def _assert_sessions_scoped_by_subject(
@@ -57,7 +38,7 @@ async def _assert_sessions_scoped_by_subject(
     with start_agent_server(
         mock_llm=mock_llm,
         persistence_config=persistence_config,
-        auth_config=_oauth_config(keycloak),
+        auth_config=jwt_auth_config(keycloak),
     ) as agent_server:
         mock_llm.stub_response("Nice to meet you, Ada!")
         _ = await send_message(
@@ -152,9 +133,7 @@ async def test_session_db_backed_conversation_survives_server_restart(
             agent_server.base_url, text="What is my name?", context_id=context_id
         )
 
-    assert task.artifacts is not None
-    assert task.artifacts[0].parts[0].root.kind == "text"
-    assert task.artifacts[0].parts[0].root.text == "Your name is Ada."
+    assert get_text_parts(task.artifacts[0].parts) == ["Your name is Ada."]
 
     # The second LLM call, served by a fresh server process state, must have
     # been prompted with the conversation history loaded from the database.
@@ -220,9 +199,7 @@ async def test_in_memory_conversation_is_remembered_within_server_lifetime(
             agent_server.base_url, text="What is my name?", context_id=context_id
         )
 
-    assert task.artifacts is not None
-    assert task.artifacts[0].parts[0].root.kind == "text"
-    assert task.artifacts[0].parts[0].root.text == "Your name is Ada."
+    assert get_text_parts(task.artifacts[0].parts) == ["Your name is Ada."]
 
     # The second call, sharing the context id with the first, must have been
     # prompted with the conversation history held in the in-memory session.

@@ -3,9 +3,8 @@ import {
   type CallInterceptor,
   ClientFactory,
   ClientFactoryOptions,
-  JsonRpcTransport,
 } from "@a2a-js/sdk/client";
-import type { MessageSendParams } from "@a2a-js/sdk";
+import { Role, type SendMessageRequest } from "@a2a-js/sdk";
 import { v4 as uuidv4 } from "uuid";
 import { env } from "bun";
 
@@ -70,31 +69,45 @@ async function main() {
 
   process.stdout.write("User: ");
   for await (const line of console) {
-    const sendParams: MessageSendParams = {
+    const sendRequest: SendMessageRequest = {
+      tenant: "",
       message: {
         messageId: uuidv4(),
-        role: "user",
-        parts: [{ kind: "text", text: line }],
-        kind: "message",
-        contextId,
+        role: Role.ROLE_USER,
+        parts: [
+          {
+            content: { $case: "text", value: line },
+            metadata: undefined,
+            filename: "",
+            mediaType: "text/plain",
+          },
+        ],
+        taskId: "",
+        contextId: contextId ?? "",
+        extensions: [],
+        metadata: {},
+        referenceTaskIds: [],
       },
+      configuration: undefined,
+      metadata: {},
     };
 
     process.stdout.write("Agent: ");
     let wroteResponse = false;
 
-    for await (const event of client.sendMessageStream(sendParams)) {
-      if (event.kind === "artifact-update" && !event.lastChunk) {
-        const chunk = event.artifact.parts
-          .filter((part) => part.kind === "text")
-          .map((part) => part.text ?? "")
+    for await (const event of client.sendMessageStream(sendRequest)) {
+      const payload = event.payload;
+      if (payload?.$case === "artifactUpdate" && !payload.value.lastChunk) {
+        const chunk = (payload.value.artifact?.parts ?? [])
+          .filter((part) => part.content?.$case === "text")
+          .map((part) => part.content?.value ?? "")
           .join("");
         process.stdout.write(chunk);
         wroteResponse = true;
       }
 
-      if (event.contextId !== undefined) {
-        contextId = event.contextId;
+      if (payload?.value.contextId) {
+        contextId = payload.value.contextId;
       }
     }
 

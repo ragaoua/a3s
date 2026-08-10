@@ -3,6 +3,9 @@
 The a3s agent engine is a configurable runtime that exposes a GenAI agent
 through HTTP via Google's A2A protocol.
 
+It speaks **A2A 1.0** over JSON-RPC, serving the agent card at
+`/.well-known/agent-card.json` and the RPC endpoint at `/`.
+
 ## Running an agent
 
 ```bash
@@ -231,7 +234,7 @@ In-memory SQLite (`sqlite://` or `sqlite:///:memory:`) is also accepted; note
 that it persists nothing across restarts, just like the default in-memory state
 you get by omitting the `persistence` config altogether.
 
-#### Session ownership
+#### Session and task ownership
 
 Sessions are partitioned by user identity. When OAuth2 auth is enabled with the
 JWT policy (`auth.policies.jwt`), the validated token's `sub` claim, if
@@ -244,6 +247,13 @@ policy), the engine derives a pseudo-user from the client-supplied context id.
 **Any client that knows a context id can then resume that conversation**, so
 with persistent sessions, prefer OAuth2 + JWT validation if conversations may
 contain sensitive data.
+
+A2A tasks are partitioned the same way: each `Task` row records an `owner`, and
+a task only resolves for the identity that created it. Under OAuth2 + JWT that
+owner is the token's `sub`, so one subject cannot fetch another's task by id.
+Under `auth: none` and `api_key` there is no authenticated identity, so every
+task shares one empty owner and **any client that knows a task id can fetch
+it** — the same caveat as sessions, and the same recommendation.
 
 ### Authorization
 
