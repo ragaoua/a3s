@@ -11,16 +11,20 @@ from src.config.types import PersistenceConfig, ServerConfig
 async def test_lifespan_closes_request_handler_and_database_service(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    database_session_service = Mock()
-    database_session_service.db_engine = Mock()
-    database_session_service.close = AsyncMock()
+    database_session_services = []
+
+    class FakeDatabaseSessionService:
+        def __init__(self, *, db_url: str) -> None:
+            self.db_engine = Mock()
+            self.close = AsyncMock()
+            database_session_services.append(self)
+
     request_handler = Mock()
     request_handler.aclose = AsyncMock()
 
-    database_session_service_factory = Mock(return_value=database_session_service)
     task_store_factory = Mock(return_value=Mock())
     monkeypatch.setattr(
-        app_module, "DatabaseSessionService", database_session_service_factory
+        app_module, "DatabaseSessionService", FakeDatabaseSessionService
     )
     monkeypatch.setattr(app_module, "DatabaseTaskStore", task_store_factory)
     monkeypatch.setattr(
@@ -37,6 +41,7 @@ async def test_lifespan_closes_request_handler_and_database_service(
             {"connect_string": "sqlite:///agent.db"}
         ),
     )
+    database_session_service = database_session_services[0]
 
     async with app.router.lifespan_context(app):
         task_store_factory.assert_called_once_with(

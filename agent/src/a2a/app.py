@@ -76,12 +76,10 @@ def build_agent_a2a_app(
     adk_logger = logging.getLogger("google_adk")
     adk_logger.setLevel(logging.INFO)
 
-    database_session_service: DatabaseSessionService | None = None
     if persistence_config is not None:
         db_url = _sqlalchemy_db_url(persistence_config)
-        database_session_service = DatabaseSessionService(db_url=db_url)
-        session_service = database_session_service
-        task_store = DatabaseTaskStore(engine=database_session_service.db_engine)
+        session_service = DatabaseSessionService(db_url=db_url)
+        task_store = DatabaseTaskStore(engine=session_service.db_engine)
     else:
         session_service = InMemorySessionService()
         task_store = InMemoryTaskStore()
@@ -193,8 +191,8 @@ def build_agent_a2a_app(
             try:
                 await request_handler.aclose()
             finally:
-                if database_session_service is not None:
-                    await database_session_service.close()
+                if isinstance(session_service, DatabaseSessionService):
+                    await session_service.close()
 
     app = Starlette(lifespan=lifespan)
     if isinstance(auth_config, ApiKeyAuthConfig):
