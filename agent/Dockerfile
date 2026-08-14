@@ -2,9 +2,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 WORKDIR /app
 
+# Resolve and install dependencies first...
 COPY pyproject.toml README.md uv.lock /app/
 RUN uv sync --frozen --no-dev --no-install-project
 
+# ...then install the project itself. That way, changes to the source
+# code don't invalidate the dependency installation part (speeding up
+# rebuilds)
 COPY src /app/src
 RUN uv sync --frozen --no-dev
 
