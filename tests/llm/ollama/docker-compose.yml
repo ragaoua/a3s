@@ -1,4 +1,4 @@
-x-ollama-model: &ollama-model "qwen2.5:7b"
+x-ollama-model: &ollama-model "qwen2.5:1.5b"
 
 services:
   ollama:
@@ -7,7 +7,11 @@ services:
       - ./ollama_data:/root/.ollama
     healthcheck:
       # The ollama image doesn't include curl, wget nor nc, so we'll use perl
-      test: ["CMD-SHELL", "perl -e 'use IO::Socket::INET; IO::Socket::INET->new(\"localhost:11434\") or exit 1;'"]
+      test:
+        [
+          "CMD-SHELL",
+          'perl -e ''use IO::Socket::INET; IO::Socket::INET->new("localhost:11434") or exit 1;''',
+        ]
       interval: 5s
       timeout: 2s
       retries: 10
@@ -22,4 +26,3 @@ services:
         condition: service_healthy
         restart: true
     command: ["pull", *ollama-model]
-
