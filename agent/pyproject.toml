@@ -9,7 +9,7 @@ dependencies = [
     "aiosqlite>=0.21.0", # SQLite driver, loaded by sqlalchemy through the persistence connect string
     "sqlalchemy[asyncio]>=2.0.0", # builds the AsyncEngine backing the A2A DatabaseTaskStore
     "authlib>=1.3.0",
-    "google-adk[a2a]>=2.5.0",
+    "google-adk[a2a]>=2.7.1",
     "litellm>=1.84", # Used to be provided by the google-adk[extensions] extra,
                      # but it installed many other (unused) integrations.
     "a2a-sdk[http-server]>=1.1.2,<2", # http-server (starlette + sse-starlette) backs a2a.server.routes
