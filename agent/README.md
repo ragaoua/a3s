@@ -255,6 +255,13 @@ Under `auth: none` and `api_key` there is no authenticated identity, so every
 task shares one empty owner and **any client that knows a task id can fetch
 it** — the same caveat as sessions, and the same recommendation.
 
+**Known limitation**: the current A2A SDK does not enforce owner isolation when
+subscribing to or canceling a task that is still active. Under OAuth2, a caller
+who learns another subject's active task id may subscribe to its updates or
+cancel it. Completed-task operations remain owner-scoped. See
+[issue #48](https://github.com/ragaoua/a3s/issues/48) for upstream tracking and
+current status.
+
 ### Authorization
 
 The agent supports 3 authorization modes configured through the **required**
