@@ -5,6 +5,14 @@ cd ollama
 podman-compose up -d
 ```
 
+Alternatively, run ollama on the host machine directly:
+
+```bash
+cd ollama
+OLLAMA_MODELS=./ollama_data/models/ ollama serve
+ollama pull qwen2.5:1.5b
+```
+
 Access OpenAI-compatible endpoint at `http://localhost:11434/v1`.
 
 # Run a mock LLM server with mockllm
