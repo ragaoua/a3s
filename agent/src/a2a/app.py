@@ -14,9 +14,7 @@ from a2a.types import (
     AgentInterface,
     AgentSkill,
     APIKeySecurityScheme,
-    AuthorizationCodeOAuthFlow,
-    OAuth2SecurityScheme,
-    OAuthFlows,
+    HTTPAuthSecurityScheme,
     SecurityRequirement,
     SecurityScheme,
     StringList,
@@ -26,7 +24,6 @@ from a2a.utils.constants import (
     PROTOCOL_VERSION_CURRENT,
     TransportProtocol,
 )
-from authlib.oauth2.rfc8414 import get_well_known_url
 from google.adk.a2a.converters.request_converter import (
     AgentRunRequest,
     convert_a2a_request_to_agent_run_request,
@@ -115,27 +112,26 @@ def build_agent_a2a_app(
             )
         ]
     elif isinstance(auth_config, OAuthConfig):
+        bearer_format = None
+        description = None
+        if auth_config.policies.jwt is not None:
+            bearer_format = "JWT"
+            if auth_config.policies.jwt.rfc9068 is None:
+                description = "OAuth 2.0 access token"
+            else:
+                description = "OAuth 2.0 access token conforming to RFC 9068"
         security_schemes = {
-            "OAuth2SecurityScheme": SecurityScheme(
-                oauth2_security_scheme=OAuth2SecurityScheme(
-                    flows=OAuthFlows(
-                        authorization_code=AuthorizationCodeOAuthFlow(
-                            # TODO(#47): Populate a usable flow from provider metadata.
-                            authorization_url="",
-                            refresh_url="",
-                            scopes={},
-                            token_url="",
-                        )
-                    ),
-                    oauth2_metadata_url=get_well_known_url(
-                        str(auth_config.issuer_url), external=True
-                    ),
+            "HTTPAuthSecurityScheme": SecurityScheme(
+                http_auth_security_scheme=HTTPAuthSecurityScheme(
+                    scheme="Bearer",
+                    bearer_format=bearer_format,
+                    description=description,
                 )
             ),
         }
         security_requirements = [
             SecurityRequirement(
-                schemes={"OAuth2SecurityScheme": StringList()},
+                schemes={"HTTPAuthSecurityScheme": StringList()},
             )
         ]
     else:

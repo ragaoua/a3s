@@ -92,6 +92,51 @@ def agent_with_fake_oauth2_inbound_auth(
 
 
 @pytest.fixture
+def agent_with_fake_introspection_oauth2_inbound_auth(
+    mock_llm: LlmFixture,
+) -> Iterator[A2aServerFixture]:
+    with start_agent_server(
+        mock_llm=mock_llm,
+        auth_config=OAuthConfig(
+            mode="oauth2",
+            issuer_url=FAKE_OAUTH2_ISSUER,
+            policies=OAuthPoliciesConfig(
+                introspection=OAuthStaticIntrospectionPolicyConfig(
+                    endpoint=Url("https://issuer.example/introspect"),
+                    client_id="test-client",
+                    client_secret=SecretStr("test-secret"),
+                )
+            ),
+        ),
+    ) as agent_server:
+        yield agent_server
+
+
+@pytest.fixture
+def agent_with_fake_combined_oauth2_inbound_auth(
+    mock_llm: LlmFixture,
+) -> Iterator[A2aServerFixture]:
+    with start_agent_server(
+        mock_llm=mock_llm,
+        auth_config=OAuthConfig(
+            mode="oauth2",
+            issuer_url=FAKE_OAUTH2_ISSUER,
+            policies=OAuthPoliciesConfig(
+                jwt=OAuthJwtPolicyConfig(
+                    jwks=OAuthDiscoveredJwksPolicyConfig(discovered=True)
+                ),
+                introspection=OAuthStaticIntrospectionPolicyConfig(
+                    endpoint=Url("https://issuer.example/introspect"),
+                    client_id="test-client",
+                    client_secret=SecretStr("test-secret"),
+                ),
+            ),
+        ),
+    ) as agent_server:
+        yield agent_server
+
+
+@pytest.fixture
 def agent_with_jwt_inbound_auth(
     mock_llm: LlmFixture,
     keycloak: KeycloakFixture,

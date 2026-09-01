@@ -1,6 +1,5 @@
 import httpx
 import pytest
-from authlib.oauth2.rfc8414 import get_well_known_url
 
 from src.auth.inbound import ApiKeyAuthMiddleware
 from tests.common.a2a import (
@@ -8,7 +7,6 @@ from tests.common.a2a import (
     agent_card_rpc_url,
     wait_for_agent_card,
 )
-from tests.integration.inbound_auth.conftest import FAKE_OAUTH2_ISSUER
 
 
 @pytest.mark.asyncio
@@ -66,7 +64,7 @@ async def test_agent_card_exposes_api_key_security_scheme(
 
 
 @pytest.mark.asyncio
-async def test_agent_card_exposes_oauth2_security_scheme(
+async def test_agent_card_exposes_http_bearer_security_scheme(
     agent_with_fake_oauth2_inbound_auth: A2aServerFixture,
 ) -> None:
     async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
@@ -76,12 +74,55 @@ async def test_agent_card_exposes_oauth2_security_scheme(
 
     assert agent_card_rpc_url(agent_card) == agent_with_fake_oauth2_inbound_auth.base_url
 
-    security_scheme = agent_card.security_schemes["OAuth2SecurityScheme"]
-    assert security_scheme.HasField("oauth2_security_scheme")
-    assert security_scheme.oauth2_security_scheme.oauth2_metadata_url == (
-        get_well_known_url(str(FAKE_OAUTH2_ISSUER), external=True)
-    )
+    security_scheme = agent_card.security_schemes["HTTPAuthSecurityScheme"]
+    assert security_scheme.HasField("http_auth_security_scheme")
+    http_auth_scheme = security_scheme.http_auth_security_scheme
+    assert http_auth_scheme.scheme == "Bearer"
+    assert http_auth_scheme.bearer_format == "JWT"
+    assert http_auth_scheme.description == "OAuth 2.0 access token"
     assert len(agent_card.security_requirements) == 1
     assert list(agent_card.security_requirements[0].schemes) == [
-        "OAuth2SecurityScheme"
+        "HTTPAuthSecurityScheme"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_introspection_only_agent_card_omits_jwt_bearer_format(
+    agent_with_fake_introspection_oauth2_inbound_auth: A2aServerFixture,
+) -> None:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
+        agent_card = await wait_for_agent_card(
+            agent_with_fake_introspection_oauth2_inbound_auth.base_url,
+            httpx_client,
+        )
+
+    security_scheme = agent_card.security_schemes["HTTPAuthSecurityScheme"]
+    assert security_scheme.HasField("http_auth_security_scheme")
+    http_auth_scheme = security_scheme.http_auth_security_scheme
+    assert http_auth_scheme.scheme == "Bearer"
+    assert not http_auth_scheme.bearer_format
+    assert len(agent_card.security_requirements) == 1
+    assert list(agent_card.security_requirements[0].schemes) == [
+        "HTTPAuthSecurityScheme"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_combined_oauth_agent_card_advertises_jwt_bearer_format(
+    agent_with_fake_combined_oauth2_inbound_auth: A2aServerFixture,
+) -> None:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30, connect=5)) as httpx_client:
+        agent_card = await wait_for_agent_card(
+            agent_with_fake_combined_oauth2_inbound_auth.base_url,
+            httpx_client,
+        )
+
+    security_scheme = agent_card.security_schemes["HTTPAuthSecurityScheme"]
+    assert security_scheme.HasField("http_auth_security_scheme")
+    http_auth_scheme = security_scheme.http_auth_security_scheme
+    assert http_auth_scheme.scheme == "Bearer"
+    assert http_auth_scheme.bearer_format == "JWT"
+    assert len(agent_card.security_requirements) == 1
+    assert list(agent_card.security_requirements[0].schemes) == [
+        "HTTPAuthSecurityScheme"
     ]
