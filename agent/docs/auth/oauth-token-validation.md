@@ -33,6 +33,18 @@ Token introspection:
 - If the introspection endpoint reports `active: false`, the request is denied
   with `401 Unauthorized`. Introspection transport or response parsing failures
   return `503 Service Unavailable`.
+- Claims returned for an active token are preserved. A valid introspection
+  `sub` and `scope` take precedence over the corresponding validated JWT claims
+  when both policies are enabled; omitted or malformed optional introspection
+  claims fall back to valid JWT claims.
+- Request ownership prefers introspection `sub`, then JWT `sub`. If neither is
+  available, `client_id` identifies a client-only principal as
+  `oauth-client:<client_id>`. This fallback provides client-level rather than
+  per-user isolation.
+- A token without a usable `sub` or `client_id` is not rejected unless the
+  configured policy requires those claims. It is accepted without an
+  OAuth-derived ownership identity, while any valid string `scope` is still
+  exposed for authorization.
 
 RFC 9068 validation:
 

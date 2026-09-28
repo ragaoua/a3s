@@ -9,14 +9,20 @@ back to the same session, and subject scoping proves `user_id` is part of it.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import uuid4
 
 import pytest
-from src.config.types import PersistenceConfig
+
+from src.config.types import OAuthConfig, PersistenceConfig
 from tests.common.a2a import get_text_parts, send_message
 from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
-from tests.integration.common.agent import jwt_auth_config, start_agent_server
+from tests.integration.common.agent import (
+    introspection_auth_config,
+    jwt_auth_config,
+    start_agent_server,
+)
 from tests.integration.common.persistence import fetch_rows
 
 
@@ -24,6 +30,7 @@ async def _assert_sessions_scoped_by_subject(
     mock_llm: LlmFixture,
     keycloak: KeycloakFixture,
     persistence_config: PersistenceConfig | None,
+    auth_config: OAuthConfig,
 ) -> str:
     """Create two conversations/sessions that use the same context id but with
     two different token subjects, and assert both sessions are isolated.
@@ -38,7 +45,7 @@ async def _assert_sessions_scoped_by_subject(
     with start_agent_server(
         mock_llm=mock_llm,
         persistence_config=persistence_config,
-        auth_config=jwt_auth_config(keycloak),
+        auth_config=auth_config,
     ) as agent_server:
         mock_llm.stub_response("Nice to meet you, Ada!")
         _ = await send_message(
@@ -146,21 +153,27 @@ async def test_session_db_backed_conversation_survives_server_restart(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "auth_config_factory",
+    [jwt_auth_config, introspection_auth_config],
+    ids=["jwt", "introspection"],
+)
 async def test_db_backed_sessions_are_scoped_by_token_subject(
     mock_llm: LlmFixture,
     persistence_db_connect_string: str,
     keycloak: KeycloakFixture,
+    auth_config_factory: Callable[[KeycloakFixture], OAuthConfig],
 ) -> None:
-    """With oauth2+jwt inbound auth, a persistent backend partitions sessions by
-    the token's `sub`: a caller reusing another user's context id gets their own
-    fresh session instead of resuming the other user's conversation. The keying
-    is additionally visible in the sessions table, one row per subject."""
+    """OAuth2 partitions sessions by the subject validated from either policy."""
     persistence_config = PersistenceConfig.model_validate(
         {"connect_string": persistence_db_connect_string}
     )
 
     context_id = await _assert_sessions_scoped_by_subject(
-        mock_llm, keycloak, persistence_config
+        mock_llm,
+        keycloak,
+        persistence_config,
+        auth_config_factory(keycloak),
     )
 
     # The sessions table is keyed by (app_name, user_id, id): the same
@@ -219,5 +232,8 @@ async def test_in_memory_sessions_are_scoped_by_token_subject(
     """The default in-memory service applies the same subject scoping, verified
     purely behaviorally since there is no sessions table to inspect."""
     _ = await _assert_sessions_scoped_by_subject(
-        mock_llm, keycloak, persistence_config=None
+        mock_llm,
+        keycloak,
+        persistence_config=None,
+        auth_config=jwt_auth_config(keycloak),
     )

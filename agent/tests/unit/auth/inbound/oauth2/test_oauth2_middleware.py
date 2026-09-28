@@ -1,10 +1,9 @@
 import time
 
-from authlib.jose import JsonWebKey, jwt
-import httpx
-from pydantic import JsonValue
-from pydantic_core import Url
 import pytest
+from authlib.jose import JsonWebKey, jwt
+from pydantic import JsonValue, SecretStr
+from pydantic_core import Url
 from starlette.authentication import AuthCredentials, SimpleUser
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -15,13 +14,16 @@ from src.auth.inbound.oauth2 import OAuth2BearerAuthMiddleware
 from src.config.types import (
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
+    OAuthStaticIntrospectionPolicyConfig,
     OAuthStaticJwksPolicyConfig,
 )
 from src.config.types.auth import OAuthRfc9068PolicyConfig
 from src.utils import FetchJson
+from tests.unit.auth.inbound.oauth2.fetch_json import route_fetch_json
 
 ISSUER_URL = "https://issuer.example"
 JWKS_URL = f"{ISSUER_URL}/jwks"
+INTROSPECTION_URL = f"{ISSUER_URL}/introspect"
 
 SIGNING_KEY_DICT: dict[str, str] = {
     "kty": "oct",
@@ -55,16 +57,23 @@ def _encode(
     return token.decode("ascii")
 
 
-def _build_jwks_fetch_json() -> FetchJson:
-    async def _fetch_json(
-        url: str | httpx.Request,  # pyright: ignore[reportUnusedParameter]
-        *,
-        error_cls: type[Exception] = ValueError,  # pyright: ignore[reportUnusedParameter]
-        error_message: str | None = None,  # pyright: ignore[reportUnusedParameter]
-    ) -> dict[str, JsonValue]:
-        return JWKS_PAYLOAD
+def _build_oauth_fetch_json(
+    introspection_response: dict[str, JsonValue],
+) -> FetchJson:
+    return route_fetch_json(
+        {
+            JWKS_URL: JWKS_PAYLOAD,
+            INTROSPECTION_URL: introspection_response,
+        }
+    )
 
-    return _fetch_json
+
+def _introspection_config() -> OAuthStaticIntrospectionPolicyConfig:
+    return OAuthStaticIntrospectionPolicyConfig(
+        endpoint=Url(INTROSPECTION_URL),
+        client_id="resource-server",
+        client_secret=SecretStr("secret"),
+    )
 
 
 def _build_middleware(
@@ -184,7 +193,7 @@ async def test_dispatch_returns_invalid_request_for_malformed_bearer_header(
 async def test_dispatch_propagates_validate_token_failure() -> None:
     middleware = _build_middleware(
         issuer_url=ISSUER_URL,
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     # Token is signed with a key that is NOT in the JWKS, so JWT validation fails.
     token = _encode(
@@ -209,7 +218,7 @@ async def test_dispatch_propagates_validate_token_failure() -> None:
 async def test_dispatch_calls_next_when_validate_token_succeeds() -> None:
     middleware = _build_middleware(
         issuer_url=ISSUER_URL,
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     token = _encode({"iss": ISSUER_URL, "exp": int(time.time()) + 3600})
     request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
@@ -228,7 +237,7 @@ async def test_dispatch_calls_next_when_validate_token_succeeds() -> None:
 async def test_dispatch_sets_request_user_from_jwt_sub_claim() -> None:
     middleware = _build_middleware(
         issuer_url=ISSUER_URL,
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     # A token validated by the plain JWT policy (no rfc9068) also carries a
     # trusted, signature-verified subject when `sub` is present.
@@ -248,7 +257,7 @@ async def test_dispatch_sets_request_user_from_jwt_sub_claim() -> None:
     assert user.display_name == "user-123"
     auth = request.scope.get("auth")
     assert isinstance(auth, AuthCredentials)
-    assert auth.scopes == ["authenticated"]
+    assert auth.scopes == ["token-valid"]
 
 
 @pytest.mark.asyncio
@@ -257,7 +266,7 @@ async def test_dispatch_does_not_set_request_user_when_sub_is_missing_from_jwt()
 ):
     middleware = _build_middleware(
         issuer_url=ISSUER_URL,
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     token = _encode({"iss": ISSUER_URL, "exp": int(time.time()) + 3600})
     request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
@@ -268,14 +277,16 @@ async def test_dispatch_does_not_set_request_user_when_sub_is_missing_from_jwt()
     _ = await middleware.dispatch(request, call_next)
 
     assert "user" not in request.scope
-    assert "auth" not in request.scope
+    auth = request.scope.get("auth")
+    assert isinstance(auth, AuthCredentials)
+    assert auth.scopes == ["token-valid"]
 
 
 @pytest.mark.asyncio
 async def test_dispatch_translates_scope_claim_into_auth_credentials() -> None:
     middleware = _build_middleware(
         issuer_url=ISSUER_URL,
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     token = _encode(
         {
@@ -301,16 +312,16 @@ async def test_dispatch_translates_scope_claim_into_auth_credentials() -> None:
     assert user.display_name == "user-123"
     auth = request.scope.get("auth")
     assert isinstance(auth, AuthCredentials)
-    assert auth.scopes == ["authenticated", "tasks:read", "tasks:write"]
+    assert auth.scopes == ["token-valid", "tasks:read", "tasks:write"]
 
 
 @pytest.mark.asyncio
-async def test_dispatch_does_not_set_request_auth_when_scope_claim_is_present_but_not_sub_claim() -> (
+async def test_dispatch_sets_request_auth_when_scope_claim_is_present_but_not_identity_claim() -> (
     None
 ):
     middleware = _build_middleware(
         issuer_url=ISSUER_URL,
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     token = _encode(
         {
@@ -330,7 +341,162 @@ async def test_dispatch_does_not_set_request_auth_when_scope_claim_is_present_bu
     _ = await middleware.dispatch(request, call_next)
 
     assert "user" not in request.scope
-    assert "auth" not in request.scope
+    auth = request.scope.get("auth")
+    assert isinstance(auth, AuthCredentials)
+    assert auth.scopes == ["token-valid", "tasks:read", "tasks:write"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_sets_request_user_and_scopes_from_introspection() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        config=OAuthPoliciesConfig(introspection=_introspection_config()),
+        fetch_json=_build_oauth_fetch_json(
+            {
+                "active": True,
+                "sub": "introspected-user",
+                "scope": "tasks:read tasks:write",
+            }
+        ),
+    )
+    request = _build_request(path="/rpc", authorization_header="Bearer opaque-token")
+
+    async def call_next(_: Request) -> Response:
+        return JSONResponse({"ok": True}, status_code=200)
+
+    _ = await middleware.dispatch(request, call_next)
+
+    user = request.scope.get("user")
+    assert isinstance(user, SimpleUser)
+    assert user.display_name == "introspected-user"
+    auth = request.scope.get("auth")
+    assert isinstance(auth, AuthCredentials)
+    assert auth.scopes == ["token-valid", "tasks:read", "tasks:write"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_prefers_introspection_identity_and_scopes_over_jwt() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        config=OAuthPoliciesConfig(
+            jwt=OAuthJwtPolicyConfig(
+                jwks=OAuthStaticJwksPolicyConfig(url=Url(JWKS_URL)),
+            ),
+            introspection=_introspection_config(),
+        ),
+        fetch_json=_build_oauth_fetch_json(
+            {
+                "active": True,
+                "sub": "current-user",
+                "scope": "current:scope",
+            }
+        ),
+    )
+    token = _encode(
+        {
+            "iss": ISSUER_URL,
+            "sub": "jwt-user",
+            "scope": "jwt:scope",
+        }
+    )
+    request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
+
+    async def call_next(_: Request) -> Response:
+        return JSONResponse({"ok": True}, status_code=200)
+
+    _ = await middleware.dispatch(request, call_next)
+
+    user = request.scope.get("user")
+    assert isinstance(user, SimpleUser)
+    assert user.display_name == "current-user"
+    auth = request.scope.get("auth")
+    assert isinstance(auth, AuthCredentials)
+    assert auth.scopes == ["token-valid", "current:scope"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_ignores_malformed_optional_introspection_claims() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        config=OAuthPoliciesConfig(
+            jwt=OAuthJwtPolicyConfig(
+                jwks=OAuthStaticJwksPolicyConfig(url=Url(JWKS_URL)),
+            ),
+            introspection=_introspection_config(),
+        ),
+        fetch_json=_build_oauth_fetch_json(
+            {
+                "active": True,
+                "sub": 123,
+                "client_id": "introspection-client",
+                "scope": ["invalid"],
+            }
+        ),
+    )
+    token = _encode(
+        {
+            "iss": ISSUER_URL,
+            "sub": "jwt-user",
+            "scope": "jwt:scope",
+        }
+    )
+    request = _build_request(path="/rpc", authorization_header=f"Bearer {token}")
+
+    async def call_next(_: Request) -> Response:
+        return JSONResponse({"ok": True}, status_code=200)
+
+    _ = await middleware.dispatch(request, call_next)
+
+    user = request.scope.get("user")
+    assert isinstance(user, SimpleUser)
+    assert user.display_name == "jwt-user"
+    auth = request.scope.get("auth")
+    assert isinstance(auth, AuthCredentials)
+    assert auth.scopes == ["token-valid", "jwt:scope"]
+
+
+@pytest.mark.asyncio
+async def test_dispatch_uses_namespaced_client_id_when_sub_is_absent() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        config=OAuthPoliciesConfig(introspection=_introspection_config()),
+        fetch_json=_build_oauth_fetch_json(
+            {"active": True, "client_id": "billing-worker"}
+        ),
+    )
+    request = _build_request(path="/rpc", authorization_header="Bearer opaque-token")
+
+    async def call_next(_: Request) -> Response:
+        return JSONResponse({"ok": True}, status_code=200)
+
+    _ = await middleware.dispatch(request, call_next)
+
+    user = request.scope.get("user")
+    assert isinstance(user, SimpleUser)
+    assert user.display_name == "oauth-client:billing-worker"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_accepts_introspected_token_without_identity_claims() -> None:
+    middleware = _build_middleware(
+        issuer_url=ISSUER_URL,
+        config=OAuthPoliciesConfig(introspection=_introspection_config()),
+        fetch_json=_build_oauth_fetch_json({"active": True}),
+    )
+    request = _build_request(path="/rpc", authorization_header="Bearer opaque-token")
+
+    expected = JSONResponse({"ok": True}, status_code=200)
+
+    async def call_next(_: Request) -> Response:
+        return expected
+
+    response = await middleware.dispatch(request, call_next)
+
+    assert response is expected
+    assert "user" not in request.scope
+    auth = request.scope.get("auth")
+    assert isinstance(auth, AuthCredentials)
+    assert auth.scopes == ["token-valid"]
 
 
 @pytest.mark.asyncio
@@ -344,7 +510,7 @@ async def test_dispatch_does_not_set_request_user_when_token_is_rejected() -> No
                 claims={},
             )
         ),
-        fetch_json=_build_jwks_fetch_json(),
+        fetch_json=route_fetch_json({JWKS_URL: JWKS_PAYLOAD}),
     )
     token = _encode(
         {"iss": ISSUER_URL, "exp": int(time.time()) + 3600},

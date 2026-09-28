@@ -8,15 +8,21 @@ which is exactly why these tests exercise only the database-backed store.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import uuid4
 
 import pytest
 from a2a.utils.errors import TaskNotFoundError
-from src.config.types import PersistenceConfig
+
+from src.config.types import OAuthConfig, PersistenceConfig
 from tests.common.a2a import get_task, send_message
 from tests.common.keycloak import KeycloakFixture
 from tests.common.llm import LlmFixture
-from tests.integration.common.agent import jwt_auth_config, start_agent_server
+from tests.integration.common.agent import (
+    introspection_auth_config,
+    jwt_auth_config,
+    start_agent_server,
+)
 from tests.integration.common.persistence import fetch_rows
 
 
@@ -84,16 +90,22 @@ async def test_task_db_backed_survives_server_restart(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "auth_config_factory",
+    [jwt_auth_config, introspection_auth_config],
+    ids=["jwt", "introspection"],
+)
 async def test_tasks_are_scoped_by_token_subject(
     mock_llm: LlmFixture,
     persistence_db_connect_string: str,
     keycloak: KeycloakFixture,
+    auth_config_factory: Callable[[KeycloakFixture], OAuthConfig],
 ) -> None:
     """A2A 1.0 partitions the task store by owner, resolved from the
     authenticated user, the same way sessions are partitioned by subject.
 
-    Under oauth2+jwt inbound auth the owner is the token's `sub`, so one
-    subject's task id is not resolvable by another.
+    Under OAuth2 the owner is the token's validated `sub`, so one subject's
+    task id is not resolvable by another.
     """
     persistence_config = PersistenceConfig.model_validate(
         {"connect_string": persistence_db_connect_string}
@@ -101,7 +113,7 @@ async def test_tasks_are_scoped_by_token_subject(
 
     mock_llm.stub_response("Hello from the mock LLM!")
     with start_agent_server(
-        auth_config=jwt_auth_config(keycloak),
+        auth_config=auth_config_factory(keycloak),
         mock_llm=mock_llm,
         persistence_config=persistence_config,
     ) as agent_server:

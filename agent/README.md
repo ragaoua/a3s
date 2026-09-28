@@ -236,24 +236,27 @@ you get by omitting the `persistence` config altogether.
 
 #### Session and task ownership
 
-Sessions are partitioned by user identity. When OAuth2 auth is enabled with the
-JWT policy (`auth.policies.jwt`), the validated token's `sub` claim, if
-present, is used as the user identity: each subject gets its own sessions, and
-a client presenting another user's context id gets a fresh session instead of
-resuming that user's conversation.
+Sessions are partitioned by user identity. With OAuth2, the agent prefers a
+valid `sub` returned by token introspection, then a validated JWT `sub`. If
+neither source provides `sub`, a valid `client_id` identifies the OAuth client
+as `oauth-client:<client_id>`; this provides workload-level, not per-user,
+ownership. Each resolved identity gets its own sessions, and a caller
+presenting another identity's context id gets a fresh session instead of
+resuming that conversation.
 
-In every other configuration (`auth: none`, `api_key`, OAuth2 without a JWT
-policy), the engine derives a pseudo-user from the client-supplied context id.
-**Any client that knows a context id can then resume that conversation**, so
-with persistent sessions, prefer OAuth2 + JWT validation if conversations may
-contain sensitive data.
+If a valid OAuth2 token has neither a usable `sub` nor `client_id`, it is still
+accepted unless the configured token policy requires those claims, but no
+OAuth-derived ownership identity is set. In that case, as well as with `auth:
+none` or `api_key`, the engine derives a pseudo-user from the client-supplied
+context id. **Any client that knows a context id can then resume that
+conversation**, so persistent deployments should use OAuth tokens with a stable
+identity claim when conversations may contain sensitive data.
 
 A2A tasks are partitioned the same way: each `Task` row records an `owner`, and
-a task only resolves for the identity that created it. Under OAuth2 + JWT that
-owner is the token's `sub`, so one subject cannot fetch another's task by id.
-Under `auth: none` and `api_key` there is no authenticated identity, so every
-task shares one empty owner and **any client that knows a task id can fetch
-it** — the same caveat as sessions, and the same recommendation.
+a task only resolves for the OAuth-derived identity that created it. Without a
+resolved identity, every task shares one empty owner and **any client that
+knows a task id can fetch it**; the same caveat as sessions, and the same
+recommendation.
 
 **Known limitation**: the current A2A SDK does not enforce owner isolation when
 subscribing to or canceling a task that is still active. Under OAuth2, a caller

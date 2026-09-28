@@ -1,22 +1,22 @@
-from typing import final
-from returns.result import Failure, Result, Success
+from collections.abc import Mapping
+from typing import NamedTuple, final, override
 
 from authlib.jose import JsonWebKey, JWTClaims, KeySet, jwt
 from authlib.jose.errors import JoseError
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata
 from authlib.oauth2.rfc9068.claims import JWTAccessTokenClaims
 from pydantic import JsonValue
+from returns.result import Failure, Result, Success
 from starlette.authentication import AuthCredentials, SimpleUser
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
-from typing_extensions import override
 
-from src.auth.inbound.constants import EXCLUDED_PATHS
 from src.auth.context import (
     bind_current_authorization_header,
 )
+from src.auth.inbound.constants import EXCLUDED_PATHS
 from src.auth.oauth_client_auth import build_client_authenticated_request
 from src.auth.oauth_metadata import fetch_authorization_server_metadata
 from src.config.types import (
@@ -33,6 +33,11 @@ from src.observability.logging import get_logger
 from src.utils import FetchJson, fetch_json
 
 logger = get_logger(__name__)
+
+
+class _RequestAuthentication(NamedTuple):
+    identity: str | None
+    scopes: list[str]
 
 
 @final
@@ -159,7 +164,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         introspection_config: OAuthStaticIntrospectionPolicyConfig
         | OAuthDiscoveredIntrospectionPolicyConfig,
         metadata: AuthorizationServerMetadata | None = None,
-    ) -> Result[None, JSONResponse]:
+    ) -> Result[dict[str, JsonValue], JSONResponse]:
         """
         introspection_config is taken as a parameter rather than read from
         self.config.introspection so the caller's null-narrowing flows
@@ -219,7 +224,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                 )
             )
 
-        return Success(None)
+        return Success(introspection_response)
 
     @staticmethod
     def _get_rfc9068_claims_options(
@@ -318,14 +323,10 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
 
     async def _validate_token(
         self, token: str
-    ) -> Result[JWTClaims | None, JSONResponse]:
-        """Validates the token against the configured policies.
-
-        On success, carries the validated JWT claims when the `jwt` policy is
-        configured, and `None` otherwise (introspection-only setups validate
-        opaque tokens, which carry no claims we can read).
-        """
-        claims: JWTClaims | None = None
+    ) -> Result[_RequestAuthentication, JSONResponse]:
+        """Validates the token against the configured policies."""
+        jwt_claims: JWTClaims | None = None
+        introspection_claims: dict[str, JsonValue] | None = None
         auth_server_metadata: AuthorizationServerMetadata | None = None
         if self._requires_authorization_server_metadata():
             res = await fetch_authorization_server_metadata(
@@ -372,7 +373,7 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
                     )
                 )
 
-            claims = res.unwrap()
+            jwt_claims = res.unwrap()
 
         if self.config.introspection is not None:
             res = await self._introspect_access_token(
@@ -384,7 +385,20 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
             if isinstance(res, Failure):
                 return res
 
-        return Success(claims)
+            introspection_claims = res.unwrap()
+
+        return Success(
+            _RequestAuthentication(
+                identity=self._resolve_request_identity(
+                    jwt_claims=jwt_claims,
+                    introspection_claims=introspection_claims,
+                ),
+                scopes=self._resolve_request_scopes(
+                    jwt_claims=jwt_claims,
+                    introspection_claims=introspection_claims,
+                ),
+            )
+        )
 
     @override
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
@@ -408,19 +422,89 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         if isinstance(res, Failure):
             return res.failure()
 
-        token_claims = res.unwrap()
-        if token_claims is not None:
-            self._authenticate_request_user(request, token_claims)
+        self._authenticate_request(request, res.unwrap())
 
         with bind_current_authorization_header(f"Bearer {token}"):
             return await call_next(request)
 
-    def _authenticate_request_user(
+    @staticmethod
+    def _non_empty_string_claim(
+        claims: Mapping[str, JsonValue] | None,
+        name: str,
+    ) -> str | None:
+        if claims is None:
+            return None
+
+        value = claims.get(name)
+        return value if isinstance(value, str) and value else None
+
+    def _resolve_request_identity(
+        self,
+        *,
+        jwt_claims: Mapping[str, JsonValue] | None,
+        introspection_claims: Mapping[str, JsonValue] | None,
+    ) -> str | None:
+        """Picks the request owner from validated claims.
+
+        Introspection claims take precedence when present because they are the
+        authorization server's current view. A non-empty string `sub` wins;
+        otherwise a non-empty string `client_id` identifies the client as
+        `oauth-client:<client_id>`. Omitted or malformed optional claims fall
+        back to the other source. Differing `sub` values are logged; the
+        introspection subject is kept.
+        """
+        introspection_subject = self._non_empty_string_claim(
+            introspection_claims, "sub"
+        )
+        jwt_subject = self._non_empty_string_claim(jwt_claims, "sub")
+
+        if introspection_subject is not None:
+            if jwt_subject is not None and introspection_subject != jwt_subject:
+                logger.warning(
+                    "OAuth2 introspection and JWT validation returned different subjects; using introspection subject"
+                )
+            return introspection_subject
+
+        if jwt_subject is not None:
+            return jwt_subject
+
+        client_id = self._non_empty_string_claim(
+            introspection_claims, "client_id"
+        ) or self._non_empty_string_claim(jwt_claims, "client_id")
+        if client_id is not None:
+            return f"oauth-client:{client_id}"
+
+        return None
+
+    @staticmethod
+    def _resolve_request_scopes(
+        *,
+        jwt_claims: Mapping[str, JsonValue] | None,
+        introspection_claims: Mapping[str, JsonValue] | None,
+    ) -> list[str]:
+        """Picks OAuth2 scopes from validated claims.
+
+        Introspection claims take precedence when present because they are the
+        authorization server's current view. A string `scope` is split on
+        whitespace (RFC 8693 section 4.2). Omitted or non-string `scope` falls
+        back to the other source, then to no scopes.
+        """
+        for claims in (introspection_claims, jwt_claims):
+            if claims is None:
+                continue
+
+            scope = claims.get("scope")
+            if isinstance(scope, str):
+                return scope.split()
+
+        return []
+
+    def _authenticate_request(
         self,
         request: Request,
-        claims: JWTClaims,
+        authentication: _RequestAuthentication,
     ) -> None:
-        """Exposes the token's `sub` claim (if it exists) as the request's authenticated user.
+        """Exposes validated OAuth identity and scopes on the request.
 
         Downstream, the a2a-sdk call-context builder reads `request.user` and
         the ADK request converter uses it as the `user_id` that sessions (and
@@ -428,19 +512,15 @@ class OAuth2BearerAuthMiddleware(BaseHTTPMiddleware):
         pseudo-user from the client-supplied context id, so any caller
         presenting a known context id can resume that conversation.
 
-        The token's `scope` claim (a space-delimited string, per RFC 8693
-        section 4.2) is translated into the request's auth credentials, so
-        downstream handlers can authorize on OAuth2 scopes (e.g. Starlette's
-        `@requires`).
+        A validated token always sets auth credentials. The leading scope is
+        `token-valid`: the token passed the configured policies, not that a
+        user was identified. Resolved scopes follow it. Missing identity does
+        not invalidate the token; no request user is set and downstream
+        ownership retains its existing fallback.
         """
-        subject = claims.get("sub")
-        if not isinstance(subject, str) or not subject:
-            return
+        if authentication.identity is not None:
+            request.scope["user"] = SimpleUser(authentication.identity)
 
-        credentials = ["authenticated"]
-        scope = claims.get("scope")
-        if isinstance(scope, str):
-            credentials.extend(scope.split())
-
-        request.scope["user"] = SimpleUser(subject)
-        request.scope["auth"] = AuthCredentials(credentials)
+        request.scope["auth"] = AuthCredentials(
+            ["token-valid", *authentication.scopes]
+        )

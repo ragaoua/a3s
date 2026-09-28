@@ -3,9 +3,9 @@ import json
 from typing import Literal
 
 import httpx
+import pytest
 from authlib.oauth2.rfc8414 import AuthorizationServerMetadata
 from pydantic import JsonValue, SecretStr
-import pytest
 from pydantic_core import Url
 from returns.result import Failure, Success
 from starlette.types import Receive, Scope, Send
@@ -77,8 +77,13 @@ def _build_fetch_json(
 @pytest.mark.asyncio
 async def test_returns_success_when_token_is_active_using_static_endpoint() -> None:
     captured: list[str | httpx.Request] = []
+    payload: dict[str, JsonValue] = {
+        "active": True,
+        "sub": "user-123",
+        "scope": "tasks:read",
+    }
     middleware = _build_middleware(
-        fetch_json=_build_fetch_json(payload={"active": True}, captured_urls=captured),
+        fetch_json=_build_fetch_json(payload=payload, captured_urls=captured),
     )
 
     res = await middleware._introspect_access_token(  # pyright: ignore[reportPrivateUsage]
@@ -86,6 +91,7 @@ async def test_returns_success_when_token_is_active_using_static_endpoint() -> N
     )
 
     assert isinstance(res, Success)
+    assert res.unwrap() == payload
     captured_urls = [
         str(c.url) if isinstance(c, httpx.Request) else c for c in captured
     ]
@@ -95,8 +101,12 @@ async def test_returns_success_when_token_is_active_using_static_endpoint() -> N
 @pytest.mark.asyncio
 async def test_returns_success_when_token_is_active_using_discovered_endpoint() -> None:
     captured: list[str | httpx.Request] = []
+    payload: dict[str, JsonValue] = {
+        "active": True,
+        "client_id": "service-client",
+    }
     middleware = _build_middleware(
-        fetch_json=_build_fetch_json(payload={"active": True}, captured_urls=captured),
+        fetch_json=_build_fetch_json(payload=payload, captured_urls=captured),
     )
     metadata = AuthorizationServerMetadata(
         {
@@ -112,6 +122,7 @@ async def test_returns_success_when_token_is_active_using_discovered_endpoint() 
     )
 
     assert isinstance(res, Success)
+    assert res.unwrap() == payload
     captured_urls = [
         str(c.url) if isinstance(c, httpx.Request) else c for c in captured
     ]

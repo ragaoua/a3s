@@ -1,9 +1,10 @@
+import socket
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from ipaddress import IPv4Address
-import socket
-import threading
 
+from pydantic import SecretStr
 from pydantic_core import Url
 
 from src.a2a import build_a2a_server
@@ -12,6 +13,7 @@ from src.config.types import (
     OAuthConfig,
     OAuthJwtPolicyConfig,
     OAuthPoliciesConfig,
+    OAuthStaticIntrospectionPolicyConfig,
     OAuthStaticJwksPolicyConfig,
     PersistenceConfig,
     ServerConfig,
@@ -30,6 +32,21 @@ def jwt_auth_config(keycloak: KeycloakFixture) -> OAuthConfig:
         policies=OAuthPoliciesConfig(
             jwt=OAuthJwtPolicyConfig(
                 jwks=OAuthStaticJwksPolicyConfig(url=Url(keycloak.external_jwks_url)),
+            ),
+        ),
+    )
+
+
+def introspection_auth_config(keycloak: KeycloakFixture) -> OAuthConfig:
+    """Inbound OAuth2 auth introspecting tokens minted by the Keycloak fixture."""
+    return OAuthConfig(
+        mode="oauth2",
+        issuer_url=Url(keycloak.internal_issuer_url),
+        policies=OAuthPoliciesConfig(
+            introspection=OAuthStaticIntrospectionPolicyConfig(
+                endpoint=Url(keycloak.external_introspection_url),
+                client_id=keycloak.confidential_client_id,
+                client_secret=SecretStr(keycloak.confidential_client_secret),
             ),
         ),
     )

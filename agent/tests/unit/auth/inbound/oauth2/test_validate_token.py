@@ -1,11 +1,10 @@
 import json
 import time
-from typing import Callable
+from collections.abc import Callable
 
-import httpx
+import pytest
 from authlib.jose import JsonWebKey, jwt
 from pydantic import JsonValue, SecretStr
-import pytest
 from pydantic_core import Url
 from returns.result import Failure, Success
 from starlette.types import Receive, Scope, Send
@@ -22,6 +21,7 @@ from src.config.types.auth import (
     OAuthDiscoveredJwksPolicyConfig,
 )
 from src.utils import FetchJson
+from tests.unit.auth.inbound.oauth2.fetch_json import route_fetch_json
 
 ISSUER_URL = "https://issuer.example"
 WELL_KNOWN_URL = f"{ISSUER_URL}/.well-known/oauth-authorization-server"
@@ -85,37 +85,6 @@ def _build_middleware(
     )
 
 
-def _route_fetch_json(
-    routes: dict[str, dict[str, JsonValue] | Exception],
-    *,
-    captured_urls: list[str] | None = None,
-) -> FetchJson:
-    """Build a FetchJson stub that routes each call by URL.
-
-    Each route value is either a JSON payload to return or an Exception to raise.
-    Httpx.Request inputs (used for introspection) are matched on their URL.
-    Unmatched URLs raise AssertionError to surface unexpected calls.
-    """
-
-    async def _fetch_json(
-        url: str | httpx.Request,
-        *,
-        error_cls: type[Exception] = ValueError,  # pyright: ignore[reportUnusedParameter]
-        error_message: str | None = None,  # pyright: ignore[reportUnusedParameter]
-    ) -> dict[str, JsonValue]:
-        url_str = str(url.url) if isinstance(url, httpx.Request) else url
-        if captured_urls is not None:
-            captured_urls.append(url_str)
-        if url_str not in routes:
-            raise AssertionError(f"Unexpected fetch_json call for url: {url_str}")
-        result = routes[url_str]
-        if isinstance(result, Exception):
-            raise result
-        return result
-
-    return _fetch_json
-
-
 @pytest.mark.asyncio
 async def test_returns_token_claims_when_only_jwt_policy_and_validation_succeeds() -> (
     None
@@ -125,15 +94,15 @@ async def test_returns_token_claims_when_only_jwt_policy_and_validation_succeeds
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json({STATIC_JWKS_URL: JWKS_PAYLOAD}),
+        fetch_json=route_fetch_json({STATIC_JWKS_URL: JWKS_PAYLOAD}),
     )
 
     res = await middleware._validate_token(_valid_token())  # pyright: ignore[reportPrivateUsage]
 
     assert isinstance(res, Success)
-    claims = res.unwrap()
-    assert claims is not None
-    assert claims["iss"] == ISSUER_URL
+    authentication = res.unwrap()
+    assert authentication.identity is None
+    assert authentication.scopes == []
 
 
 @pytest.mark.asyncio
@@ -141,16 +110,23 @@ async def test_returns_success_when_only_introspection_policy_and_token_is_activ
     None
 ):
     config = OAuthPoliciesConfig(introspection=STATIC_INTROSPECTION_CONFIG)
+    introspection_response: dict[str, JsonValue] = {
+        "active": True,
+        "sub": "user-123",
+    }
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json({STATIC_INTROSPECTION_URL: {"active": True}}),
+        fetch_json=route_fetch_json(
+            {STATIC_INTROSPECTION_URL: introspection_response}
+        ),
     )
 
     res = await middleware._validate_token("opaque-token")  # pyright: ignore[reportPrivateUsage]
 
     assert isinstance(res, Success)
-    # Opaque tokens carry no claims we can read
-    assert res.unwrap() is None
+    authentication = res.unwrap()
+    assert authentication.identity == "user-123"
+    assert authentication.scopes == []
 
 
 @pytest.mark.asyncio
@@ -163,10 +139,13 @@ async def test_returns_token_claims_when_both_jwt_and_introspection_policies_suc
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json(
+        fetch_json=route_fetch_json(
             {
                 STATIC_JWKS_URL: JWKS_PAYLOAD,
-                STATIC_INTROSPECTION_URL: {"active": True},
+                STATIC_INTROSPECTION_URL: {
+                    "active": True,
+                    "sub": "introspected-user",
+                },
             }
         ),
     )
@@ -174,9 +153,9 @@ async def test_returns_token_claims_when_both_jwt_and_introspection_policies_suc
     res = await middleware._validate_token(_valid_token())  # pyright: ignore[reportPrivateUsage]
 
     assert isinstance(res, Success)
-    claims = res.unwrap()
-    assert claims is not None
-    assert claims["iss"] == ISSUER_URL
+    authentication = res.unwrap()
+    assert authentication.identity == "introspected-user"
+    assert authentication.scopes == []
 
 
 @pytest.mark.asyncio
@@ -188,7 +167,7 @@ async def test_does_not_fetch_authorization_server_metadata_when_not_required() 
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json(
+        fetch_json=route_fetch_json(
             {
                 STATIC_JWKS_URL: JWKS_PAYLOAD,
                 STATIC_INTROSPECTION_URL: {"active": True},
@@ -213,7 +192,7 @@ async def test_fetches_metadata_only_once_when_jwks_and_introspection_are_discov
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json(
+        fetch_json=route_fetch_json(
             {
                 WELL_KNOWN_URL: METADATA_PAYLOAD,
                 DISCOVERED_JWKS_URL: JWKS_PAYLOAD,
@@ -236,7 +215,7 @@ async def test_returns_503_when_required_metadata_fetch_fails() -> None:
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json({WELL_KNOWN_URL: ValueError("network down")}),
+        fetch_json=route_fetch_json({WELL_KNOWN_URL: ValueError("network down")}),
     )
 
     res = await middleware._validate_token(_valid_token())  # pyright: ignore[reportPrivateUsage]
@@ -256,7 +235,7 @@ async def test_returns_503_when_jwks_fetch_fails() -> None:
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json({STATIC_JWKS_URL: ValueError("jwks down")}),
+        fetch_json=route_fetch_json({STATIC_JWKS_URL: ValueError("jwks down")}),
     )
 
     res = await middleware._validate_token(_valid_token())  # pyright: ignore[reportPrivateUsage]
@@ -286,7 +265,7 @@ async def test_returns_401_with_invalid_token_when_jwt_validation_fails(
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json({STATIC_JWKS_URL: JWKS_PAYLOAD}),
+        fetch_json=route_fetch_json({STATIC_JWKS_URL: JWKS_PAYLOAD}),
     )
 
     res = await middleware._validate_token(token_factory())  # pyright: ignore[reportPrivateUsage]
@@ -309,7 +288,7 @@ async def test_does_not_call_introspection_when_jwt_validation_fails() -> None:
     )
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json(
+        fetch_json=route_fetch_json(
             {
                 STATIC_JWKS_URL: JWKS_PAYLOAD,
                 STATIC_INTROSPECTION_URL: {"active": True},
@@ -329,7 +308,7 @@ async def test_passes_through_introspection_failure_response_unchanged() -> None
     config = OAuthPoliciesConfig(introspection=STATIC_INTROSPECTION_CONFIG)
     middleware = _build_middleware(
         config=config,
-        fetch_json=_route_fetch_json({STATIC_INTROSPECTION_URL: {"active": False}}),
+        fetch_json=route_fetch_json({STATIC_INTROSPECTION_URL: {"active": False}}),
     )
 
     res = await middleware._validate_token("opaque-token")  # pyright: ignore[reportPrivateUsage]
